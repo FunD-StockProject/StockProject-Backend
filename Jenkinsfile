@@ -43,7 +43,7 @@ pipeline {
                         sudo docker pull ${DOCKER_IMAGE_NAME}:latest
                         sudo docker stop ${CONTAINER_NAME} || true
                         sudo docker rm ${CONTAINER_NAME} || true
-                        sudo docker run -d --name ${CONTAINER_NAME} -p 8080:8080 ${DOCKER_IMAGE_NAME}:latest
+                        sudo docker run -d --name ${CONTAINER_NAME} -p 8081:8081 ${DOCKER_IMAGE_NAME}:latest
 
                         IMAGES=\$(sudo docker images -f 'dangling=true' -q)
                         if [ -n "\$IMAGES" ]; then
