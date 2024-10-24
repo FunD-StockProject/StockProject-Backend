@@ -5,7 +5,7 @@ pipeline {
         DOCKER_IMAGE_NAME = 'jennahan/spring-mvc-app' // Docker Hub에 저장할 이미지 이름
         DOCKER_CREDENTIALS_ID = 'funddockercicd' // Docker Hub 자격 증명 ID
         EC2_IP = '15.165.237.52' // EC2 인스턴스 IP 주소
-        EC2_USER = 'ubuntu' // EC2 인스턴스 사용자 ex ubuntu
+        EC2_USER = 'ubuntu' // EC2 인스턴스 사용자
         CONTAINER_NAME = 'stockSpringContainer' // 컨테이너 이름
     }
 
