@@ -8,4 +8,4 @@ RUN gradle build -x test
 FROM openjdk:17-jdk-slim
 WORKDIR /app
 COPY --from=build /app/build/libs/*.jar /app/
-ENTRYPOINT ["java", "-jar", "/app/*.jar"]
+ENTRYPOINT ["java", "-jar", "/app/*.jar", "0.0.0.0:8081"]
