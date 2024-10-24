@@ -7,6 +7,7 @@ pipeline {
         EC2_IP = '15.165.237.52' // EC2 인스턴스 IP 주소
         EC2_USER = 'ubuntu' // EC2 인스턴스 사용자
         CONTAINER_NAME = 'stockSpringContainer' // 사용할 컨테이너 이름
+        PORT = '8081'
     }
 
     stages {
