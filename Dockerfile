@@ -1,4 +1,11 @@
-FROM openjdk:17
-ARG JAR_FILE=build/libs/*-SNAPSHOT.jar
-COPY ${JAR_FILE} app.jar
-ENTRYPOINT ["java", "-jar", "/app.jar"]
+# Build stage
+FROM gradle:7.6.0-jdk17 AS build
+WORKDIR /app
+COPY --chown=gradle:gradle . /app
+RUN gradle build -x test
+
+# Run stage
+FROM openjdk:17-jdk-slim
+WORKDIR /app
+COPY --from=build /app/build/libs/*.jar app.jar
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
