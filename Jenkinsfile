@@ -37,14 +37,20 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                sshagent (credentials: ['EC2_API_SSH']) { // 'aws_key'는 Jenkins에 저장된 SSH 자격 증명 ID
+                sshagent (credentials: ['EC2_API_SSH']) { // 'EC2_API_SSH'는 Jenkins에 저장된 SSH 자격 증명 ID
                     sh """
                     ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} << 'EOF'
+                        # Docker 최신 이미지 가져오기
                         sudo docker pull ${DOCKER_IMAGE_NAME}:latest
+
+                        # 기존 컨테이너 중지 및 삭제
                         sudo docker stop ${CONTAINER_NAME} || true
                         sudo docker rm ${CONTAINER_NAME} || true
+
+                        # 컨테이너 실행 (변경된 JAR 파일 경로에 맞추어 실행)
                         sudo docker run -d --name ${CONTAINER_NAME} -p 8080:8080 ${DOCKER_IMAGE_NAME}:latest
 
+                        # 불필요한 이미지 제거
                         IMAGES=\$(sudo docker images -f 'dangling=true' -q)
                         if [ -n "\$IMAGES" ]; then
                             sudo docker rmi -f \$IMAGES
