@@ -1,3 +1,8 @@
 spring:
   application:
     name: stockProject
+
+jasypt:
+  encryptor:
+    bean: jasyptStringEncryptor
+    password: ${JASYPT_ENCRYPTOR_PASSWORD}

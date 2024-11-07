@@ -7,6 +7,7 @@ pipeline {
         EC2_IP = '43.200.51.20' // EC2 인스턴스 IP 주소
         EC2_USER = 'ubuntu' // EC2 인스턴스 사용자
         CONTAINER_NAME = 'stockSpringContainer' // 사용할 컨테이너 이름
+        JASYPT_ENCRYPTOR_PASSWORD = credentials('jasypt_password') // Jenkins에 저장된 Jasypt 암호화 비밀번호
     }
 
     stages {
@@ -19,7 +20,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    dockerImage = docker.build("${DOCKER_IMAGE_NAME}")
+                    dockerImage = docker.build("${DOCKER_IMAGE_NAME}", "--build-arg JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD} .")
                 }
             }
         }
@@ -47,8 +48,8 @@ pipeline {
                         sudo docker stop ${CONTAINER_NAME} || true
                         sudo docker rm ${CONTAINER_NAME} || true
 
-                        # 컨테이너 실행 (변경된 JAR 파일 경로에 맞추어 실행)
-                        sudo docker run -d --name ${CONTAINER_NAME} -p 8080:8080 ${DOCKER_IMAGE_NAME}:latest
+                        # 컨테이너 실행 (Jasypt 비밀번호 환경 변수 추가)
+                        sudo docker run -d --name ${CONTAINER_NAME} -p 8080:8080 -e JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD} ${DOCKER_IMAGE_NAME}:latest
 
                         # 불필요한 이미지 제거
                         IMAGES=\$(sudo docker images -f 'dangling=true' -q)
