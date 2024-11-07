@@ -18,9 +18,6 @@ pipeline {
         }
 
         stage('Build Docker Image') {
-            when {
-                branch 'main' // main 브랜치일 때만 빌드 수행
-            }
             steps {
                 script {
                     dockerImage = docker.build("${DOCKER_IMAGE_NAME}", "--build-arg JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD} .")
@@ -29,9 +26,6 @@ pipeline {
         }
 
         stage('Push to Docker Hub') {
-            when {
-                branch 'main' // main 브랜치일 때만 푸시 수행
-            }
             steps {
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CREDENTIALS_ID}") {
@@ -43,9 +37,6 @@ pipeline {
         }
 
         stage('Deploy to EC2') {
-            when {
-                branch 'main' // main 브랜치일 때만 배포 수행
-            }
             steps {
                 sshagent (credentials: ['EC2_API_SSH']) { // 'EC2_API_SSH'는 Jenkins에 저장된 SSH 자격 증명 ID
                     sh """
