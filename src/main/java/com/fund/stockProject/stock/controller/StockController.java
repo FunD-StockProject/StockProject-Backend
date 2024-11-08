@@ -1,6 +1,6 @@
 package com.fund.stockProject.stock.controller;
 
-import com.fund.stockProject.stock.dto.response.SearchResponse;
+import com.fund.stockProject.stock.dto.response.StockSearchResponse;
 import com.fund.stockProject.stock.service.StockService;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.ResponseEntity;
@@ -32,9 +32,9 @@ public class StockController {
 
     @GetMapping("/search/{symbolName}")
     @Operation(summary = "주식 종목 검색 API", description = "주식 종목 및 인간지표 데이터 검색")
-    public ResponseEntity<SearchResponse> searchStockBySymbolName(final @PathVariable String symbolName) {
-        SearchResponse searchResponse = stockService.searchStockBySymbolName(symbolName);
+    public ResponseEntity<StockSearchResponse> searchStockBySymbolName(final @PathVariable String symbolName) {
+        StockSearchResponse stockSearchResponse = stockService.searchStockBySymbolName(symbolName);
 
-        return ResponseEntity.ok().body(searchResponse);
+        return ResponseEntity.ok().body(stockSearchResponse);
     }
 }

@@ -1,6 +1,6 @@
 package com.fund.stockProject.stock.service;
 
-import com.fund.stockProject.stock.dto.response.SearchResponse;
+import com.fund.stockProject.stock.dto.response.StockSearchResponse;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockRepository;
 
@@ -17,10 +17,10 @@ public class StockService {
         this.stockRepository = stockRepository;
     }
 
-    public SearchResponse searchStockBySymbolName(final String symbolName) {
+    public StockSearchResponse searchStockBySymbolName(final String symbolName) {
         final Stock stock = stockRepository.findStockBySymbolName(symbolName).orElseThrow(NoSuchElementException::new);
 
-        return SearchResponse.builder()
+        return StockSearchResponse.builder()
                 .stockId(stock.getId())
                 .symbol(stock.getSymbol())
                 .symbolName(stock.getSymbolName())

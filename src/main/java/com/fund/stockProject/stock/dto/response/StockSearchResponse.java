@@ -8,7 +8,7 @@ import lombok.Getter;
 @Getter
 @Builder
 @AllArgsConstructor
-public class SearchResponse {
+public class StockSearchResponse {
     private Integer stockId;
     private String symbol;
     private String symbolName;
