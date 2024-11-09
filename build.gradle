@@ -42,10 +42,26 @@ dependencies {
 	implementation group: 'com.github.ulisesbocchio', name: 'jasypt-spring-boot-starter', version: '3.0.4'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.1.0'
 
+	// queryDSL 의존성
+	implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
+	annotationProcessor "com.querydsl:querydsl-apt:5.0.0:jakarta"
+	annotationProcessor "jakarta.annotation:jakarta.annotation-api"
+	annotationProcessor "jakarta.persistence:jakarta.persistence-api"
+
 	// mysql
 	runtimeOnly 'com.mysql:mysql-connector-j'
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+// QueryDSL 빌드 옵션
+def querydslSrcDir = 'src/main/generated'
+clean{
+	delete file(querydslSrcDir)
+}
+
+tasks.withType(JavaCompile){
+	options.generatedSourceOutputDirectory = file(querydslSrcDir)
 }
