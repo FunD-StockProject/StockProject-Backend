@@ -1,6 +1,7 @@
-package com.fund.stockProject.stock.entity;
+package com.fund.stockProject.score.entity;
 
 import com.fund.stockProject.global.entity.Core;
+import com.fund.stockProject.stock.entity.Stock;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
