@@ -16,7 +16,6 @@ public class StockSearchResponse {
     private String exchangeNum;
 
     private Integer scoreId;
-    private Integer scoreFinal;
-    private Integer scoreNaver;
-    private Integer scoreReddit;
+    private Integer scoreKorea;
+    private Integer scoreOversea;
 }

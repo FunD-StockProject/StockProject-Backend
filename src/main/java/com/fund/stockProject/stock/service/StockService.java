@@ -31,9 +31,8 @@ public class StockService {
             .securityName(stock.getSecurityName())
             .exchangeNum(stock.getExchangeNum())
             .scoreId(stock.getScore().getId())
-            .scoreNaver(stock.getScore().getScoreNaver())
-            .scoreReddit(stock.getScore().getScoreReddit())
-            .scoreFinal(stock.getScore().getScoreFinal())
+            .scoreKorea(stock.getScore().getScoreKorea())
+            .scoreOversea(stock.getScore().getScoreOversea())
             .build();
     }
 
@@ -53,9 +52,8 @@ public class StockService {
                 .securityName(stock.getSecurityName())
                 .exchangeNum(stock.getExchangeNum())
                 .scoreId(stock.getScore().getId())
-                .scoreNaver(stock.getScore().getScoreNaver())
-                .scoreReddit(stock.getScore().getScoreReddit())
-                .scoreFinal(stock.getScore().getScoreFinal())
+                 .scoreKorea(stock.getScore().getScoreKorea())
+                 .scoreOversea(stock.getScore().getScoreOversea())
                 .build())
             .collect(Collectors.toList());
     }
