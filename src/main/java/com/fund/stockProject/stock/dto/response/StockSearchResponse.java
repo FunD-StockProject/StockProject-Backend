@@ -1,6 +1,7 @@
 package com.fund.stockProject.stock.dto.response;
 
 
+import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -15,7 +16,8 @@ public class StockSearchResponse {
     private String securityName;
     private String exchangeNum;
 
-    private Integer scoreId;
     private Integer scoreKorea;
     private Integer scoreOversea;
+    private Integer scoreNaver;
+    private Integer scorePax;
 }
