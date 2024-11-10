@@ -21,13 +21,16 @@ public class Score extends Core {
     private Integer id;
 
     @Column(nullable = false)
-    private Integer scoreFinal;  // 최종 인간지표 점수
+    private Integer scoreKorea;  // 국내
 
     @Column(nullable = false)
     private Integer scoreNaver;
 
     @Column(nullable = false)
-    private Integer scoreReddit;
+    private Integer scorePax;
+
+    @Column(nullable = false)
+    private Integer scoreOversea;
 
     @OneToOne
     @MapsId // Score의 기본 키를 Stock의 scoreId와 매핑
@@ -36,12 +39,14 @@ public class Score extends Core {
 
     @Builder
     public Score(
-            Integer scoreFinal,
+            Integer scoreKorea,
             Integer scoreNaver,
-            Integer scoreReddit
+            Integer scorePax,
+            Integer scoreOversea
     ) {
-        this.scoreFinal = scoreFinal;
+        this.scoreKorea = scoreKorea;
+        this.scorePax = scorePax;
         this.scoreNaver = scoreNaver;
-        this.scoreReddit = scoreReddit;
+        this.scoreOversea = scoreOversea;
     }
 }
