@@ -30,7 +30,7 @@ public class StockService {
             .symbolName(stock.getSymbolName())
             .securityName(stock.getSecurityName())
             .exchangeNum(stock.getExchangeNum())
-            .scoreId(stock.getScore().getId())
+            .scoreId(stock.getScore().getStockId())
             .scoreKorea(stock.getScore().getScoreKorea())
             .scoreOversea(stock.getScore().getScoreOversea())
             .build();
@@ -51,7 +51,7 @@ public class StockService {
                 .symbolName(stock.getSymbolName())
                 .securityName(stock.getSecurityName())
                 .exchangeNum(stock.getExchangeNum())
-                .scoreId(stock.getScore().getId())
+                .scoreId(stock.getScore().getStockId())
                  .scoreKorea(stock.getScore().getScoreKorea())
                  .scoreOversea(stock.getScore().getScoreOversea())
                 .build())
