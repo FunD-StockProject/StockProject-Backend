@@ -15,4 +15,8 @@ spring:
     database: mysql
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
+
+security:
+  appkey: ENC(FS8DY9wSmCauQ8SGk2CW3avWxPia5c41UDxMHAzzog3AloY5ynPAz1J/vVPvophr)
+  appsecret: ENC(cYfISHcPzRSI2OO/N17vf9MD7OOqfp8Zq8+DcsXY+X7PTpbECdwqEDXclOlJfWUwhYZl8yy5bSwvuveEOPpxd5LFg5NtQWIcV63oWdPBzZmaGeJIvu8owdrJd5V07EJWNAHl9z4dZ6nTNTKCgahQ/o6Gy15FHDwFk99hM1TgZzvZ7h1hOsKZt9xbvZvLMtq3UbumkxrCGLbJHSUYK2EhmVXsC6GQmZwSAKJdxAzIvB2PKUDwu3eI5RXcxDyhzRzd)
