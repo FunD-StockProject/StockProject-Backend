@@ -14,10 +14,13 @@ import jakarta.persistence.SequenceGenerator;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+// 임시적으로 setter 추가
+@Setter
 public class Stock extends Core {
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "stock_seq")

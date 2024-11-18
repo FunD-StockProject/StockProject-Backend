@@ -4,6 +4,7 @@ import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.dto.response.StockSearchResponse;
 import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
 import com.fund.stockProject.stock.service.StockService;
+import com.fund.stockProject.stock.service.StockUpdateService;
 
 import io.swagger.v3.oas.annotations.Operation;
 
@@ -24,6 +25,7 @@ import reactor.core.publisher.Mono;
 @RequestMapping("/stock")
 public class StockController {
     private final StockService stockService;
+    private final StockUpdateService stockUpdateService;
 
     @GetMapping("/search/{symbolName}")
     @Operation(summary = "주식 종목 검색 API", description = "주식 종목 및 인간지표 데이터 검색")
@@ -53,5 +55,10 @@ public class StockController {
     @Operation(summary = "떡락중인 지표 api", description = "떡락중인 지표 api")
     public ResponseEntity<List<StockSimpleResponse>> getDescentStocks(final @PathVariable("country") COUNTRY country) {
         return ResponseEntity.ok().body(stockService.getDescentStocks(country));
+    }
+
+    @GetMapping("/update")
+    public void updateStock() {
+        stockUpdateService.updateSymbolNames();
     }
 }
