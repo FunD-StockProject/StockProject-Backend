@@ -6,6 +6,8 @@ import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockQueryRepository;
 import com.fund.stockProject.stock.repository.StockRepository;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
@@ -101,5 +103,71 @@ public class StockService {
                      .collect(Collectors.toList()));
         }
         return Mono.error(new IllegalArgumentException("Invalid country: " + country));
+    }
+
+    /**
+     * 국내/해외 떡상 지표 반환
+     * @param country 국내/해외 분류
+     * @return 종목 정보
+     */
+    public List<StockSimpleResponse> getRisingStocks(COUNTRY country) {
+        List<StockSimpleResponse> stockSimpleResponses = new ArrayList<>();
+        if (country == COUNTRY.KOREA) {
+            for(int i = 1; i <= 9; i++) {
+                final Stock stock = stockRepository.findById(i)
+                                                   .orElseThrow(NoSuchElementException::new);
+                 StockSimpleResponse stockSimpleResponse = StockSimpleResponse.builder()
+                                   .stockId(stock.getId())
+                                   .symbolName(stock.getSymbolName())
+                                   .score(stock.getScore().getScoreKorea())
+                                   .build();
+                stockSimpleResponses.add(stockSimpleResponse);
+            }
+        } else if (country == COUNTRY.OVERSEA) {
+            for(int i = 1; i <= 9; i++) {
+                final Stock stock = stockRepository.findById(i)
+                                                   .orElseThrow(NoSuchElementException::new);
+                StockSimpleResponse stockSimpleResponse = StockSimpleResponse.builder()
+                                                                             .stockId(stock.getId())
+                                                                             .symbolName(stock.getSymbolName())
+                                                                             .score(stock.getScore().getScoreKorea())
+                                                                             .build();
+                stockSimpleResponses.add(stockSimpleResponse);
+            }
+        }
+        return stockSimpleResponses;
+    }
+
+    /**
+     * 국내/해외 떡락 지표 반환
+     * @param country 국내/해외 분류
+     * @return 종목 정보
+     */
+    public List<StockSimpleResponse> getDescentStocks(COUNTRY country) {
+        List<StockSimpleResponse> stockSimpleResponses = new ArrayList<>();
+        if (country == COUNTRY.KOREA) {
+            for(int i = 1; i <= 9; i++) {
+                final Stock stock = stockRepository.findById(i)
+                                                   .orElseThrow(NoSuchElementException::new);
+                StockSimpleResponse stockSimpleResponse = StockSimpleResponse.builder()
+                                                                             .stockId(stock.getId())
+                                                                             .symbolName(stock.getSymbolName())
+                                                                             .score(stock.getScore().getScoreKorea())
+                                                                             .build();
+                stockSimpleResponses.add(stockSimpleResponse);
+            }
+        } else if (country == COUNTRY.OVERSEA) {
+            for(int i = 1; i <= 9; i++) {
+                final Stock stock = stockRepository.findById(i)
+                                                   .orElseThrow(NoSuchElementException::new);
+                StockSimpleResponse stockSimpleResponse = StockSimpleResponse.builder()
+                                                                             .stockId(stock.getId())
+                                                                             .symbolName(stock.getSymbolName())
+                                                                             .score(stock.getScore().getScoreKorea())
+                                                                             .build();
+                stockSimpleResponses.add(stockSimpleResponse);
+            }
+        }
+        return stockSimpleResponses;
     }
 }
