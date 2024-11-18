@@ -3,7 +3,6 @@ package com.fund.stockProject.stock.controller;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.dto.response.StockSearchResponse;
 import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
-import com.fund.stockProject.stock.service.SecurityService;
 import com.fund.stockProject.stock.service.StockService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,5 +41,17 @@ public class StockController {
     @Operation(summary = "지금 가장 hot한 지표 api", description = "지금 가장 hot한 지표 api")
     public ResponseEntity<Mono<List<StockSimpleResponse>>> getHotStocks(final @PathVariable("country") COUNTRY country) {
         return ResponseEntity.ok().body(stockService.getHotStocks(country));
+    }
+
+    @GetMapping("/rising/{country}")
+    @Operation(summary = "떡상중인 지표 api", description = "떡상중인 지표 api")
+    public ResponseEntity<List<StockSimpleResponse>> getRisingStocks(final @PathVariable("country") COUNTRY country) {
+        return ResponseEntity.ok().body(stockService.getRisingStocks(country));
+    }
+
+    @GetMapping("/descent/{country}")
+    @Operation(summary = "떡락중인 지표 api", description = "떡락중인 지표 api")
+    public ResponseEntity<List<StockSimpleResponse>> getDescentStocks(final @PathVariable("country") COUNTRY country) {
+        return ResponseEntity.ok().body(stockService.getDescentStocks(country));
     }
 }
