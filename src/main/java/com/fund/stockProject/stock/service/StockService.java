@@ -30,17 +30,17 @@ public class StockService {
             .symbolName(stock.getSymbolName())
             .securityName(stock.getSecurityName())
             .exchangeNum(stock.getExchangeNum())
-            .scoreId(stock.getScore().getId())
             .scoreKorea(stock.getScore().getScoreKorea())
+            .scoreNaver(stock.getScore().getScoreNaver())
+            .scorePax(stock.getScore().getScorePax())
             .scoreOversea(stock.getScore().getScoreOversea())
             .build();
     }
 
-
     public List<StockSearchResponse> autoCompleteKeyword(String keyword) {
         final List<Stock> stocks = stockQueryRepository.autocompleteKeyword(keyword);
 
-        if(stocks.isEmpty()){
+        if (stocks.isEmpty()) {
             throw new NoSuchElementException();
         }
 
@@ -51,9 +51,10 @@ public class StockService {
                 .symbolName(stock.getSymbolName())
                 .securityName(stock.getSecurityName())
                 .exchangeNum(stock.getExchangeNum())
-                .scoreId(stock.getScore().getId())
-                 .scoreKorea(stock.getScore().getScoreKorea())
-                 .scoreOversea(stock.getScore().getScoreOversea())
+                .scoreKorea(stock.getScore().getScoreKorea())
+                .scoreNaver(stock.getScore().getScoreNaver())
+                .scorePax(stock.getScore().getScorePax())
+                .scoreOversea(stock.getScore().getScoreOversea())
                 .build())
             .collect(Collectors.toList());
     }
