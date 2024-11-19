@@ -15,7 +15,8 @@ spring:
     database: mysql
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
+
   batch:
     jdbc:
       initialize-schema: ALWAYS

@@ -3,7 +3,6 @@ package com.fund.stockProject.global.dto.response;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class AccessTokenResponse {
-
     @JsonProperty("access_token")
     private String accessToken;
 

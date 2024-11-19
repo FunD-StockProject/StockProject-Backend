@@ -1,8 +1,7 @@
 package com.fund.stockProject.global.config;
 
-import com.fund.stockProject.global.dto.request.AccessTokenRequest;
-import com.fund.stockProject.global.dto.response.AccessTokenResponse;
 import java.time.LocalDateTime;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,8 +9,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import com.fund.stockProject.global.dto.request.AccessTokenRequest;
+import com.fund.stockProject.global.dto.response.AccessTokenResponse;
+
 @Configuration
 public class SecurityHttpConfig {
+
     @Value("${security.appkey}")
     private String appkey;
 
@@ -44,12 +47,12 @@ public class SecurityHttpConfig {
 
         try {
             AccessTokenResponse response = webClient.post()
-                .uri("https://openapi.koreainvestment.com:9443/oauth2/tokenP")
-                .headers(headers -> headers.setContentType(MediaType.APPLICATION_JSON))
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(AccessTokenResponse.class)
-                .block();
+                                                    .uri("https://openapi.koreainvestment.com:9443/oauth2/tokenP")
+                                                    .headers(headers -> headers.setContentType(MediaType.APPLICATION_JSON))
+                                                    .bodyValue(request)
+                                                    .retrieve()
+                                                    .bodyToMono(AccessTokenResponse.class)
+                                                    .block();
 
             if (response != null) {
                 return response.getAccessToken();
