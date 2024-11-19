@@ -21,7 +21,7 @@ public class StockQueryRepository {
     public List<Stock> autocompleteKeyword(String keyword) {
         return jpaQueryFactory.selectFrom(QStock.stock)
             .where(QStock.stock.symbolName.startsWith(keyword))
-            .limit(5)
+            .limit(10)
             .fetch();
     }
 }
