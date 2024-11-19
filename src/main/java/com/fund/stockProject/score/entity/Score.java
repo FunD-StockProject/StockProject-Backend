@@ -33,10 +33,13 @@ public class Score extends Core {
     private Integer scoreNaver;
 
     @Column(nullable = false)
-    private Integer scorePax;
+    private Integer scoreReddit;
 
     @Column(nullable = false)
     private Integer scoreOversea;
+
+    @Column(nullable = false)
+    private Integer diff = 0; // 전일 대비
 
     @Builder
     public Score(
@@ -45,15 +48,17 @@ public class Score extends Core {
             Stock stock,
             Integer scoreKorea,
             Integer scoreNaver,
-            Integer scorePax,
-            Integer scoreOversea
+            Integer scoreReddit,
+            Integer scoreOversea,
+            Integer diff
     ) {
         this.stockId = stockId;
         this.date = date;
         this.stock = stock;
         this.scoreKorea = scoreKorea;
         this.scoreNaver = scoreNaver;
-        this.scorePax = scorePax;
+        this.scoreReddit = scoreReddit;
         this.scoreOversea = scoreOversea;
+        this.diff = diff;
     }
 }
