@@ -41,4 +41,11 @@ public class Stock extends Core {
     @Column(nullable = false)
     private String exchangeNum;
 
+    // symbolName을 안전하게 설정하는 비즈니스 메서드
+    public void updateSymbolNameIfNull(String symbolName) {
+        if (this.symbolName == null) {
+            this.symbolName = symbolName;
+        }
+    }
+
 }
