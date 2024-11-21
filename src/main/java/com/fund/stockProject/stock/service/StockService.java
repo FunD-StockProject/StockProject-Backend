@@ -187,6 +187,7 @@ public class StockService {
      * @param country 국내/해외 분류
      * @return 종목 정보
      */
+    // todo: 조회시점에 오늘 데이터가 없는 경우?
     public List<StockDiffResponse> getDescentStocks(COUNTRY country) {
         LocalDate today = LocalDate.now();
         List<Score> bottomScores;

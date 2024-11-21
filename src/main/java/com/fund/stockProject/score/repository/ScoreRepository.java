@@ -2,6 +2,7 @@ package com.fund.stockProject.score.repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -58,5 +59,15 @@ public interface ScoreRepository extends JpaRepository<Score, Integer> {
     LIMIT 9
 """)
     List<Score> findBottom3ByDateAndExchangeNumsNotIn(@Param("date") LocalDate date, @Param("exchangeNums") List<String> exchangeNums);
+
+    /**
+     * stock_id와 date로 특정 데이터가 존재하는지 확인
+     */
+    boolean existsByStockIdAndDate(Integer stockId, LocalDate date);
+
+    /**
+     * stock_id와 date로 Score 데이터 조회
+     */
+    Optional<Score> findByStockIdAndDate(Integer stockId, LocalDate date);
 
 }

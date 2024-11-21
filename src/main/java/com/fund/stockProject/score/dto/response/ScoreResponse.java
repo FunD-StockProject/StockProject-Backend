@@ -5,14 +5,8 @@ import lombok.Getter;
 
 @Getter
 public class ScoreResponse {
-    private final Integer scoreKorea;
-
-    private final Integer scoreOversea;
+    private final Integer score;
 
     @Builder
-    public ScoreResponse(Integer scoreKorea, Integer scoreOversea) {
-        this.scoreKorea = scoreKorea;
-        this.scoreOversea = scoreOversea;
-    }
-
+    public ScoreResponse(Integer score) {this.score = score;}
 }
