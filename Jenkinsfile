@@ -59,7 +59,7 @@ pipeline {
                         sudo docker rm ${CONTAINER_NAME} || true
 
                         # 컨테이너 실행 (Jasypt 비밀번호 환경 변수 추가)
-                        sudo docker run -d --name ${CONTAINER_NAME} -p 8080:8080 -e JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD} ${DOCKER_IMAGE_NAME}:latest
+                        sudo docker run -d --name ${CONTAINER_NAME} -p 443:443 -e JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD} ${DOCKER_IMAGE_NAME}:latest
 
                         # 불필요한 이미지 제거
                         IMAGES=\$(sudo docker images -f 'dangling=true' -q)
