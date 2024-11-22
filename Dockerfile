@@ -16,6 +16,6 @@ ENV JASYPT_ENCRYPTOR_PASSWORD=$JASYPT_ENCRYPTOR_PASSWORD
 COPY --from=build /app/build/libs/stockProject-0.0.1-SNAPSHOT.jar /app/app.jar
 
 # keystore.p12 파일 복사
-COPY keystore.p12 /app/config/keystore.p12
+COPY /keystore.p12 /app/config/keystore.p12
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
