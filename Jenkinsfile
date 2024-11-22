@@ -20,7 +20,6 @@ pipeline {
         stage('Prepare Keystore') {
             steps {
                 script {
-                    // keystore.p12 파일을 빌드 컨텍스트에 복사
                     sh """
                     cp /home/ubuntu/keystore.p12 ${WORKSPACE}/keystore.p12
                     """
