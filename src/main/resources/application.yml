@@ -1,3 +1,11 @@
+server:
+  port: 443
+  ssl:
+    enabled: true
+    key-store: /app/config/keystore.p12
+    key-store-password: ENC(0XTW44izU5HxXDDdiFc8m65uTBTAshty)
+    key-store-type: PKCS12
+
 jasypt:
   encryptor:
     bean: jasyptStringEncryptor

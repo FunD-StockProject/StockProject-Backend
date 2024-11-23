@@ -25,12 +25,15 @@ public class SecurityHttpConfig {
     private LocalDateTime lastTokenUpdateTime = LocalDateTime.now(); // 마지막 갱신 시간
 
     @Bean
-    public WebClient webClient(WebClient.Builder builder) {
-        return builder.baseUrl("https://openapi.koreainvestment.com:9443").build();
+    public WebClient webClient() {
+        return WebClient.builder()
+                        .baseUrl("https://openapi.koreainvestment.com:9443")
+                        .defaultHeaders(httpHeaders -> httpHeaders.addAll(createSecurityHeaders()))
+                        .build();
     }
 
     @Bean
-    public HttpHeaders createSecurityHeaders() {
+    public synchronized HttpHeaders createSecurityHeaders() {
         refreshTokenIfNeeded(); // 헤더 생성 시 토큰 갱신 여부 확인
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -67,9 +70,12 @@ public class SecurityHttpConfig {
 
     public synchronized void refreshTokenIfNeeded() {
         if (accessToken == null || lastTokenUpdateTime.plusHours(24).isBefore(LocalDateTime.now())) {
+            String oldToken = accessToken; // 이전 토큰 로깅
             accessToken = fetchAccessTokenFromApi();
             lastTokenUpdateTime = LocalDateTime.now();
             System.out.println("AccessToken 갱신 완료: " + lastTokenUpdateTime);
+            System.out.println("이전 AccessToken: " + oldToken);
+            System.out.println("새로운 AccessToken: " + accessToken);
         }
     }
 }
