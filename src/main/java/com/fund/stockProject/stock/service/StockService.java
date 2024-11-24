@@ -35,8 +35,15 @@ public class StockService {
     private final ObjectMapper objectMapper;
 
     public StockSearchResponse searchStockBySymbolName(final String symbolName) {
-        final Stock stock = stockRepository.findStockBySymbolName(symbolName)
-            .orElseThrow(NoSuchElementException::new);
+        final Stock stock = stockRepository.findStockBySymbolName(symbolName).orElseThrow(NoSuchElementException::new);
+
+        String region;
+
+        if(stock.getExchangeNum().equals("1") || stock.getExchangeNum().equals("2")){
+            region = COUNTRY.KOREA.name();
+        }else{
+            region = COUNTRY.OVERSEA.name();
+        }
 
         return StockSearchResponse.builder()
             .stockId(stock.getId())
@@ -44,6 +51,7 @@ public class StockService {
             .symbolName(stock.getSymbolName())
             .securityName(stock.getSecurityName())
             .exchangeNum(stock.getExchangeNum())
+            .region(region)
             .scoreKorea(stock.getScore().getScoreKorea())
             .scoreNaver(stock.getScore().getScoreNaver())
             .scoreOversea(stock.getScore().getScoreOversea())
@@ -64,6 +72,7 @@ public class StockService {
                 .symbolName(stock.getSymbolName())
                 .securityName(stock.getSecurityName())
                 .exchangeNum(stock.getExchangeNum())
+                .region(stock.getExchangeNum().equals("1") || stock.getExchangeNum().equals("2") ? "KOREA" : "OVERSEAS")
                 .scoreKorea(stock.getScore().getScoreKorea())
                 .scoreNaver(stock.getScore().getScoreNaver())
                 .scoreOversea(stock.getScore().getScoreOversea())
@@ -116,31 +125,32 @@ public class StockService {
     public Mono<List<StockSimpleResponse>> getHotStocks(COUNTRY country) {
         if (country == COUNTRY.KOREA) {
             return securityService.getVolumeRankKorea()
-                  .map(volumeRankResponses -> volumeRankResponses.stream().map(rankResponse -> {
-                         final Stock stock = stockRepository.findStockBySymbolName(rankResponse.getHtsKorIsnm())
-                                                            .orElseThrow(NoSuchElementException::new);
-                         return StockSimpleResponse.builder()
-                                 .stockId(stock.getId())
-                                 .symbolName(stock.getSymbolName())
-                                 .score(stock.getScore().getScoreKorea())
-                                 .build();
-                     })
-                     .collect(Collectors.toList()));
+                .map(volumeRankResponses -> volumeRankResponses.stream().map(rankResponse -> {
+                        final Stock stock = stockRepository.findStockBySymbolName(
+                                rankResponse.getHtsKorIsnm())
+                            .orElseThrow(NoSuchElementException::new);
+                        return StockSimpleResponse.builder()
+                            .stockId(stock.getId())
+                            .symbolName(stock.getSymbolName())
+                            .score(stock.getScore().getScoreKorea())
+                            .build();
+                    })
+                    .collect(Collectors.toList()));
         } else if (country == COUNTRY.OVERSEA) {
             return securityService.getVolumeRankOversea()
-                  .map(volumeRankResponses -> volumeRankResponses.stream().map(rankResponse -> {
-                         // 추후 symbolName으로 변경예정
-                         final Stock stock = stockRepository.findStockBySymbol(rankResponse.getSymb())
-                                                            .orElseThrow(NoSuchElementException::new);
-                         return StockSimpleResponse.builder()
-                                                   .stockId(stock.getId())
+                .map(volumeRankResponses -> volumeRankResponses.stream().map(rankResponse -> {
+                        // 추후 symbolName으로 변경예정
+                        final Stock stock = stockRepository.findStockBySymbol(rankResponse.getSymb())
+                            .orElseThrow(NoSuchElementException::new);
+                        return StockSimpleResponse.builder()
+                            .stockId(stock.getId())
 //                                                   .symbolName(stock.getSymbolName())
-                                                   // 추후 symbolName 채워지면 변경예정
-                                                   .symbolName(rankResponse.getName())
-                                                   .score(stock.getScore().getScoreOversea())
-                                                   .build();
-                     })
-                     .collect(Collectors.toList()));
+                            // 추후 symbolName 채워지면 변경예정
+                            .symbolName(rankResponse.getName())
+                            .score(stock.getScore().getScoreOversea())
+                            .build();
+                    })
+                    .collect(Collectors.toList()));
         }
         return Mono.error(new IllegalArgumentException("Invalid country: " + country));
     }
@@ -176,7 +186,8 @@ public class StockService {
      * @param isInClause   true면 IN, false면 NOT IN 조건
      * @return 상위 3개의 Score 데이터
      */
-    private List<Score> getTopScores(LocalDate date, List<String> exchangeNums, boolean isInClause) {
+    private List<Score> getTopScores(LocalDate date, List<String> exchangeNums,
+        boolean isInClause) {
         if (isInClause) {
             return scoreRepository.findTop3ByDateAndExchangeNums(date, exchangeNums);
         } else {
@@ -192,7 +203,8 @@ public class StockService {
      * @param isInClause   true면 IN, false면 NOT IN 조건
      * @return 하위 3개의 Score 데이터
      */
-    private List<Score> getBottomScores(LocalDate date, List<String> exchangeNums, boolean isInClause) {
+    private List<Score> getBottomScores(LocalDate date, List<String> exchangeNums,
+        boolean isInClause) {
         if (isInClause) {
             return scoreRepository.findBottom3ByDateAndExchangeNums(date, exchangeNums);
         } else {
@@ -208,13 +220,13 @@ public class StockService {
      */
     private List<StockDiffResponse> convertToStockDiffResponses(List<Score> scores) {
         return scores.stream()
-                     .map(score -> StockDiffResponse.builder()
-                                                    .stockId(score.getStock().getId())
-                                                    .symbolName(score.getStock().getSymbolName())
-                                                    .score(score.getScoreKorea())
-                                                    .diff(score.getDiff())
-                                                    .build())
-                     .collect(Collectors.toList());
+            .map(score -> StockDiffResponse.builder()
+                .stockId(score.getStock().getId())
+                .symbolName(score.getStock().getSymbolName())
+                .score(score.getScoreKorea())
+                .diff(score.getDiff())
+                .build())
+            .collect(Collectors.toList());
     }
 
     /**

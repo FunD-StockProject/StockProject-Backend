@@ -16,6 +16,8 @@ public class StockSearchResponse {
     private String securityName;
     private String exchangeNum;
 
+    private String region; // 주식 지역(국내/해외)
+
     private Integer scoreKorea;
     private Integer scoreOversea;
     private Integer scoreNaver;
