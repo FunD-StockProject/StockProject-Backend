@@ -53,6 +53,9 @@ dependencies {
 
 	// mysql
 	runtimeOnly 'com.mysql:mysql-connector-j'
+
+	// python 스크립트 처리
+	implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.0'
 }
 
 tasks.named('test') {
