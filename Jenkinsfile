@@ -8,8 +8,6 @@ pipeline {
         EC2_USER = 'ubuntu' // EC2 인스턴스 사용자
         CONTAINER_NAME = 'stockSpringContainer' // 사용할 컨테이너 이름
         JASYPT_ENCRYPTOR_PASSWORD = credentials('jasypt_password') // Jenkins에 저장된 Jasypt 암호화 비밀번호
-        SCORE_SCRIPT_PATH = '/home/ubuntu/score.py' // EC2에 설치된 score.py 경로
-        MOUNT_PATH = '/app/score.py' // Docker 컨테이너 내부에서 접근할 경로
     }
 
     stages {
@@ -24,6 +22,18 @@ pipeline {
                 script {
                     sh """
                     cp /keystore.p12 ${WORKSPACE}/keystore.p12
+                    """
+                }
+            }
+        }
+
+        stage('Fetch score.py and requirements.txt') {
+            steps {
+                sshagent (credentials: ['EC2_API_SSH']) { // EC2_API_SSH는 Jenkins에 등록된 SSH 키
+                    sh """
+                    # EC2에서 score.py와 requirements.txt 가져오기
+                    scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/score.py ${WORKSPACE}/score.py
+                    scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/requirements.txt ${WORKSPACE}/requirements.txt
                     """
                 }
             }
@@ -50,7 +60,7 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                sshagent (credentials: ['EC2_API_SSH']) { // 'EC2_API_SSH'는 Jenkins에 저장된 SSH 자격 증명 ID
+                sshagent (credentials: ['EC2_API_SSH']) {
                     sh """
                     ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} << 'EOF'
                         # Docker 최신 이미지 가져오기
@@ -60,10 +70,9 @@ pipeline {
                         sudo docker stop ${CONTAINER_NAME} || true
                         sudo docker rm ${CONTAINER_NAME} || true
 
-                        # 컨테이너 실행 (Jasypt 비밀번호 환경 변수 추가 및 score.py 마운트)
-                        sudo docker run -d --name ${CONTAINER_NAME} -p 443:443 \\
-                            -e JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD} \\
-                            -v ${SCORE_SCRIPT_PATH}:${MOUNT_PATH} \\
+                        # 컨테이너 실행
+                        sudo docker run -d --name ${CONTAINER_NAME} -p 443:443 \
+                            -e JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD} \
                             ${DOCKER_IMAGE_NAME}:latest
 
                         # 불필요한 이미지 제거

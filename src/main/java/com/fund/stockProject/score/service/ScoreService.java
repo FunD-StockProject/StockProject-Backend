@@ -75,10 +75,10 @@ public class ScoreService {
     private int executeScoreAI(String symbol, COUNTRY country) {
         try {
             // Python 스크립트 경로
-            String scriptPath = "/home/ubuntu/score.py";
+            String scriptPath = "/app/config/score.py";
 
             // ProcessBuilder를 사용하여 Python 스크립트 실행
-            ProcessBuilder processBuilder = new ProcessBuilder("/usr/bin/python3", scriptPath, symbol, country.toString());
+            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol, country.toString());
             processBuilder.redirectErrorStream(true);
             Process process = processBuilder.start();
 
