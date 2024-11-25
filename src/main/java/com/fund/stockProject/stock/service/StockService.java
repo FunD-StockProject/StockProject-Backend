@@ -62,7 +62,7 @@ public class StockService {
         final List<Stock> stocks = stockQueryRepository.autocompleteKeyword(keyword);
 
         if (stocks.isEmpty()) {
-            throw new NoSuchElementException();
+            return null;
         }
 
         return stocks.stream()
