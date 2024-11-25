@@ -15,13 +15,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 1. 레이어 캐싱을 위해 requirements.txt를 먼저 복사
-COPY /var/lib/jenkins/workspace/springmv/requirements.txt /app/requirements.txt
+COPY requirements.txt /app/requirements.txt
 
 # 2. Python 패키지 설치
 RUN pip3 install --no-cache-dir -r /app/requirements.txt
 
 # 3. 레이어 캐싱을 위해 변경 가능성이 높은 score.py를 나중에 복사
-COPY /var/lib/jenkins/workspace/springmv/score.py /app/score.py
+COPY score.py /app/score.py
 
 # 4. Jasypt 암호화 비밀번호 환경 변수 설정
 ARG JASYPT_ENCRYPTOR_PASSWORD
