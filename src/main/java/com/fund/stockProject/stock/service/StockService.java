@@ -99,9 +99,7 @@ public class StockService {
                                                             .orElseThrow(NoSuchElementException::new);
                          return StockSimpleResponse.builder()
                                                    .stockId(stock.getId())
-//                                                   .symbolName(stock.getSymbolName())
-                                                   // 추후 symbolName 채워지면 변경예정
-                                                   .symbolName(rankResponse.getName())
+                                                   .symbolName(stock.getSymbolName())
                                                    .score(stock.getScore().getScoreOversea())
                                                    .build();
                      })
