@@ -88,7 +88,7 @@ public class ScoreService {
                 return reader.lines()
                              .filter(line -> line.trim().startsWith("{") && line.trim().endsWith("}")) // JSON 형식 필터링
                              .collect(Collectors.joining("\n"));
-            }).get(30, TimeUnit.SECONDS); // 최대 30초 대기
+            }).get(120, TimeUnit.SECONDS); // 최대 120초 대기
 
             System.out.println("Filtered output = " + output);
 
