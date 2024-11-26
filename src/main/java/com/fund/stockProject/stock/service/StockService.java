@@ -203,4 +203,22 @@ public class StockService {
         // 공통 변환 로직
         return convertToStockDiffResponses(bottomScores);
     }
+
+    public List<StockSimpleResponse> getRelevantStocks(final Integer id) {
+        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(id);
+
+        if(relevantStocksByExchangeNumAndScore.isEmpty()){
+            System.out.println("Stock " + id + " relevant Stocks are not found");
+
+            return null;
+        }
+
+        return relevantStocksByExchangeNumAndScore.stream().map(
+            stock -> StockSimpleResponse.builder()
+                .stockId(stock.getId())
+                .symbolName(stock.getSymbolName())
+                .score(stock.getExchangeNum().equals("1") || stock.getExchangeNum().equals("2") ? stock.getScore().getScoreKorea() : stock.getScore().getScoreOversea())
+                .build()
+        ).collect(Collectors.toList());
+    }
 }

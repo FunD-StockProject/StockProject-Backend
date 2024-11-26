@@ -5,6 +5,7 @@ import com.fund.stockProject.stock.entity.Stock;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Repository;
@@ -23,5 +24,34 @@ public class StockQueryRepository {
             .where(QStock.stock.symbolName.startsWith(keyword))
             .limit(5)
             .fetch();
+    }
+
+    public List<Stock> findRelevantStocksByExchangeNumAndScore(Integer id) {
+        final Stock currentStock = jpaQueryFactory.selectFrom(QStock.stock).where(QStock.stock.id.eq(id)).fetchOne();
+
+        if (currentStock == null) {
+            System.out.println("Stock " + id + " is not found");
+
+            return new ArrayList<>();
+        }
+
+        if (currentStock.getExchangeNum().equals("1") || currentStock.getExchangeNum().equals("2")) {
+            return jpaQueryFactory.selectFrom(QStock.stock).where(
+                QStock.stock.exchangeNum.eq(currentStock.getExchangeNum())
+                    .and(QStock.stock.score.scoreKorea.between(
+                        currentStock.getScore().getScoreKorea() - 10,
+                        currentStock.getScore().getScoreKorea() + 10))
+                    .and(QStock.stock.ne(currentStock))
+            ).limit(3).fetch();
+        }
+
+        return jpaQueryFactory.selectFrom(QStock.stock)
+            .where(
+                QStock.stock.exchangeNum.eq(currentStock.getExchangeNum())
+                    .and(QStock.stock.score.scoreOversea.between(
+                        currentStock.getScore().getScoreOversea() - 10,
+                        currentStock.getScore().getScoreOversea() + 10))
+                    .and(QStock.stock.ne(currentStock))
+            ).limit(3).fetch();
     }
 }
