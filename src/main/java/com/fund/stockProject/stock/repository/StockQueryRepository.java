@@ -42,7 +42,7 @@ public class StockQueryRepository {
                         currentStock.getScore().getScoreKorea() - 10,
                         currentStock.getScore().getScoreKorea() + 10))
                     .and(QStock.stock.ne(currentStock))
-            ).limit(5).fetch();
+            ).limit(3).fetch();
         }
 
         return jpaQueryFactory.selectFrom(QStock.stock)
@@ -52,6 +52,6 @@ public class StockQueryRepository {
                         currentStock.getScore().getScoreOversea() - 10,
                         currentStock.getScore().getScoreOversea() + 10))
                     .and(QStock.stock.ne(currentStock))
-            ).limit(5).fetch();
+            ).limit(3).fetch();
     }
 }
