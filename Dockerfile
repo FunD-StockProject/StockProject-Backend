@@ -22,11 +22,11 @@ RUN pip3 install --no-cache-dir \
 COPY requirements.txt /app/requirements.txt
 RUN pip3 install --no-cache-dir -r /app/requirements.txt
 
-# Hugging Face 모델과 토크나이저 데이터 미리 다운로드
-RUN python3 -c "\
-from transformers import AutoTokenizer, AutoModelForSequenceClassification; \
-tokenizer = AutoTokenizer.from_pretrained('klue/roberta-small'); \
-model = AutoModelForSequenceClassification.from_pretrained('klue/roberta-small')"
+## Hugging Face 모델과 토크나이저 데이터 미리 다운로드
+#RUN python3 -c "\
+#from transformers import AutoTokenizer, AutoModelForSequenceClassification; \
+#tokenizer = AutoTokenizer.from_pretrained('klue/roberta-small'); \
+#model = AutoModelForSequenceClassification.from_pretrained('klue/roberta-small')"
 
 # 4. 변경 가능성이 높은 파일 복사
 COPY score.py /app/score.py
