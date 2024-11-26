@@ -28,6 +28,7 @@ public class ScoreService {
     private final StockRepository stockRepository;
 
     public ScoreResponse getScoreById(Integer id, COUNTRY country) {
+        // 첫 인간지표인경우
         if (isFirst(id)) {
             Stock stock = stockRepository.findById(id).orElseThrow(() -> new RuntimeException("Could not find stock"));
             // STEP1: AI 실행
@@ -57,8 +58,14 @@ public class ScoreService {
             // 첫 인간지표가 아닌 경우: 오늘 날짜 데이터를 조회
             LocalDate today = LocalDate.now();
             Score score = scoreRepository.findByStockIdAndDate(id, today)
-                                         .orElseThrow(() -> new RuntimeException("Score not found for stock_id: " + id + " and date: " + today));
+                                         .orElseGet(() -> {
+                                             // 오늘 데이터가 없으면 하루 전 날짜 데이터 조회
+                                             LocalDate yesterday = today.minusDays(1);
+                                             return scoreRepository.findByStockIdAndDate(id, yesterday)
+                                                                   .orElseThrow(() -> new RuntimeException("Score not found for stock_id: " + id + " and date: " + today + " or " + yesterday));
+                                         });
 
+            // country에 따라 점수 선택
             int scoreValue = (country == COUNTRY.KOREA) ? score.getScoreKorea() : score.getScoreOversea();
 
             return ScoreResponse.builder()
