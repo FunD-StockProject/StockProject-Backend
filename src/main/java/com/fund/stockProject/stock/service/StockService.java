@@ -78,6 +78,7 @@ public class StockService {
      * @param country 국내/해외 분류
      * @return 점수 정보
      */
+    // TODO: 오늘 날짜 점수 반환하도록(없으면 어제)
     public Mono<List<StockSimpleResponse>> getHotStocks(COUNTRY country) {
         if (country == COUNTRY.KOREA) {
             return securityService.getVolumeRankKorea()

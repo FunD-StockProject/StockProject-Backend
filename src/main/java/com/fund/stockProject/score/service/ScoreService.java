@@ -3,11 +3,13 @@ package com.fund.stockProject.score.service;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,6 +29,11 @@ public class ScoreService {
     private final ScoreRepository scoreRepository;
     private final StockRepository stockRepository;
 
+    @Transactional(readOnly = true)
+    public List<Score> findScoresByDate(LocalDate yesterday, LocalDate today) {
+        return scoreRepository.findScoresWithoutTodayData(yesterday, today);
+    }
+
     public ScoreResponse getScoreById(Integer id, COUNTRY country) {
         // 첫 인간지표인경우
         if (isFirst(id)) {
@@ -34,21 +41,21 @@ public class ScoreService {
             // STEP1: AI 실행
             int finalScore = executeScoreAI(stock.getSymbol(), country);
 
-            // STEP3: SCORE 데이터 저장
+            // STEP2: SCORE 데이터 저장
             Score newScore = Score.builder()
                                   .stockId(stock.getId())
                                   .date(LocalDate.now())
-                                  .scoreKorea(country == COUNTRY.KOREA? finalScore : 0)  // 예제 점수
-                                  .scoreNaver(0)
-                                  .scoreReddit(0)
-                                  .scoreOversea(country == COUNTRY.OVERSEA? finalScore : 0)
+                                  .scoreKorea(country == COUNTRY.KOREA? finalScore : 9999)
+                                  .scoreNaver(finalScore)
+                                  .scoreReddit(9999)
+                                  .scoreOversea(country == COUNTRY.OVERSEA? finalScore : 9999)
                                   .diff(0)
                                   .build();
             // `stock` 연관 설정
             newScore.setStock(stock);
             scoreRepository.save(newScore);
 
-            // STEP4: 기존의 초기 데이터 삭제 (1111-11-11)
+            // STEP3: 기존의 초기 데이터 삭제 (1111-11-11)
             scoreRepository.deleteByStockIdAndDate(id, LocalDate.of(1111, 11, 11));
 
             return ScoreResponse.builder()
@@ -72,6 +79,27 @@ public class ScoreService {
                                 .score(scoreValue)
                                 .build();
         }
+    }
+
+    public void updateScore(Integer id, COUNTRY country, int yesterdayScore) {
+        Stock stock = stockRepository.findById(id).orElseThrow(() -> new RuntimeException("Could not find stock"));
+        // STEP1: AI 실행
+        int finalScore = executeScoreAI(stock.getSymbol(), country);
+
+        // STEP2: SCORE 데이터 저장
+        Score newScore = Score.builder()
+                              .stockId(stock.getId())
+                              .date(LocalDate.now())
+                              .scoreKorea(country == COUNTRY.KOREA? finalScore : 9999)
+                              .scoreNaver(finalScore)
+                              .scoreReddit(9999)
+                              .scoreOversea(country == COUNTRY.OVERSEA? finalScore : 9999)
+                              .diff(finalScore - yesterdayScore)
+                              .build();
+        // `stock` 연관 설정
+        newScore.setStock(stock);
+        scoreRepository.save(newScore);
+
     }
 
     private boolean isFirst(Integer id) {

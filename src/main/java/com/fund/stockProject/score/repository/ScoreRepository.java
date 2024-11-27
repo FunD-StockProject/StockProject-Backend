@@ -77,4 +77,13 @@ public interface ScoreRepository extends JpaRepository<Score, Integer> {
     @Query("DELETE FROM Score s WHERE s.stockId = :stockId AND s.date = :date")
     void deleteByStockIdAndDate(@Param("stockId") Integer stockId, @Param("date") LocalDate date);
 
+    @Query("""
+    SELECT s1 
+    FROM Score s1 
+    LEFT JOIN Score s2 
+      ON s1.stockId = s2.stockId AND s2.date = :today
+    WHERE s1.date = :yesterday
+      AND s2.stockId IS NULL
+""")
+    List<Score> findScoresWithoutTodayData(@Param("yesterday") LocalDate yesterday, @Param("today") LocalDate today);
 }
