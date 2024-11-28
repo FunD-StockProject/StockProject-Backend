@@ -44,9 +44,6 @@ public class StockService {
             .symbolName(stock.getSymbolName())
             .securityName(stock.getSecurityName())
             .exchangeNum(stock.getExchangeNum())
-            .scoreId(stock.getScore().getStockId())
-            .scoreKorea(stock.getScore().getScoreKorea())
-            .scoreOversea(stock.getScore().getScoreOversea())
             .build();
     }
 
@@ -65,9 +62,6 @@ public class StockService {
                 .symbolName(stock.getSymbolName())
                 .securityName(stock.getSecurityName())
                 .exchangeNum(stock.getExchangeNum())
-                .scoreId(stock.getScore().getStockId())
-                 .scoreKorea(stock.getScore().getScoreKorea())
-                 .scoreOversea(stock.getScore().getScoreOversea())
                 .build())
             .collect(Collectors.toList());
     }
@@ -78,30 +72,32 @@ public class StockService {
      * @param country 국내/해외 분류
      * @return 점수 정보
      */
-    // TODO: 오늘 날짜 점수 반환하도록(없으면 어제)
     public Mono<List<StockSimpleResponse>> getHotStocks(COUNTRY country) {
         if (country == COUNTRY.KOREA) {
+            // todo: symbol로 찾도록 수정 검토
             return securityService.getVolumeRankKorea()
                   .map(volumeRankResponses -> volumeRankResponses.stream().map(rankResponse -> {
-                         final Stock stock = stockRepository.findStockBySymbolName(rankResponse.getHtsKorIsnm())
+                         final Stock stock = stockRepository.findStockBySymbolNameWithScores(rankResponse.getHtsKorIsnm())
                                                             .orElseThrow(NoSuchElementException::new);
+
                          return StockSimpleResponse.builder()
-                                 .stockId(stock.getId())
-                                 .symbolName(stock.getSymbolName())
-                                 .score(stock.getScore().getScoreKorea())
-                                 .build();
+                                                   .stockId(stock.getId())
+                                                   .symbolName(stock.getSymbolName())
+                                                   .score(stock.getScores().get(0).getScoreKorea()) // 최신 데이터를 보장
+                                                   .build();
                      })
                      .collect(Collectors.toList()));
         } else if (country == COUNTRY.OVERSEA) {
             return securityService.getVolumeRankOversea()
                   .map(volumeRankResponses -> volumeRankResponses.stream().map(rankResponse -> {
-                         // 추후 symbolName으로 변경예정
-                         final Stock stock = stockRepository.findStockBySymbol(rankResponse.getSymb())
+                         System.out.println("rankResponse = " + rankResponse.getSymb());
+                         final Stock stock = stockRepository.findStockBySymbolWithScores(rankResponse.getSymb())
                                                             .orElseThrow(NoSuchElementException::new);
+
                          return StockSimpleResponse.builder()
                                                    .stockId(stock.getId())
                                                    .symbolName(stock.getSymbolName())
-                                                   .score(stock.getScore().getScoreOversea())
+                                                   .score(stock.getScores().get(0).getScoreOversea())
                                                    .build();
                      })
                      .collect(Collectors.toList()));
@@ -115,53 +111,68 @@ public class StockService {
      * @return 종목 정보
      */
     public List<StockDiffResponse> getRisingStocks(COUNTRY country) {
-        LocalDate today = LocalDate.now();
-        List<Score> topScores;
-
-        if (country == COUNTRY.KOREA) {
-            // 국내 로직: exchangeNum이 '1', '2'인 데이터를 조회
-            topScores = getTopScores(today, List.of("1", "2", "3"), true);
-        } else if (country == COUNTRY.OVERSEA) {
-            // 해외 로직: exchangeNum이 '1', '2'가 아닌 데이터를 조회
-            topScores = getTopScores(today, List.of("1", "2", "3"), false);
-        } else {
-            throw new IllegalArgumentException("Invalid country: " + country);
-        }
-
-        // 공통 변환 로직
+        List<Score> topScores = getTopScores(country);
         return convertToStockDiffResponses(topScores);
     }
 
     /**
-     * 지정된 조건에 따라 상위 3개의 Score 데이터를 조회합니다.
+     * 지정된 조건에 따라 상위 9개의 Score 데이터를 조회합니다.
      *
-     * @param date         날짜
-     * @param exchangeNums 거래소 코드 목록
-     * @param isInClause   true면 IN, false면 NOT IN 조건
      * @return 상위 3개의 Score 데이터
      */
-    private List<Score> getTopScores(LocalDate date, List<String> exchangeNums, boolean isInClause) {
-        if (isInClause) {
-            return scoreRepository.findTop3ByDateAndExchangeNums(date, exchangeNums);
+    private List<Score> getTopScores(COUNTRY country) {
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+
+        List<Score> topScores;
+
+        if (country == COUNTRY.KOREA) {
+            topScores = scoreRepository.findTopScoresKorea(today);
+
+            // 오늘 날짜 데이터가 없을 경우 어제 날짜로 재조회
+            if (topScores.isEmpty()) {
+                topScores = scoreRepository.findTopScoresKorea(yesterday);
+            }
         } else {
-            return scoreRepository.findTop3ByDateAndExchangeNumsNotIn(date, exchangeNums);
+            topScores = scoreRepository.findTopScoresOversea(today);
+
+            // 오늘 날짜 데이터가 없을 경우 어제 날짜로 재조회
+            if (topScores.isEmpty()) {
+                topScores = scoreRepository.findTopScoresOversea(yesterday);
+            }
         }
+
+        return topScores;
     }
 
     /**
-     * 지정된 조건에 따라 하위 3개의 Score 데이터를 조회합니다.
+     * 지정된 조건에 따라 하위 9개의 Score 데이터를 조회합니다.
      *
-     * @param date         날짜
-     * @param exchangeNums 거래소 코드 목록
-     * @param isInClause   true면 IN, false면 NOT IN 조건
      * @return 하위 3개의 Score 데이터
      */
-    private List<Score> getBottomScores(LocalDate date, List<String> exchangeNums, boolean isInClause) {
-        if (isInClause) {
-            return scoreRepository.findBottom3ByDateAndExchangeNums(date, exchangeNums);
+    private List<Score> getBottomScores(COUNTRY country) {
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+
+        List<Score> bottomScores;
+
+        if (country == COUNTRY.KOREA) {
+            bottomScores = scoreRepository.findBottomScoresKorea(today);
+
+            // 오늘 날짜 데이터가 없을 경우 어제 날짜로 재조회
+            if (bottomScores.isEmpty()) {
+                bottomScores = scoreRepository.findBottomScoresKorea(yesterday);
+            }
         } else {
-            return scoreRepository.findBottom3ByDateAndExchangeNumsNotIn(date, exchangeNums);
+            bottomScores = scoreRepository.findBottomScoresOversea(today);
+
+            // 오늘 날짜 데이터가 없을 경우 어제 날짜로 재조회
+            if (bottomScores.isEmpty()) {
+                bottomScores = scoreRepository.findBottomScoresOversea(yesterday);
+            }
         }
+
+        return bottomScores;
     }
 
     /**
@@ -186,40 +197,26 @@ public class StockService {
      * @param country 국내/해외 분류
      * @return 종목 정보
      */
-    // todo: 조회시점에 오늘 데이터가 없는 경우?
     public List<StockDiffResponse> getDescentStocks(COUNTRY country) {
-        LocalDate today = LocalDate.now();
-        List<Score> bottomScores;
-
-        if (country == COUNTRY.KOREA) {
-            // 국내 로직: exchangeNum이 '1', '2'인 데이터를 diff 오름차순으로 조회
-            bottomScores = getBottomScores(today, List.of("1", "2", "3"), true);
-        } else if (country == COUNTRY.OVERSEA) {
-            // 해외 로직: exchangeNum이 '1', '2'가 아닌 데이터를 diff 오름차순으로 조회
-            bottomScores = getBottomScores(today, List.of("1", "2", "3"), false);
-        } else {
-            throw new IllegalArgumentException("Invalid country: " + country);
-        }
-
-        // 공통 변환 로직
+        List<Score> bottomScores = getBottomScores(country);
         return convertToStockDiffResponses(bottomScores);
     }
 
-    public List<StockSimpleResponse> getRelevantStocks(final Integer id) {
-        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(id);
-
-        if(relevantStocksByExchangeNumAndScore.isEmpty()){
-            System.out.println("Stock " + id + " relevant Stocks are not found");
-
-            return null;
-        }
-
-        return relevantStocksByExchangeNumAndScore.stream().map(
-            stock -> StockSimpleResponse.builder()
-                .stockId(stock.getId())
-                .symbolName(stock.getSymbolName())
-                .score(stock.getExchangeNum().equals("1") || stock.getExchangeNum().equals("2") ? stock.getScore().getScoreKorea() : stock.getScore().getScoreOversea())
-                .build()
-        ).collect(Collectors.toList());
-    }
+//    public List<StockSimpleResponse> getRelevantStocks(final Integer id) {
+//        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(id);
+//
+//        if(relevantStocksByExchangeNumAndScore.isEmpty()){
+//            System.out.println("Stock " + id + " relevant Stocks are not found");
+//
+//            return null;
+//        }
+//
+//        return relevantStocksByExchangeNumAndScore.stream().map(
+//            stock -> StockSimpleResponse.builder()
+//                .stockId(stock.getId())
+//                .symbolName(stock.getSymbolName())
+//                .score(stock.getExchangeNum().equals("1") || stock.getExchangeNum().equals("2") ? stock.getScores().get(0).getScoreKorea() : stock.getScores().get(0).getScoreOversea())
+//                .build()
+//        ).collect(Collectors.toList());
+//    }
 }

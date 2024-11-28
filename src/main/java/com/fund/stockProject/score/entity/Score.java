@@ -23,7 +23,7 @@ public class Score extends Core {
     @Column(name = "date", nullable = false)
     private LocalDate date;
 
-    @OneToOne
+    @ManyToOne
     @JoinColumn(name = "stock_id", referencedColumnName = "id", insertable = false, updatable = false)
     private Stock stock;
 

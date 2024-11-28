@@ -1,5 +1,8 @@
 package com.fund.stockProject.stock.entity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.fund.stockProject.global.entity.Core;
 import com.fund.stockProject.score.entity.Score;
 
@@ -9,7 +12,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.SequenceGenerator;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -24,15 +28,14 @@ public class Stock extends Core {
     @SequenceGenerator(name = "stock_seq", sequenceName = "stock_sequence", allocationSize = 1)
     private Integer id;
 
-    @OneToOne(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Score score;
+    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("date DESC") // date 기준 내림차순 정렬
+    private List<Score> scores = new ArrayList<>();
 
     @Column(nullable = false)
     private String symbol;
 
-//    @Column(nullable = false)
-//    영문주식명 찾기를 위해 nullbable 주석처리
-    @Column
+    @Column(nullable = false)
     private String symbolName;
 
     @Column(nullable = false)

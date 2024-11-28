@@ -10,12 +10,12 @@ import lombok.Getter;
 @AllArgsConstructor
 public class StockSearchResponse {
     private Integer stockId;
-    private String symbol;
-    private String symbolName;
-    private String securityName;
-    private String exchangeNum;
 
-    private Integer scoreId;
-    private Integer scoreKorea;
-    private Integer scoreOversea;
+    private String symbol;
+
+    private String symbolName;
+
+    private String securityName;
+
+    private String exchangeNum;
 }

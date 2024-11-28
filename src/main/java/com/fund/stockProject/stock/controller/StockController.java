@@ -56,9 +56,9 @@ public class StockController {
         return ResponseEntity.ok().body(stockService.getDescentStocks(country));
     }
 
-    @GetMapping("/{id}/relevant")
-    @Operation(summary = "관련 종목 api", description = "현재 종목과 관련된 종목 api")
-    ResponseEntity<List<StockSimpleResponse>> getRelevantStocks(final @PathVariable("id") Integer id) {
-        return ResponseEntity.ok().body(stockService.getRelevantStocks(id));
-    }
+//    @GetMapping("/{id}/relevant")
+//    @Operation(summary = "관련 종목 api", description = "현재 종목과 관련된 종목 api")
+//    ResponseEntity<List<StockSimpleResponse>> getRelevantStocks(final @PathVariable("id") Integer id) {
+//        return ResponseEntity.ok().body(stockService.getRelevantStocks(id));
+//    }
 }

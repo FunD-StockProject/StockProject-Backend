@@ -17,50 +17,45 @@ import com.fund.stockProject.score.entity.Score;
 @Repository
 @EnableJpaRepositories
 public interface ScoreRepository extends JpaRepository<Score, Integer> {
-    /**
-     * 오늘 날짜의 diff 값이 가장 높은 상위 3개 데이터를 조회합니다.
-     * @param date 오늘 날짜
-     * @return 상위 3개 Score 리스트
-     */
-    @Query("""
-    SELECT s 
-    FROM Score s
-    WHERE s.date = :date 
-      AND s.stock.exchangeNum IN :exchangeNums
-    ORDER BY s.diff DESC
-    LIMIT 9
+    @Query(value = """
+SELECT DISTINCT s
+FROM Score s
+WHERE s.date = :date
+  AND s.scoreOversea = 9999
+ORDER BY s.diff DESC
+LIMIT 9
 """)
-    List<Score> findTop3ByDateAndExchangeNums(@Param("date") LocalDate date, @Param("exchangeNums") List<String> exchangeNums);
+    List<Score> findTopScoresKorea(@Param("date") LocalDate date);
 
-    @Query("""
-    SELECT s 
-    FROM Score s
-    WHERE s.date = :date 
-      AND s.stock.exchangeNum NOT IN :exchangeNums
-    ORDER BY s.diff DESC
-    LIMIT 9
+    @Query(value = """
+SELECT DISTINCT s
+FROM Score s
+WHERE s.date = :date
+  AND s.scoreKorea = 9999
+ORDER BY s.diff DESC
+LIMIT 9
 """)
-    List<Score> findTop3ByDateAndExchangeNumsNotIn(@Param("date") LocalDate date, @Param("exchangeNums") List<String> exchangeNums);
+    List<Score> findTopScoresOversea(@Param("date") LocalDate date);
 
-    @Query("""
-    SELECT s 
-    FROM Score s
-    WHERE s.date = :date 
-      AND s.stock.exchangeNum IN :exchangeNums
-    ORDER BY s.diff ASC
-    LIMIT 9
+    @Query(value = """
+SELECT DISTINCT s
+FROM Score s
+WHERE s.date = :date
+  AND s.scoreOversea = 9999
+ORDER BY s.diff
+LIMIT 9
 """)
-    List<Score> findBottom3ByDateAndExchangeNums(@Param("date") LocalDate date, @Param("exchangeNums") List<String> exchangeNums);
+    List<Score> findBottomScoresKorea(@Param("date") LocalDate date);
 
-    @Query("""
-    SELECT s 
-    FROM Score s
-    WHERE s.date = :date 
-      AND s.stock.exchangeNum NOT IN :exchangeNums
-    ORDER BY s.diff ASC
-    LIMIT 9
+    @Query(value = """
+SELECT DISTINCT s
+FROM Score s
+WHERE s.date = :date
+  AND s.scoreKorea = 9999
+ORDER BY s.diff
+LIMIT 9
 """)
-    List<Score> findBottom3ByDateAndExchangeNumsNotIn(@Param("date") LocalDate date, @Param("exchangeNums") List<String> exchangeNums);
+    List<Score> findBottomScoresOversea(@Param("date") LocalDate date);
 
     /**
      * stock_id와 date로 특정 데이터가 존재하는지 확인
