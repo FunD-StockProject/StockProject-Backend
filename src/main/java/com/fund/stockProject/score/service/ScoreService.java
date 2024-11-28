@@ -136,7 +136,6 @@ public class ScoreService {
             // Python 스크립트에서 출력된 JSON 파싱
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode jsonNode = objectMapper.readTree(output);
-            System.out.println("final score : " + jsonNode.get("final_score").asInt());
             return jsonNode.get("final_score").asInt();
 
         } catch (Exception e) {

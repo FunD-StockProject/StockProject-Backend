@@ -68,4 +68,12 @@ public class Score extends Core {
             this.stockId = stock.getId(); // stock의 id로 stockId 동기화
         }
     }
+
+    public void setScoreKorea(Integer scoreKorea) {
+        this.scoreKorea = scoreKorea;
+    }
+
+    public void setScoreOversea(Integer scoreOversea) {
+        this.scoreOversea = scoreOversea;
+    }
 }

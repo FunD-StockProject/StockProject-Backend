@@ -2,6 +2,7 @@ package com.fund.stockProject.stock.service;
 
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
+import com.fund.stockProject.score.service.ScoreService;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.dto.response.StockDiffResponse;
 import com.fund.stockProject.stock.dto.response.StockSearchResponse;
@@ -25,13 +26,15 @@ public class StockService {
     private final ScoreRepository scoreRepository;
     private final StockQueryRepository stockQueryRepository;
     private final SecurityService securityService;
+    private final ScoreService scoreService;
 
     public StockService(StockRepository stockRepository, ScoreRepository scoreRepository, StockQueryRepository stockQueryRepository,
-                        SecurityService securityService) {
+                        SecurityService securityService, ScoreService scoreService) {
         this.stockRepository = stockRepository;
         this.scoreRepository = scoreRepository;
         this.stockQueryRepository = stockQueryRepository;
         this.securityService = securityService;
+        this.scoreService = scoreService;
     }
 
     public StockSearchResponse searchStockBySymbolName(final String symbolName) {
@@ -74,11 +77,18 @@ public class StockService {
      */
     public Mono<List<StockSimpleResponse>> getHotStocks(COUNTRY country) {
         if (country == COUNTRY.KOREA) {
-            // todo: symbol로 찾도록 수정 검토
             return securityService.getVolumeRankKorea()
                   .map(volumeRankResponses -> volumeRankResponses.stream().map(rankResponse -> {
                          final Stock stock = stockRepository.findStockBySymbolNameWithScores(rankResponse.getHtsKorIsnm())
                                                             .orElseThrow(NoSuchElementException::new);
+
+                         // 첫 인간지표인 경우, 점수 계산 실행
+                         LocalDate initialDate = LocalDate.of(1111, 11, 11);
+                         if (stock.getScores().get(0).getDate().isEqual(initialDate)) {
+                             int newScore = scoreService.getScoreById(stock.getId(), country).getScore();
+                             // 첫 Score의 점수를 갱신
+                             stock.getScores().get(0).setScoreKorea(newScore);
+                         }
 
                          return StockSimpleResponse.builder()
                                                    .stockId(stock.getId())
@@ -90,9 +100,16 @@ public class StockService {
         } else if (country == COUNTRY.OVERSEA) {
             return securityService.getVolumeRankOversea()
                   .map(volumeRankResponses -> volumeRankResponses.stream().map(rankResponse -> {
-                         System.out.println("rankResponse = " + rankResponse.getSymb());
                          final Stock stock = stockRepository.findStockBySymbolWithScores(rankResponse.getSymb())
                                                             .orElseThrow(NoSuchElementException::new);
+
+                         // 첫 인간지표인 경우, 점수 계산 실행
+                         LocalDate initialDate = LocalDate.of(1111, 11, 11);
+                         if (stock.getScores().get(0).getDate().isEqual(initialDate)) {
+                             int newScore = scoreService.getScoreById(stock.getId(), country).getScore();
+                             // 첫 Score의 점수를 갱신
+                             stock.getScores().get(0).setScoreOversea(newScore);
+                         }
 
                          return StockSimpleResponse.builder()
                                                    .stockId(stock.getId())
@@ -112,7 +129,7 @@ public class StockService {
      */
     public List<StockDiffResponse> getRisingStocks(COUNTRY country) {
         List<Score> topScores = getTopScores(country);
-        return convertToStockDiffResponses(topScores);
+        return convertToStockDiffResponses(topScores, country);
     }
 
     /**
@@ -181,12 +198,12 @@ public class StockService {
      * @param scores Score 데이터 목록
      * @return 변환된 StockDiffResponse 목록
      */
-    private List<StockDiffResponse> convertToStockDiffResponses(List<Score> scores) {
+    private List<StockDiffResponse> convertToStockDiffResponses(List<Score> scores, COUNTRY country) {
         return scores.stream()
                      .map(score -> StockDiffResponse.builder()
                                                     .stockId(score.getStock().getId())
                                                     .symbolName(score.getStock().getSymbolName())
-                                                    .score(score.getScoreKorea())
+                                                    .score(country == COUNTRY.KOREA? score.getScoreKorea() : score.getScoreOversea())
                                                     .diff(score.getDiff())
                                                     .build())
                      .collect(Collectors.toList());
@@ -199,7 +216,7 @@ public class StockService {
      */
     public List<StockDiffResponse> getDescentStocks(COUNTRY country) {
         List<Score> bottomScores = getBottomScores(country);
-        return convertToStockDiffResponses(bottomScores);
+        return convertToStockDiffResponses(bottomScores, country);
     }
 
 //    public List<StockSimpleResponse> getRelevantStocks(final Integer id) {
