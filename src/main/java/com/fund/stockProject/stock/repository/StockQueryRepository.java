@@ -40,7 +40,7 @@ public class StockQueryRepository {
             .equals("2")) {
             return jpaQueryFactory.selectFrom(QStock.stock).where(
                 QStock.stock.exchangeNum.eq(currentStock.getExchangeNum())
-                    .and(QStock.stock.score.scoreKorea.between(
+                    .and(QStock.stock.scores.get(0).scoreKorea.between(
                         currentStock.getScores().get(0).getScoreKorea() - 10,
                         currentStock.getScores().get(0).getScoreKorea() + 10))
                     .and(QStock.stock.ne(currentStock))
@@ -50,7 +50,7 @@ public class StockQueryRepository {
         return jpaQueryFactory.selectFrom(QStock.stock)
             .where(
                 QStock.stock.exchangeNum.eq(currentStock.getExchangeNum())
-                    .and(QStock.stock.score.scoreOversea.between(
+                    .and(QStock.stock.scores.get(0).scoreOversea.between(
                         currentStock.getScores().get(0).getScoreOversea() - 10,
                         currentStock.getScores().get(0).getScoreOversea() + 10))
                     .and(QStock.stock.ne(currentStock))
