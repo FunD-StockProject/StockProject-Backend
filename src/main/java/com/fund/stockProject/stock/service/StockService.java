@@ -48,6 +48,7 @@ public class StockService {
             .symbolName(stock.getSymbolName())
             .securityName(stock.getSecurityName())
             .exchangeNum(stock.getExchangeNum())
+            .country(List.of("1", "2", "3").contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA)
             .build();
     }
 
