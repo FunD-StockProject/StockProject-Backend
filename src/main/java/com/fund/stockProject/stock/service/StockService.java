@@ -14,6 +14,7 @@ import com.fund.stockProject.stock.repository.StockRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
@@ -78,46 +79,46 @@ public class StockService {
     public Mono<List<StockSimpleResponse>> getHotStocks(COUNTRY country) {
         if (country == COUNTRY.KOREA) {
             return securityService.getVolumeRankKorea()
-                  .map(volumeRankResponses -> volumeRankResponses.stream().map(rankResponse -> {
-                         final Stock stock = stockRepository.findStockBySymbolNameWithScores(rankResponse.getHtsKorIsnm())
-                                                            .orElseThrow(NoSuchElementException::new);
+                  .map(volumeRankResponses -> volumeRankResponses.stream()
+                                                                 .map(rankResponse -> stockRepository.findStockBySymbolNameWithScores(rankResponse.getHtsKorIsnm()).orElse(null))
+                                                                 .filter(Objects::nonNull) // null인 경우 건너뜀
+                                                                 .map(stock -> {
+                                                                     // 첫 인간지표인 경우, 점수 계산 실행
+                                                                     LocalDate initialDate = LocalDate.of(1111, 11, 11);
+                                                                     if (stock.getScores().get(0).getDate().isEqual(initialDate)) {
+                                                                         int newScore = scoreService.getScoreById(stock.getId(), country).getScore();
+                                                                         // 첫 Score의 점수를 갱신
+                                                                         stock.getScores().get(0).setScoreKorea(newScore);
+                                                                     }
 
-                         // 첫 인간지표인 경우, 점수 계산 실행
-                         LocalDate initialDate = LocalDate.of(1111, 11, 11);
-                         if (stock.getScores().get(0).getDate().isEqual(initialDate)) {
-                             int newScore = scoreService.getScoreById(stock.getId(), country).getScore();
-                             // 첫 Score의 점수를 갱신
-                             stock.getScores().get(0).setScoreKorea(newScore);
-                         }
-
-                         return StockSimpleResponse.builder()
-                                                   .stockId(stock.getId())
-                                                   .symbolName(stock.getSymbolName())
-                                                   .score(stock.getScores().get(0).getScoreKorea()) // 최신 데이터를 보장
-                                                   .build();
-                     })
-                     .collect(Collectors.toList()));
+                                                                     return StockSimpleResponse.builder()
+                                                                                               .stockId(stock.getId())
+                                                                                               .symbolName(stock.getSymbolName())
+                                                                                               .score(stock.getScores().get(0).getScoreKorea()) // 최신 데이터를 보장
+                                                                                               .build();
+                                                                 })
+                                                                 .collect(Collectors.toList()));
         } else if (country == COUNTRY.OVERSEA) {
             return securityService.getVolumeRankOversea()
-                  .map(volumeRankResponses -> volumeRankResponses.stream().map(rankResponse -> {
-                         final Stock stock = stockRepository.findStockBySymbolWithScores(rankResponse.getSymb())
-                                                            .orElseThrow(NoSuchElementException::new);
+                  .map(volumeRankResponses -> volumeRankResponses.stream()
+                                                                 .map(rankResponse -> stockRepository.findStockBySymbolWithScores(rankResponse.getSymb()).orElse(null))
+                                                                 .filter(Objects::nonNull) // null인 경우 건너뜀
+                                                                 .map(stock -> {
+                                                                     // 첫 인간지표인 경우, 점수 계산 실행
+                                                                     LocalDate initialDate = LocalDate.of(1111, 11, 11);
+                                                                     if (stock.getScores().get(0).getDate().isEqual(initialDate)) {
+                                                                         int newScore = scoreService.getScoreById(stock.getId(), country).getScore();
+                                                                         // 첫 Score의 점수를 갱신
+                                                                         stock.getScores().get(0).setScoreOversea(newScore);
+                                                                     }
 
-                         // 첫 인간지표인 경우, 점수 계산 실행
-                         LocalDate initialDate = LocalDate.of(1111, 11, 11);
-                         if (stock.getScores().get(0).getDate().isEqual(initialDate)) {
-                             int newScore = scoreService.getScoreById(stock.getId(), country).getScore();
-                             // 첫 Score의 점수를 갱신
-                             stock.getScores().get(0).setScoreOversea(newScore);
-                         }
-
-                         return StockSimpleResponse.builder()
-                                                   .stockId(stock.getId())
-                                                   .symbolName(stock.getSymbolName())
-                                                   .score(stock.getScores().get(0).getScoreOversea())
-                                                   .build();
-                     })
-                     .collect(Collectors.toList()));
+                                                                     return StockSimpleResponse.builder()
+                                                                                               .stockId(stock.getId())
+                                                                                               .symbolName(stock.getSymbolName())
+                                                                                               .score(stock.getScores().get(0).getScoreOversea())
+                                                                                               .build();
+                                                                 })
+                                                                 .collect(Collectors.toList()));
         }
         return Mono.error(new IllegalArgumentException("Invalid country: " + country));
     }
