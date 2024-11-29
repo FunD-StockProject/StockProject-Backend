@@ -1,12 +1,14 @@
 package com.fund.stockProject.global.config;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.fund.stockProject.global.dto.request.AccessTokenRequest;
@@ -21,20 +23,18 @@ public class SecurityHttpConfig {
     @Value("${security.appsecret}")
     private String appSecret;
 
-    private String accessToken; // 초기화를 나중에 수행
-    private LocalDateTime lastTokenUpdateTime = LocalDateTime.now(); // 마지막 갱신 시간
+    private volatile String accessToken;
+    private volatile LocalDateTime expiredDateTime = LocalDateTime.now();
 
     @Bean
     public WebClient webClient() {
         return WebClient.builder()
                         .baseUrl("https://openapi.koreainvestment.com:9443")
-                        .defaultHeaders(httpHeaders -> httpHeaders.addAll(createSecurityHeaders()))
-                        .build();
+                        .build(); // 기본 헤더는 WebClient 호출 시 동적으로 설정
     }
 
-    @Bean
-    public synchronized HttpHeaders createSecurityHeaders() {
-        refreshTokenIfNeeded(); // 헤더 생성 시 토큰 갱신 여부 확인
+    public HttpHeaders createSecurityHeaders() {
+        refreshTokenIfNeeded(); // 항상 최신 토큰을 보장
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(accessToken);
@@ -58,6 +58,8 @@ public class SecurityHttpConfig {
                                                     .block();
 
             if (response != null) {
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                expiredDateTime = LocalDateTime.parse(response.getAccessTokenExpired(), formatter);
                 return response.getAccessToken();
             } else {
                 throw new RuntimeException("Failed to fetch access token: Response is null");
@@ -68,14 +70,22 @@ public class SecurityHttpConfig {
         }
     }
 
-    public synchronized void refreshTokenIfNeeded() {
-        if (accessToken == null || lastTokenUpdateTime.plusHours(24).isBefore(LocalDateTime.now())) {
-            String oldToken = accessToken; // 이전 토큰 로깅
-            accessToken = fetchAccessTokenFromApi();
-            lastTokenUpdateTime = LocalDateTime.now();
-            System.out.println("AccessToken 갱신 완료: " + lastTokenUpdateTime);
-            System.out.println("이전 AccessToken: " + oldToken);
-            System.out.println("새로운 AccessToken: " + accessToken);
+    public void refreshTokenIfNeeded() {
+        if (accessToken == null || LocalDateTime.now().isAfter(expiredDateTime)) {
+            synchronized (this) {
+                if (accessToken == null || LocalDateTime.now().isAfter(expiredDateTime)) {
+                    String oldToken = accessToken;
+                    accessToken = fetchAccessTokenFromApi();
+                    System.out.println("토큰 기간 만료: " + expiredDateTime);
+                    System.out.println("이전 AccessToken: " + oldToken);
+                    System.out.println("새로운 AccessToken: " + accessToken);
+                }
+            }
         }
+    }
+
+    @Scheduled(fixedRate = 3600000) // 1시간마다 토큰 갱신 확인
+    public void scheduledTokenRefresh() {
+        refreshTokenIfNeeded();
     }
 }
