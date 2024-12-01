@@ -29,6 +29,4 @@ public class Core {
     @JsonIgnore
     private LocalDateTime modifiedAt;
 
-    private LocalDateTime deletedAt;
-
 }

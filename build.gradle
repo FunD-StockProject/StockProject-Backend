@@ -59,6 +59,9 @@ dependencies {
 
 	// mysql
 	runtimeOnly 'com.mysql:mysql-connector-j'
+
+	// python 스크립트 처리
+	implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.0'
 }
 
 tasks.named('test') {
@@ -66,11 +69,6 @@ tasks.named('test') {
 }
 
 // QueryDSL 빌드 옵션
-def querydslSrcDir = 'src/main/generated'
 clean{
-	delete file(querydslSrcDir)
-}
-
-tasks.withType(JavaCompile){
-	options.generatedSourceOutputDirectory = file(querydslSrcDir)
+	delete file("src/main/generated")
 }

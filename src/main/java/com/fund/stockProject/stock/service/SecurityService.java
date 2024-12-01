@@ -29,9 +29,6 @@ public class SecurityService {
      * 한국 거래량 순위 조회
      */
     public Mono<List<StockKoreaVolumeRankResponse>> getVolumeRankKorea() {
-        HttpHeaders headers = securityHttpConfig.createSecurityHeaders();
-        headers.set("tr_id", "FHPST01710000");
-
         return webClient.get()
                         .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/quotations/volume-rank")
                                                      .queryParam("FID_COND_MRKT_DIV_CODE", "J")
@@ -46,7 +43,11 @@ public class SecurityService {
                                                      .queryParam("FID_VOL_CNT", "0")
                                                      .queryParam("FID_INPUT_DATE_1", "")
                                                      .build())
-                        .headers(httpHeaders -> httpHeaders.addAll(headers))
+                        .headers(httpHeaders -> {
+                            HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                            headers.set("tr_id", "FHPST01710000"); // 추가 헤더 설정
+                            httpHeaders.addAll(headers);
+                        })
                         .retrieve()
                         .bodyToMono(String.class)
                         .flatMap(this::parseFVolumeRankKorea);
@@ -56,9 +57,6 @@ public class SecurityService {
      * 해외 거래량 순위 조회
      */
     public Mono<List<StockOverseaVolumeRankResponse>> getVolumeRankOversea() {
-        HttpHeaders headers = securityHttpConfig.createSecurityHeaders();
-        headers.set("tr_id", "HHDFS76410000");
-
         return webClient.get()
                         .uri(uriBuilder -> uriBuilder.path("/uapi/overseas-price/v1/quotations/inquire-search")
                                                      .queryParam("AUTH", "")
@@ -88,7 +86,11 @@ public class SecurityService {
                                                      .queryParam("CO_ST_PER", "")
                                                      .queryParam("CO_EN_PER", "")
                                                      .build())
-                        .headers(httpHeaders -> httpHeaders.addAll(headers))
+                        .headers(httpHeaders -> {
+                            HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                            headers.set("tr_id", "HHDFS76410000"); // 추가 헤더 설정
+                            httpHeaders.addAll(headers);
+                        })
                         .retrieve()
                         .bodyToMono(String.class)
                         .flatMap(this::parseFVolumeRankOversea);

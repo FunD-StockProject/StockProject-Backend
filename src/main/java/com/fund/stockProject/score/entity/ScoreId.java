@@ -1,11 +1,9 @@
 package com.fund.stockProject.score.entity;
 
-import jakarta.persistence.Embeddable;
 import java.io.Serializable;
 import java.time.LocalDate;
 import java.util.Objects;
 
-@Embeddable
 public class ScoreId implements Serializable {
 
     private Integer stockId;  // Stock의 ID
@@ -15,23 +13,6 @@ public class ScoreId implements Serializable {
 
     public ScoreId(Integer stockId, LocalDate date) {
         this.stockId = stockId;
-        this.date = date;
-    }
-
-    // Getter, Setter, equals, hashCode 추가
-    public Integer getStockId() {
-        return stockId;
-    }
-
-    public void setStockId(Integer stockId) {
-        this.stockId = stockId;
-    }
-
-    public LocalDate getDate() {
-        return date;
-    }
-
-    public void setDate(LocalDate date) {
         this.date = date;
     }
 
