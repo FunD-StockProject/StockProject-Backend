@@ -31,7 +31,7 @@ public class StockQueryRepository {
 
         return jpaQueryFactory.selectFrom(QStock.stock)
             .where(condition)
-            .limit(10)
+            .limit(30)
             .fetch();
     }
 
