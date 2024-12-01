@@ -51,6 +51,12 @@ dependencies {
 	annotationProcessor "jakarta.annotation:jakarta.annotation-api"
 	annotationProcessor "jakarta.persistence:jakarta.persistence-api"
 
+	// Batch 의존성
+	implementation 'org.springframework.boot:spring-boot-starter-batch'
+
+	// webclient
+	implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
 	// mysql
 	runtimeOnly 'com.mysql:mysql-connector-j'
 
@@ -63,11 +69,6 @@ tasks.named('test') {
 }
 
 // QueryDSL 빌드 옵션
-def querydslSrcDir = 'src/main/generated'
 clean{
-	delete file(querydslSrcDir)
-}
-
-tasks.withType(JavaCompile){
-	options.generatedSourceOutputDirectory = file(querydslSrcDir)
+	delete file("src/main/generated")
 }

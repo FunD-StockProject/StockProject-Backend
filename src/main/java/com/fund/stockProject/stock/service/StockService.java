@@ -1,5 +1,8 @@
 package com.fund.stockProject.stock.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fund.stockProject.global.config.SecurityHttpConfig;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
 import com.fund.stockProject.score.service.ScoreService;
@@ -16,11 +19,16 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 @Service
+@RequiredArgsConstructor
 public class StockService {
 
     private final StockRepository stockRepository;
@@ -28,15 +36,10 @@ public class StockService {
     private final StockQueryRepository stockQueryRepository;
     private final SecurityService securityService;
     private final ScoreService scoreService;
+    private final SecurityHttpConfig securityHttpConfig;
+    private final WebClient webClient;
+    private final ObjectMapper objectMapper;
 
-    public StockService(StockRepository stockRepository, ScoreRepository scoreRepository, StockQueryRepository stockQueryRepository,
-                        SecurityService securityService, ScoreService scoreService) {
-        this.stockRepository = stockRepository;
-        this.scoreRepository = scoreRepository;
-        this.stockQueryRepository = stockQueryRepository;
-        this.securityService = securityService;
-        this.scoreService = scoreService;
-    }
 
     public StockSearchResponse searchStockBySymbolName(final String symbolName) {
         final Stock stock = stockRepository.findStockBySymbolName(symbolName)
@@ -56,8 +59,8 @@ public class StockService {
     public List<StockSearchResponse> autoCompleteKeyword(String keyword) {
         final List<Stock> stocks = stockQueryRepository.autocompleteKeyword(keyword);
 
-        if(stocks.isEmpty()){
-            throw new NoSuchElementException();
+        if (stocks.isEmpty()) {
+            return null;
         }
 
         return stocks.stream()
@@ -69,6 +72,42 @@ public class StockService {
                 .exchangeNum(stock.getExchangeNum())
                 .build())
             .collect(Collectors.toList());
+    }
+
+    /**
+     * API 호출을 통해 symbol_name을 가져옵니다.
+     *
+     * @param symbol      종목 심볼
+     * @param exchangeNum 거래소 코드 (String 타입)
+     * @return API에서 가져온 symbol_name (prdt_name 값)
+     */
+    public String fetchSymbolName(String symbol, String exchangeNum) {
+        try {
+            HttpHeaders headers = securityHttpConfig.createSecurityHeaders();
+            headers.set("tr_id", "CTPF1702R");
+
+            String response = webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                    .path("/uapi/overseas-price/v1/quotations/search-info")
+                    .queryParam("PDNO", symbol)
+                    .queryParam("PRDT_TYPE_CD", exchangeNum)
+                    .build())
+                .headers(httpHeaders -> httpHeaders.addAll(headers))
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            // JSON 파싱
+            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode outputNode = rootNode.path("output");
+
+            return outputNode.path("prdt_name").asText(null);
+        } catch (Exception e) {
+            System.err.println("Error while fetching symbol name for symbol: " + symbol);
+            e.printStackTrace();
+
+            return null;
+        }
     }
 
     /**

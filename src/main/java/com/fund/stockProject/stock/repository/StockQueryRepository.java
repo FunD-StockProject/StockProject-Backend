@@ -1,13 +1,13 @@
 package com.fund.stockProject.stock.repository;
 
+import static com.fund.stockProject.score.entity.QScore.score;
+
 import com.fund.stockProject.stock.entity.QStock;
 import com.fund.stockProject.stock.entity.Stock;
-
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-
 import java.util.ArrayList;
 import java.util.List;
-
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -20,9 +20,18 @@ public class StockQueryRepository {
     }
 
     public List<Stock> autocompleteKeyword(String keyword) {
+        final String[] keywordParts = keyword.split("");
+
+        BooleanExpression condition = null;
+
+        for (String part : keywordParts) {
+            BooleanExpression containsPart = QStock.stock.symbolName.contains(part);
+            condition = (condition == null) ? containsPart : condition.and(containsPart);
+        }
+
         return jpaQueryFactory.selectFrom(QStock.stock)
-            .where(QStock.stock.symbolName.startsWith(keyword))
-            .limit(5)
+            .where(condition)
+            .limit(10)
             .fetch();
     }
 
@@ -36,18 +45,20 @@ public class StockQueryRepository {
             return new ArrayList<>();
         }
 
-        if (currentStock.getExchangeNum().equals("1") || currentStock.getExchangeNum()
-            .equals("2")) {
-            return jpaQueryFactory.selectFrom(QStock.stock).where(
-                QStock.stock.exchangeNum.eq(currentStock.getExchangeNum())
-                    .and(QStock.stock.scores.get(0).scoreKorea.between(
-                        currentStock.getScores().get(0).getScoreKorea() - 10,
-                        currentStock.getScores().get(0).getScoreKorea() + 10))
-                    .and(QStock.stock.ne(currentStock))
-            ).limit(3).fetch();
+        if (currentStock.getExchangeNum().equals("1") || currentStock.getExchangeNum().equals("2")) {
+            return jpaQueryFactory.selectFrom(QStock.stock)
+                .join(QStock.stock.scores, score).on()
+                .where(
+                    QStock.stock.exchangeNum.eq(currentStock.getExchangeNum())
+                        .and(score.scoreKorea.between(
+                            currentStock.getScores().get(0).getScoreKorea() - 10,
+                            currentStock.getScores().get(0).getScoreKorea() + 10))
+                        .and(QStock.stock.ne(currentStock))
+                ).limit(3).fetch();
         }
 
         return jpaQueryFactory.selectFrom(QStock.stock)
+            .join(QStock.stock.scores, score)
             .where(
                 QStock.stock.exchangeNum.eq(currentStock.getExchangeNum())
                     .and(QStock.stock.scores.get(0).scoreOversea.between(
