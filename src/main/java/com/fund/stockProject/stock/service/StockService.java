@@ -9,22 +9,21 @@ import com.fund.stockProject.score.service.ScoreService;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockDiffResponse;
+import com.fund.stockProject.stock.dto.response.StockRelevantResponse;
 import com.fund.stockProject.stock.dto.response.StockSearchResponse;
 import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockQueryRepository;
 import com.fund.stockProject.stock.repository.StockRepository;
-
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
-
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -77,8 +76,7 @@ public class StockService {
                 .symbolName(stock.getSymbolName())
                 .securityName(stock.getSecurityName())
                 .exchangeNum(stock.getExchangeNum())
-                .country(List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF)
-                    .contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA)
+                .country(List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF).contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA)
                 .build())
             .collect(Collectors.toList());
     }
@@ -274,7 +272,7 @@ public class StockService {
         return convertToStockDiffResponses(bottomScores, country);
     }
 
-    public List<StockSimpleResponse> getRelevantStocks(final Integer id) {
+    public List<StockRelevantResponse> getRelevantStocks(final Integer id) {
         Stock searchById = stockRepository.findStockById(id).orElse(null);
         final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(
             searchById);
@@ -285,15 +283,24 @@ public class StockService {
             return null;
         }
 
-        return relevantStocksByExchangeNumAndScore.stream().map(
-            stock -> StockSimpleResponse.builder()
-                .stockId(stock.getId())
-                .symbolName(stock.getSymbolName())
-                .score(stock.getExchangeNum().equals(EXCHANGENUM.KOSPI) || stock.getExchangeNum()
-                    .equals(EXCHANGENUM.KOSDAQ) || stock.getExchangeNum()
-                    .equals(EXCHANGENUM.KOREAN_ETF) ? stock.getScores().get(0).getScoreKorea()
-                    : stock.getScores().get(0).getScoreOversea())
-                .build()
-        ).collect(Collectors.toList());
+        final List<StockRelevantResponse> stockRelevantResponses = new ArrayList<>();
+
+        for (final Stock stock : relevantStocksByExchangeNumAndScore) {
+            stockRelevantResponses.add(
+                StockRelevantResponse.builder()
+                    .stockId(stock.getId())
+                    .symbolName(stock.getSymbolName())
+                    .score(
+                        stock.getExchangeNum().equals(EXCHANGENUM.KOSPI) || stock.getExchangeNum()
+                            .equals(EXCHANGENUM.KOSDAQ) || stock.getExchangeNum()
+                            .equals(EXCHANGENUM.KOREAN_ETF) ? stock.getScores().get(0)
+                            .getScoreKorea()
+                            : stock.getScores().get(0).getScoreOversea())
+                    .diff(stock.getScores().get(0).getDiff())
+                    .build()
+            );
+        }
+
+        return stockRelevantResponses;
     }
 }
