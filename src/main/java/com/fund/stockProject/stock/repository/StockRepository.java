@@ -1,6 +1,5 @@
 package com.fund.stockProject.stock.repository;
 
-import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.stock.entity.Stock;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;

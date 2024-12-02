@@ -55,8 +55,8 @@ public class StockQueryRepository {
             .where(
                 stock.exchangeNum.eq(currentExchangeNum) // Enum 비교
                     .and(score.scoreOversea.between(
-                        stockById.getScores().get(0).getScoreKorea() - 10,
-                        stockById.getScores().get(0).getScoreKorea() + 10))
+                        stockById.getScores().get(0).getScoreOversea() - 10,
+                        stockById.getScores().get(0).getScoreOversea() + 10))
                     .and(stock.id.ne(stockById.getId()))
             ).limit(3).fetch();
     }

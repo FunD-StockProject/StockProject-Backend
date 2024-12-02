@@ -15,17 +15,15 @@ import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockQueryRepository;
 import com.fund.stockProject.stock.repository.StockRepository;
-
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
-
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -44,8 +42,13 @@ public class StockService {
 
 
     public StockSearchResponse searchStockBySymbolName(final String symbolName) {
-        final Stock stock = stockRepository.findStockBySymbolName(symbolName)
-            .orElseThrow(NoSuchElementException::new);
+        final Optional<Stock> optionalStock = stockRepository.findStockBySymbolName(symbolName);
+
+        if (optionalStock.isEmpty()) {
+            return null;
+        }
+
+        final Stock stock = optionalStock.get();
 
         return StockSearchResponse.builder()
             .stockId(stock.getId())
@@ -280,7 +283,6 @@ public class StockService {
             return null;
         }
 
-        LocalDate today = LocalDate.now();
         final List<StockRelevantResponse> stockRelevantResponses = new ArrayList<>();
 
         for (final Stock stock : relevantStocksByExchangeNumAndScore) {
