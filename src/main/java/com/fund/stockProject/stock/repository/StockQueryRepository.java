@@ -39,7 +39,7 @@ public class StockQueryRepository {
         EXCHANGENUM currentExchangeNum = stockById.getExchangeNum(); // 현재 Stock의 ExchangeNum Enum
 
         if (currentExchangeNum == EXCHANGENUM.KOSPI || currentExchangeNum == EXCHANGENUM.KOSDAQ) {
-            return jpaQueryFactory.selectFrom(stock)
+            return jpaQueryFactory.selectDistinct(stock).from(stock)
                 .join(stock.scores, score).on()
                 .where(
                     stock.exchangeNum.eq(currentExchangeNum) // Enum 비교
@@ -50,7 +50,7 @@ public class StockQueryRepository {
                 ).limit(3).fetch();
         }
 
-        return jpaQueryFactory.selectFrom(stock)
+        return jpaQueryFactory.selectDistinct(stock).from(stock)
             .join(stock.scores, score)
             .where(
                 stock.exchangeNum.eq(currentExchangeNum) // Enum 비교
