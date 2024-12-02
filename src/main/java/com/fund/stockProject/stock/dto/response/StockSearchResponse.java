@@ -2,6 +2,7 @@ package com.fund.stockProject.stock.dto.response;
 
 
 import com.fund.stockProject.stock.domain.COUNTRY;
+import com.fund.stockProject.stock.domain.EXCHANGENUM;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,7 +20,7 @@ public class StockSearchResponse {
 
     private String securityName;
 
-    private String exchangeNum;
+    private EXCHANGENUM exchangeNum;
 
     private COUNTRY country;
 }

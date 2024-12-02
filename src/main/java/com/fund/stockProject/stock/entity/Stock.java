@@ -5,10 +5,14 @@ import java.util.List;
 
 import com.fund.stockProject.global.entity.Core;
 import com.fund.stockProject.score.entity.Score;
+import com.fund.stockProject.stock.domain.EXCHANGENUM;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -41,8 +45,10 @@ public class Stock extends Core {
     @Column(nullable = false)
     private String securityName;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String exchangeNum;
+    @Convert(converter = ExchangeNumConverter.class)
+    private EXCHANGENUM exchangeNum;
 
     // symbolName을 안전하게 설정하는 비즈니스 메서드
     public void updateSymbolNameIfNull(String symbolName) {

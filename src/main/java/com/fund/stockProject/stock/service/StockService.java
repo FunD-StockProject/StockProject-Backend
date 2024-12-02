@@ -7,6 +7,7 @@ import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
 import com.fund.stockProject.score.service.ScoreService;
 import com.fund.stockProject.stock.domain.COUNTRY;
+import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockDiffResponse;
 import com.fund.stockProject.stock.dto.response.StockSearchResponse;
 import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
@@ -19,7 +20,6 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
@@ -51,7 +51,7 @@ public class StockService {
             .symbolName(stock.getSymbolName())
             .securityName(stock.getSecurityName())
             .exchangeNum(stock.getExchangeNum())
-            .country(List.of("1", "2", "3").contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA)
+            .country(List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF).contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA)
             .build();
     }
 
@@ -81,7 +81,7 @@ public class StockService {
      * @param exchangeNum 거래소 코드 (String 타입)
      * @return API에서 가져온 symbol_name (prdt_name 값)
      */
-    public String fetchSymbolName(String symbol, String exchangeNum) {
+    public String fetchSymbolName(String symbol, EXCHANGENUM exchangeNum) {
         try {
             HttpHeaders headers = securityHttpConfig.createSecurityHeaders();
             headers.set("tr_id", "CTPF1702R");
@@ -90,7 +90,7 @@ public class StockService {
                 .uri(uriBuilder -> uriBuilder
                     .path("/uapi/overseas-price/v1/quotations/search-info")
                     .queryParam("PDNO", symbol)
-                    .queryParam("PRDT_TYPE_CD", exchangeNum)
+                    .queryParam("PRDT_TYPE_CD", String.valueOf(exchangeNum))
                     .build())
                 .headers(httpHeaders -> httpHeaders.addAll(headers))
                 .retrieve()
@@ -273,7 +273,7 @@ public class StockService {
             stock -> StockSimpleResponse.builder()
                 .stockId(stock.getId())
                 .symbolName(stock.getSymbolName())
-                .score(stock.getExchangeNum().equals("1") || stock.getExchangeNum().equals("2") ? stock.getScores().get(0).getScoreKorea() : stock.getScores().get(0).getScoreOversea())
+                .score(stock.getExchangeNum().equals(EXCHANGENUM.KOSPI) || stock.getExchangeNum().equals(EXCHANGENUM.KOSDAQ) || stock.getExchangeNum().equals(EXCHANGENUM.KOREAN_ETF) ? stock.getScores().get(0).getScoreKorea() : stock.getScores().get(0).getScoreOversea())
                 .build()
         ).collect(Collectors.toList());
     }
