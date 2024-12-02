@@ -3,6 +3,7 @@ package com.fund.stockProject.score.service;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -17,6 +18,7 @@ import com.fund.stockProject.score.dto.response.ScoreResponse;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
 import com.fund.stockProject.stock.domain.COUNTRY;
+import com.fund.stockProject.stock.dto.response.StockWordResponse;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockRepository;
 
@@ -81,6 +83,50 @@ public class ScoreService {
         }
     }
 
+
+    public List<StockWordResponse> getWordCloud(final String symbol, final COUNTRY country) {
+        try {
+            String scriptPath = "wc.py";
+
+            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol, country.toString());
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
+
+            // Asynchronously read the script output
+            String output = Executors.newSingleThreadExecutor().submit(() -> {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                return reader.lines()
+                             .filter(line -> line.trim().startsWith("{") && line.trim().endsWith("}")) // JSON format filtering
+                             .collect(Collectors.joining("\n"));
+            }).get(60, TimeUnit.SECONDS); // Maximum 60 seconds wait
+
+            System.out.println("Filtered output = " + output);
+
+            // Check the process exit code
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
+            }
+
+            // Parse the JSON output from the Python script
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode jsonNode = objectMapper.readTree(output);
+
+            // Parse the "word_cloud" array
+            List<StockWordResponse> wordCloud = new ArrayList<>();
+            for (JsonNode wordNode : jsonNode.get("word_cloud")) {
+                String word = wordNode.get("word").asText();
+                int freq = wordNode.get("freq").asInt();
+                wordCloud.add(new StockWordResponse(word, freq));
+            }
+
+            return wordCloud;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to execute Python script", e);
+        }
+    }
+
     public void updateScore(Integer id, COUNTRY country, int yesterdayScore) {
         Stock stock = stockRepository.findById(id).orElseThrow(() -> new RuntimeException("Could not find stock"));
         // STEP1: AI 실행
@@ -123,7 +169,7 @@ public class ScoreService {
                 return reader.lines()
                              .filter(line -> line.trim().startsWith("{") && line.trim().endsWith("}")) // JSON 형식 필터링
                              .collect(Collectors.joining("\n"));
-            }).get(120, TimeUnit.SECONDS); // 최대 120초 대기
+            }).get(60, TimeUnit.SECONDS); // 최대 120초 대기
 
             System.out.println("Filtered output = " + output);
 

@@ -30,6 +30,7 @@ RUN pip3 install --no-cache-dir -r /app/requirements.txt
 
 # 4. 변경 가능성이 높은 파일 복사
 COPY score.py /app/score.py
+COPY wc.py /app/wc.py
 
 # 5. Jasypt 암호화 비밀번호 환경 변수 설정
 ARG JASYPT_ENCRYPTOR_PASSWORD
