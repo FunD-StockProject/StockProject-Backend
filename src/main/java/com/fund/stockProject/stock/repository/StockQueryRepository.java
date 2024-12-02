@@ -51,12 +51,12 @@ public class StockQueryRepository {
         }
 
         return jpaQueryFactory.selectDistinct(stock).from(stock)
-            .join(stock.scores, score)
+            .join(stock.scores, score).on()
             .where(
                 stock.exchangeNum.eq(currentExchangeNum) // Enum 비교
-                    .and(stock.scores.get(0).scoreOversea.between(
-                        stockById.getScores().get(0).getScoreOversea() - 10,
-                        stockById.getScores().get(0).getScoreOversea() + 10))
+                    .and(score.scoreOversea.between(
+                        stockById.getScores().get(0).getScoreKorea() - 10,
+                        stockById.getScores().get(0).getScoreKorea() + 10))
                     .and(stock.id.ne(stockById.getId()))
             ).limit(3).fetch();
     }
