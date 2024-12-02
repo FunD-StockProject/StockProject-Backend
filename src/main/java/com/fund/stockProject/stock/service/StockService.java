@@ -70,6 +70,7 @@ public class StockService {
                 .symbolName(stock.getSymbolName())
                 .securityName(stock.getSecurityName())
                 .exchangeNum(stock.getExchangeNum())
+                .country(List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF).contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA)
                 .build())
             .collect(Collectors.toList());
     }
