@@ -26,6 +26,8 @@ spring:
     show-sql: false
 
   batch:
+    job:
+      enabled: false
     jdbc:
       initialize-schema: ALWAYS
       enabled: false
