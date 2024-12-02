@@ -21,4 +21,5 @@ public interface StockRepository extends JpaRepository<Stock, Integer> {
     Optional<Stock> findStockBySymbol(final String symbol);
 
     List<Stock> findStockBySymbolNameIsNull();
+    Optional<Stock> findStockById(final Integer id);
 }
