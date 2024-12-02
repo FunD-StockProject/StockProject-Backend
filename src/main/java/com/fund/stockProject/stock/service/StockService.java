@@ -9,6 +9,7 @@ import com.fund.stockProject.score.service.ScoreService;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockDiffResponse;
+import com.fund.stockProject.stock.dto.response.StockRelevantResponse;
 import com.fund.stockProject.stock.dto.response.StockSearchResponse;
 import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
 import com.fund.stockProject.stock.entity.Stock;
@@ -16,6 +17,7 @@ import com.fund.stockProject.stock.repository.StockQueryRepository;
 import com.fund.stockProject.stock.repository.StockRepository;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -51,7 +53,8 @@ public class StockService {
             .symbolName(stock.getSymbolName())
             .securityName(stock.getSecurityName())
             .exchangeNum(stock.getExchangeNum())
-            .country(List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF).contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA)
+            .country(List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF)
+                .contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA)
             .build();
     }
 
@@ -120,46 +123,50 @@ public class StockService {
     public Mono<List<StockSimpleResponse>> getHotStocks(COUNTRY country) {
         if (country == COUNTRY.KOREA) {
             return securityService.getVolumeRankKorea()
-                  .map(volumeRankResponses -> volumeRankResponses.stream()
-                                                                 .map(rankResponse -> stockRepository.findStockBySymbolNameWithScores(rankResponse.getHtsKorIsnm()).orElse(null))
-                                                                 .filter(Objects::nonNull) // null인 경우 건너뜀
-                                                                 .map(stock -> {
-                                                                     // 첫 인간지표인 경우, 점수 계산 실행
-                                                                     LocalDate initialDate = LocalDate.of(1111, 11, 11);
-                                                                     if (stock.getScores().get(0).getDate().isEqual(initialDate)) {
-                                                                         int newScore = scoreService.getScoreById(stock.getId(), country).getScore();
-                                                                         // 첫 Score의 점수를 갱신
-                                                                         stock.getScores().get(0).setScoreKorea(newScore);
-                                                                     }
+                .map(volumeRankResponses -> volumeRankResponses.stream()
+                    .map(rankResponse -> stockRepository.findStockBySymbolNameWithScores(
+                        rankResponse.getHtsKorIsnm()).orElse(null))
+                    .filter(Objects::nonNull) // null인 경우 건너뜀
+                    .map(stock -> {
+                        // 첫 인간지표인 경우, 점수 계산 실행
+                        LocalDate initialDate = LocalDate.of(1111, 11, 11);
+                        if (stock.getScores().get(0).getDate().isEqual(initialDate)) {
+                            int newScore = scoreService.getScoreById(stock.getId(), country)
+                                .getScore();
+                            // 첫 Score의 점수를 갱신
+                            stock.getScores().get(0).setScoreKorea(newScore);
+                        }
 
-                                                                     return StockSimpleResponse.builder()
-                                                                                               .stockId(stock.getId())
-                                                                                               .symbolName(stock.getSymbolName())
-                                                                                               .score(stock.getScores().get(0).getScoreKorea()) // 최신 데이터를 보장
-                                                                                               .build();
-                                                                 })
-                                                                 .collect(Collectors.toList()));
+                        return StockSimpleResponse.builder()
+                            .stockId(stock.getId())
+                            .symbolName(stock.getSymbolName())
+                            .score(stock.getScores().get(0).getScoreKorea()) // 최신 데이터를 보장
+                            .build();
+                    })
+                    .collect(Collectors.toList()));
         } else if (country == COUNTRY.OVERSEA) {
             return securityService.getVolumeRankOversea()
-                  .map(volumeRankResponses -> volumeRankResponses.stream()
-                                                                 .map(rankResponse -> stockRepository.findStockBySymbolWithScores(rankResponse.getSymb()).orElse(null))
-                                                                 .filter(Objects::nonNull) // null인 경우 건너뜀
-                                                                 .map(stock -> {
-                                                                     // 첫 인간지표인 경우, 점수 계산 실행
-                                                                     LocalDate initialDate = LocalDate.of(1111, 11, 11);
-                                                                     if (stock.getScores().get(0).getDate().isEqual(initialDate)) {
-                                                                         int newScore = scoreService.getScoreById(stock.getId(), country).getScore();
-                                                                         // 첫 Score의 점수를 갱신
-                                                                         stock.getScores().get(0).setScoreOversea(newScore);
-                                                                     }
+                .map(volumeRankResponses -> volumeRankResponses.stream()
+                    .map(rankResponse -> stockRepository.findStockBySymbolWithScores(
+                        rankResponse.getSymb()).orElse(null))
+                    .filter(Objects::nonNull) // null인 경우 건너뜀
+                    .map(stock -> {
+                        // 첫 인간지표인 경우, 점수 계산 실행
+                        LocalDate initialDate = LocalDate.of(1111, 11, 11);
+                        if (stock.getScores().get(0).getDate().isEqual(initialDate)) {
+                            int newScore = scoreService.getScoreById(stock.getId(), country)
+                                .getScore();
+                            // 첫 Score의 점수를 갱신
+                            stock.getScores().get(0).setScoreOversea(newScore);
+                        }
 
-                                                                     return StockSimpleResponse.builder()
-                                                                                               .stockId(stock.getId())
-                                                                                               .symbolName(stock.getSymbolName())
-                                                                                               .score(stock.getScores().get(0).getScoreOversea())
-                                                                                               .build();
-                                                                 })
-                                                                 .collect(Collectors.toList()));
+                        return StockSimpleResponse.builder()
+                            .stockId(stock.getId())
+                            .symbolName(stock.getSymbolName())
+                            .score(stock.getScores().get(0).getScoreOversea())
+                            .build();
+                    })
+                    .collect(Collectors.toList()));
         }
         return Mono.error(new IllegalArgumentException("Invalid country: " + country));
     }
@@ -240,15 +247,16 @@ public class StockService {
      * @param scores Score 데이터 목록
      * @return 변환된 StockDiffResponse 목록
      */
-    private List<StockDiffResponse> convertToStockDiffResponses(List<Score> scores, COUNTRY country) {
+    private List<StockDiffResponse> convertToStockDiffResponses(List<Score> scores,
+        COUNTRY country) {
         return scores.stream()
-                     .map(score -> StockDiffResponse.builder()
-                                                    .stockId(score.getStock().getId())
-                                                    .symbolName(score.getStock().getSymbolName())
-                                                    .score(country == COUNTRY.KOREA? score.getScoreKorea() : score.getScoreOversea())
-                                                    .diff(score.getDiff())
-                                                    .build())
-                     .collect(Collectors.toList());
+            .map(score -> StockDiffResponse.builder()
+                .stockId(score.getStock().getId())
+                .symbolName(score.getStock().getSymbolName())
+                .score(country == COUNTRY.KOREA ? score.getScoreKorea() : score.getScoreOversea())
+                .diff(score.getDiff())
+                .build())
+            .collect(Collectors.toList());
     }
 
     /**
@@ -261,22 +269,36 @@ public class StockService {
         return convertToStockDiffResponses(bottomScores, country);
     }
 
-    public List<StockSimpleResponse> getRelevantStocks(final Integer id) {
+    public List<StockRelevantResponse> getRelevantStocks(final Integer id) {
         Stock searchById = stockRepository.findStockById(id).orElse(null);
-        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(searchById);
+        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(
+            searchById);
 
-        if(relevantStocksByExchangeNumAndScore.isEmpty()){
+        if (relevantStocksByExchangeNumAndScore.isEmpty()) {
             System.out.println("Stock " + id + " relevant Stocks are not found");
 
             return null;
         }
 
-        return relevantStocksByExchangeNumAndScore.stream().map(
-            stock -> StockSimpleResponse.builder()
-                .stockId(stock.getId())
-                .symbolName(stock.getSymbolName())
-                .score(stock.getExchangeNum().equals(EXCHANGENUM.KOSPI) || stock.getExchangeNum().equals(EXCHANGENUM.KOSDAQ) || stock.getExchangeNum().equals(EXCHANGENUM.KOREAN_ETF) ? stock.getScores().get(0).getScoreKorea() : stock.getScores().get(0).getScoreOversea())
-                .build()
-        ).collect(Collectors.toList());
+        LocalDate today = LocalDate.now();
+        final List<StockRelevantResponse> stockRelevantResponses = new ArrayList<>();
+
+        for (final Stock stock : relevantStocksByExchangeNumAndScore) {
+            stockRelevantResponses.add(
+                StockRelevantResponse.builder()
+                    .stockId(stock.getId())
+                    .symbolName(stock.getSymbolName())
+                    .score(
+                        stock.getExchangeNum().equals(EXCHANGENUM.KOSPI) || stock.getExchangeNum()
+                            .equals(EXCHANGENUM.KOSDAQ) || stock.getExchangeNum()
+                            .equals(EXCHANGENUM.KOREAN_ETF) ? stock.getScores().get(0)
+                            .getScoreKorea()
+                            : stock.getScores().get(0).getScoreOversea())
+                    .diff(stock.getScores().get(0).getDiff())
+                    .build()
+            );
+        }
+
+        return stockRelevantResponses;
     }
 }

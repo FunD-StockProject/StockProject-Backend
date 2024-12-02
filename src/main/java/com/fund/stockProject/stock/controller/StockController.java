@@ -2,6 +2,7 @@ package com.fund.stockProject.stock.controller;
 
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.dto.response.StockDiffResponse;
+import com.fund.stockProject.stock.dto.response.StockRelevantResponse;
 import com.fund.stockProject.stock.dto.response.StockSearchResponse;
 import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
 import com.fund.stockProject.stock.service.StockService;
@@ -58,7 +59,7 @@ public class StockController {
 
     @GetMapping("/{id}/relevant")
     @Operation(summary = "관련 종목 api", description = "현재 종목과 관련된 종목 api")
-    ResponseEntity<List<StockSimpleResponse>> getRelevantStocks(final @PathVariable("id") Integer id) {
+    ResponseEntity<List<StockRelevantResponse>> getRelevantStocks(final @PathVariable("id") Integer id) {
         return ResponseEntity.ok().body(stockService.getRelevantStocks(id));
     }
 }
