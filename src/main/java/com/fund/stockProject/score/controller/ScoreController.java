@@ -1,5 +1,7 @@
 package com.fund.stockProject.score.controller;
 
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -8,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.fund.stockProject.score.dto.response.ScoreResponse;
 import com.fund.stockProject.score.service.ScoreService;
 import com.fund.stockProject.stock.domain.COUNTRY;
+import com.fund.stockProject.stock.dto.response.StockWordResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
@@ -21,5 +24,11 @@ public class ScoreController {
     @GetMapping("{id}/score/{country}")
     public ResponseEntity<ScoreResponse> getScore(@PathVariable("id") Integer id, final @PathVariable("country") COUNTRY country) {
         return ResponseEntity.ok(scoreService.getScoreById(id, country));
+    }
+
+    @GetMapping("/{symbol}/{country}")
+    @Operation(summary = "워드클라우드 api", description = "워드클라우드 api")
+    ResponseEntity<List<StockWordResponse>> getWordCloud(final @PathVariable("symbol") String symbol, final @PathVariable("country") COUNTRY country) {
+        return ResponseEntity.ok().body(scoreService.getWordCloud(symbol, country));
     }
 }
