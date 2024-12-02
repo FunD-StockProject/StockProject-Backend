@@ -26,9 +26,9 @@ public class ScoreController {
         return ResponseEntity.ok(scoreService.getScoreById(id, country));
     }
 
-    @GetMapping("/{symbol}/{country}")
+    @GetMapping("/wordcloud/{symbol}/{country}")
     @Operation(summary = "워드클라우드 api", description = "워드클라우드 api")
-    ResponseEntity<List<StockWordResponse>> getWordCloud(final @PathVariable("symbol") String symbol, final @PathVariable("country") COUNTRY country) {
+    ResponseEntity<List<StockWordResponse>> getWordCloud(@PathVariable("symbol") String symbol, @PathVariable("country") COUNTRY country) {
         return ResponseEntity.ok().body(scoreService.getWordCloud(symbol, country));
     }
 }

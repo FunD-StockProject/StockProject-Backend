@@ -18,7 +18,7 @@ public class SwaggerConfig {
                                 .version("0.0.1")
                                 .license(new License().name("Apache 2.0").url("http://springdoc.org")))
                 .externalDocs(new ExternalDocumentation()
-                                      .description("Mews API Documentation")
+                                      .description("인간지표 API Documentation")
                                       .url("https://example.com/docs"));
     }
 }
