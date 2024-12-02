@@ -261,7 +261,8 @@ public class StockService {
     }
 
     public List<StockSimpleResponse> getRelevantStocks(final Integer id) {
-        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(id);
+        Stock searchById = stockRepository.findStockById(id).orElse(null);
+        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(searchById);
 
         if(relevantStocksByExchangeNumAndScore.isEmpty()){
             System.out.println("Stock " + id + " relevant Stocks are not found");
