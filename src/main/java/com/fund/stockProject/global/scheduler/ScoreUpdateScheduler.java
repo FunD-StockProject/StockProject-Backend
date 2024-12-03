@@ -16,7 +16,7 @@ public class ScoreUpdateScheduler {
 
     private final ScoreService scoreService;
 
-    @Scheduled(cron = "10 0 9 * * ?") // (서버시각 기준) 0시 경에 실행
+    @Scheduled(cron = "10 0 0 * * ?") // 0시 경에 실행
     public void processScores() {
         LocalDate today = LocalDate.now();
         LocalDate yesterday = LocalDate.now().minusDays(1); // 어제 날짜 계산
