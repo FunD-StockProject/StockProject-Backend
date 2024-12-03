@@ -9,6 +9,7 @@ import com.fund.stockProject.score.service.ScoreService;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockDiffResponse;
+import com.fund.stockProject.stock.dto.response.StockInfoResponse;
 import com.fund.stockProject.stock.dto.response.StockRelevantResponse;
 import com.fund.stockProject.stock.dto.response.StockSearchResponse;
 import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
@@ -302,5 +303,11 @@ public class StockService {
         }
 
         return stockRelevantResponses;
+    }
+
+    public Mono<StockInfoResponse> getStockInfo(Integer id, COUNTRY country) {
+        // TODO: 비 블로킹 컨텍스트 관련 처리
+        Stock stock = stockRepository.findStockById(id).orElseThrow(() -> new RuntimeException("no stock found"));
+        return securityService.getSecurityStockInfoKorea(stock.getSymbol(), stock.getExchangeNum(), country);
     }
 }
