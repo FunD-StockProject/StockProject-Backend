@@ -30,15 +30,16 @@ public class StockQueryRepository {
         }
 
         return jpaQueryFactory.selectFrom(stock)
-                              .where(condition)
-                              .limit(30)
-                              .fetch();
+            .where(condition)
+            .limit(30)
+            .fetch();
     }
 
     public List<Stock> findRelevantStocksByExchangeNumAndScore(Stock stockById) {
         EXCHANGENUM currentExchangeNum = stockById.getExchangeNum(); // 현재 Stock의 ExchangeNum Enum
 
-        if (currentExchangeNum == EXCHANGENUM.KOSPI || currentExchangeNum == EXCHANGENUM.KOSDAQ) {
+        if (currentExchangeNum == EXCHANGENUM.KOSPI || currentExchangeNum == EXCHANGENUM.KOSDAQ
+            || currentExchangeNum == EXCHANGENUM.KOREAN_ETF) {
             return jpaQueryFactory.selectDistinct(stock).from(stock)
                 .join(stock.scores, score).on()
                 .where(
