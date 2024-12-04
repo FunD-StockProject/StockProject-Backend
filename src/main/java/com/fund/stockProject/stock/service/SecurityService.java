@@ -31,7 +31,7 @@ public class SecurityService {
     /**
      * 국내, 해외 주식 정보 조회
      */
-    public Mono<StockInfoResponse> getSecurityStockInfoKorea(String symbol, EXCHANGENUM exchangenum, COUNTRY country) {
+    public Mono<StockInfoResponse> getSecurityStockInfoKorea(Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum, COUNTRY country) {
         if (country == COUNTRY.KOREA) {
             return webClient.get()
                             .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/quotations/inquire-price")
@@ -45,7 +45,7 @@ public class SecurityService {
                             })
                             .retrieve()
                             .bodyToMono(String.class)
-                            .flatMap(response -> parseFStockInfoKorea(response, symbol, exchangenum));
+                            .flatMap(response -> parseFStockInfoKorea(response, id, symbolName, securityName, symbol, exchangenum));
         } else if (country == COUNTRY.OVERSEA) {
             return webClient.get()
                             .uri(uriBuilder -> uriBuilder.path("/uapi/overseas-price/v1/quotations/price")
@@ -60,21 +60,24 @@ public class SecurityService {
                             })
                             .retrieve()
                             .bodyToMono(String.class)
-                            .flatMap(response -> parseFStockInfoOversea(response, symbol, exchangenum));
+                            .flatMap(response -> parseFStockInfoOversea(response, id, symbolName, securityName, symbol, exchangenum));
         } else {
             return Mono.error(new UnsupportedOperationException("COUNTRY 입력 에러"));
         }
     }
 
-    private Mono<StockInfoResponse> parseFStockInfoKorea(String response, String symbol, EXCHANGENUM exchangenum) {
+    private Mono<StockInfoResponse> parseFStockInfoKorea(String response, Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum) {
         try {
             JsonNode rootNode = objectMapper.readTree(response);
             JsonNode outputNode = rootNode.get("output");
             StockInfoResponse stockInfoResponse = new StockInfoResponse();
 
             if (outputNode != null) {
+                stockInfoResponse.setStockId(id);
+                stockInfoResponse.setSymbolName(symbolName);
+                stockInfoResponse.setSecurityName(securityName);
                 stockInfoResponse.setSymbol(symbol);
-                stockInfoResponse.setExchange(exchangenum);
+                stockInfoResponse.setExchangeNum(exchangenum);
                 stockInfoResponse.setPrice(outputNode.get("stck_prpr").asDouble());
                 stockInfoResponse.setPriceDiff(outputNode.get("prdy_vrss").asDouble());
                 stockInfoResponse.setPriceDiffPerCent(outputNode.get("prdy_ctrt").asDouble());
@@ -87,15 +90,18 @@ public class SecurityService {
         }
     }
 
-    private Mono<StockInfoResponse> parseFStockInfoOversea(String response, String symbol, EXCHANGENUM exchangenum) {
+    private Mono<StockInfoResponse> parseFStockInfoOversea(String response, Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum) {
         try {
             JsonNode rootNode = objectMapper.readTree(response);
             JsonNode outputNode = rootNode.get("output");
             StockInfoResponse stockInfoResponse = new StockInfoResponse();
 
             if (outputNode != null) {
+                stockInfoResponse.setStockId(id);
+                stockInfoResponse.setSymbolName(symbolName);
+                stockInfoResponse.setSecurityName(securityName);
                 stockInfoResponse.setSymbol(symbol);
-                stockInfoResponse.setExchange(exchangenum);
+                stockInfoResponse.setExchangeNum(exchangenum);
                 stockInfoResponse.setPrice(outputNode.get("last").asDouble());
                 // 해외는 diff가 절대값이므로 절대값에 따라 음수로 변경
                 if(outputNode.get("rate").asDouble() < 0) {

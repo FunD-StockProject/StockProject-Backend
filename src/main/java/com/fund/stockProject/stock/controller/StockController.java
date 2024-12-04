@@ -30,7 +30,7 @@ public class StockController {
 
     @GetMapping("/search/{symbolName}")
     @Operation(summary = "주식 종목 검색 API", description = "주식 종목 및 인간지표 데이터 검색")
-    public ResponseEntity<StockSearchResponse> searchStockBySymbolName(final @PathVariable String symbolName) {
+    public ResponseEntity<Mono<StockInfoResponse>> searchStockBySymbolName(final @PathVariable String symbolName) {
         return ResponseEntity.ok().body(stockService.searchStockBySymbolName(symbolName));
     }
 
