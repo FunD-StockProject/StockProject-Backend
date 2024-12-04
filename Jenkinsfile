@@ -83,6 +83,9 @@ pipeline {
                         else
                             echo "No dangling images to remove."
                         fi
+
+                        # 이전 버전의 이미지 삭제
+                        sudo docker images | grep ${DOCKER_IMAGE_NAME} | awk '{print \$3}' | tail -n +3 | xargs --no-run-if-empty sudo docker rmi -f
 EOF
                     """
                 }
