@@ -63,21 +63,15 @@ pipeline {
             steps {
                 sshagent (credentials: ['EC2_API_SSH']) {
                     sh """
-                    ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} << 'EOF'
-                        # Docker 최신 이미지 가져오기
+                    ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} <<EOF
                         sudo docker pull ${DOCKER_IMAGE_NAME}:latest
-
-                        # 기존 컨테이너 중지 및 삭제
                         sudo docker stop ${CONTAINER_NAME} || true
                         sudo docker rm ${CONTAINER_NAME} || true
-
-                        # 컨테이너 실행 (KST 설정)
                         sudo docker run -d --name ${CONTAINER_NAME} -p 443:443 \
                             -e JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD} \
                             -e TZ=Asia/Seoul \
                             ${DOCKER_IMAGE_NAME}:latest
 
-                        # 불필요한 이미지 제거
                         IMAGES=\$(sudo docker images -f 'dangling=true' -q)
                         if [ -n "\$IMAGES" ]; then
                             sudo docker rmi -f \$IMAGES
@@ -86,7 +80,7 @@ pipeline {
                         fi
 
                         sudo docker images | grep ${DOCKER_IMAGE_NAME} | awk '{print \$3}' | tail -n +3 | xargs --no-run-if-empty sudo docker rmi -f
-                    EOF
+        EOF
                     """
                 }
             }
