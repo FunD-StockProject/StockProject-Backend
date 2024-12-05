@@ -16,8 +16,29 @@ public class ScoreUpdateScheduler {
 
     private final ScoreService scoreService;
 
-    @Scheduled(cron = "0 29 21 * * ?", zone = "Asia/Seoul") // 0시 경에 실행
-    public void processScores() {
+    @Scheduled(cron = "0 0 6 * * ?", zone = "Asia/Seoul") // 6시에 실행
+    public void processScoresOversea() {
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = LocalDate.now().minusDays(1); // 어제 날짜 계산
+
+        // 오늘 데이터가 없는 어제 날짜의 데이터를 조회
+        List<Score> scores = scoreService.findScoresByDate(yesterday, today);
+
+        for (Score score : scores) {
+            try {
+                // COUNTRY를 설정하고 updateScore 실행
+                COUNTRY country = determineCountry(score);
+                if (country == COUNTRY.OVERSEA) {
+                    scoreService.updateScore(score.getStockId(), country, score.getScoreOversea());
+                }
+            } catch (Exception e) {
+                System.err.println("Error processing score " + score.getStockId() + " - " + e.getMessage());
+            }
+        }
+    }
+
+    @Scheduled(cron = "0 0 17 * * ?", zone = "Asia/Seoul") // 17시에 실행
+    public void processScoresKorea() {
         LocalDate today = LocalDate.now();
         LocalDate yesterday = LocalDate.now().minusDays(1); // 어제 날짜 계산
 
@@ -30,9 +51,6 @@ public class ScoreUpdateScheduler {
                 COUNTRY country = determineCountry(score);
                 if (country == COUNTRY.KOREA) {
                     scoreService.updateScore(score.getStockId(), country, score.getScoreKorea());
-                }
-                else if (country == COUNTRY.OVERSEA) {
-                    scoreService.updateScore(score.getStockId(), country, score.getScoreOversea());
                 }
             } catch (Exception e) {
                 System.err.println("Error processing score " + score.getStockId() + " - " + e.getMessage());
