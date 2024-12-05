@@ -74,6 +74,7 @@ pipeline {
                         # 컨테이너 실행
                         sudo docker run -d --name ${CONTAINER_NAME} -p 443:443 \
                             -e JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD} \
+                            -e TZ=Asia/Seoul \
                             ${DOCKER_IMAGE_NAME}:latest
 
                         # 불필요한 이미지 제거
@@ -91,7 +92,6 @@ EOF
                 }
             }
         }
-    }
 
     post {
         always {
