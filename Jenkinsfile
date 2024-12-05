@@ -71,7 +71,7 @@ pipeline {
                         sudo docker stop ${CONTAINER_NAME} || true
                         sudo docker rm ${CONTAINER_NAME} || true
 
-                        # 컨테이너 실행
+                        # 컨테이너 실행 (KST 설정)
                         sudo docker run -d --name ${CONTAINER_NAME} -p 443:443 \
                             -e JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD} \
                             -e TZ=Asia/Seoul \
@@ -87,7 +87,7 @@ pipeline {
 
                         # 이전 버전의 이미지 삭제
                         sudo docker images | grep ${DOCKER_IMAGE_NAME} | awk '{print \$3}' | tail -n +3 | xargs --no-run-if-empty sudo docker rmi -f
-EOF
+        EOF
                     """
                 }
             }
