@@ -8,6 +8,8 @@ import com.fund.stockProject.score.repository.ScoreRepository;
 import com.fund.stockProject.score.service.ScoreService;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
+import com.fund.stockProject.stock.dto.response.StockChartResponse;
+import com.fund.stockProject.stock.dto.response.StockChartResponse.PriceInfo;
 import com.fund.stockProject.stock.dto.response.StockDiffResponse;
 import com.fund.stockProject.stock.dto.response.StockRelevantResponse;
 import com.fund.stockProject.stock.dto.response.StockSearchResponse;
@@ -16,6 +18,7 @@ import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockQueryRepository;
 import com.fund.stockProject.stock.repository.StockRepository;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -76,7 +79,8 @@ public class StockService {
                 .symbolName(stock.getSymbolName())
                 .securityName(stock.getSecurityName())
                 .exchangeNum(stock.getExchangeNum())
-                .country(List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF).contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA)
+                .country(List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF)
+                    .contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA)
                 .build())
             .collect(Collectors.toList());
     }
@@ -303,4 +307,61 @@ public class StockService {
 
         return stockRelevantResponses;
     }
+
+    public Mono<StockChartResponse> getStockChart(final Integer id, final String periodCode, LocalDate startDate) {
+        final Stock stock = stockRepository.findStockById(id).orElse(null);
+
+        LocalDate endDate = LocalDate.now();
+        String startDateToString;
+        String endDateToString = endDate.format(DateTimeFormatter.BASIC_ISO_DATE);
+
+        // 시작일자와 종료일자가 없는 경우, 기간분류코드를 기반으로 계산
+        if (startDate == null) {
+            switch (periodCode) {
+                case "D": // 일봉: 최근 30일
+                    startDate = endDate.minusDays(30);
+                    break;
+                case "W": // 주봉: 최근 6개월
+                    startDate = endDate.minusMonths(6);
+                    break;
+                case "M": // 월봉: 최근 2년
+                    startDate = endDate.minusYears(2);
+                    break;
+                case "Y": // 년봉: 최근 5년
+                    startDate = endDate.minusYears(5);
+                    break;
+                default:
+                    throw new IllegalArgumentException("Invalid period code: " + periodCode);
+            }
+        }
+
+        startDateToString = startDate.format(DateTimeFormatter.BASIC_ISO_DATE);
+
+        if (stock == null) {
+            System.out.println("Stock " + id + " is not found");
+
+            return null;
+        }
+
+        final Mono<List<PriceInfo>> itemChartPrice = securityService.getItemChartPrice(
+            stock.getSymbol(), startDateToString, endDateToString, periodCode, stock.getExchangeNum()
+        );
+
+        return convertToStockChartResponse(itemChartPrice, stock);
+    }
+
+    public Mono<StockChartResponse> convertToStockChartResponse(Mono<List<PriceInfo>> itemChartPrice, Stock stock) {
+        return itemChartPrice.map(
+            priceInfos -> StockChartResponse.builder()
+                .symbolName(stock.getSymbolName())
+                .symbol(stock.getSymbol())
+                .exchangenum(stock.getExchangeNum())
+                .securityName(stock.getSecurityName())
+                .country(List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF)
+                    .contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA)
+                .priceInfos(priceInfos)
+                .build()
+        );
+    }
+
 }

@@ -1,6 +1,7 @@
 package com.fund.stockProject.stock.controller;
 
 import com.fund.stockProject.stock.domain.COUNTRY;
+import com.fund.stockProject.stock.dto.response.StockChartResponse;
 import com.fund.stockProject.stock.dto.response.StockDiffResponse;
 import com.fund.stockProject.stock.dto.response.StockRelevantResponse;
 import com.fund.stockProject.stock.dto.response.StockSearchResponse;
@@ -9,6 +10,8 @@ import com.fund.stockProject.stock.service.StockService;
 
 import io.swagger.v3.oas.annotations.Operation;
 
+import io.swagger.v3.oas.annotations.Parameter;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
@@ -25,35 +28,41 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 @RequestMapping("/stock")
 public class StockController {
+
     private final StockService stockService;
 
     @GetMapping("/search/{symbolName}")
     @Operation(summary = "주식 종목 검색 API", description = "주식 종목 및 인간지표 데이터 검색")
-    public ResponseEntity<StockSearchResponse> searchStockBySymbolName(final @PathVariable String symbolName) {
+    public ResponseEntity<StockSearchResponse> searchStockBySymbolName(
+        final @PathVariable String symbolName) {
         return ResponseEntity.ok().body(stockService.searchStockBySymbolName(symbolName));
     }
 
     @GetMapping("/autocomplete")
     @Operation(summary = "검색어 자동완성 API", description = "검색어 자동완성")
-    public ResponseEntity<List<StockSearchResponse>> autocompleteKeyword(final @RequestParam String keyword) {
+    public ResponseEntity<List<StockSearchResponse>> autocompleteKeyword(
+        final @RequestParam String keyword) {
         return ResponseEntity.ok().body(stockService.autoCompleteKeyword(keyword));
     }
 
     @GetMapping("/hot/{country}")
     @Operation(summary = "지금 가장 hot한 지표 api", description = "지금 가장 hot한 지표 api")
-    public ResponseEntity<Mono<List<StockSimpleResponse>>> getHotStocks(final @PathVariable("country") COUNTRY country) {
+    public ResponseEntity<Mono<List<StockSimpleResponse>>> getHotStocks(
+        final @PathVariable("country") COUNTRY country) {
         return ResponseEntity.ok().body(stockService.getHotStocks(country));
     }
 
     @GetMapping("/rising/{country}")
     @Operation(summary = "떡상중인 지표 api", description = "떡상중인 지표 api")
-    public ResponseEntity<List<StockDiffResponse>> getRisingStocks(final @PathVariable("country") COUNTRY country) {
+    public ResponseEntity<List<StockDiffResponse>> getRisingStocks(
+        final @PathVariable("country") COUNTRY country) {
         return ResponseEntity.ok().body(stockService.getRisingStocks(country));
     }
 
     @GetMapping("/descent/{country}")
     @Operation(summary = "떡락중인 지표 api", description = "떡락중인 지표 api")
-    public ResponseEntity<List<StockDiffResponse>> getDescentStocks(final @PathVariable("country") COUNTRY country) {
+    public ResponseEntity<List<StockDiffResponse>> getDescentStocks(
+        final @PathVariable("country") COUNTRY country) {
         return ResponseEntity.ok().body(stockService.getDescentStocks(country));
     }
 
@@ -61,5 +70,14 @@ public class StockController {
     @Operation(summary = "관련 종목 api", description = "현재 종목과 관련된 종목 api")
     ResponseEntity<List<StockRelevantResponse>> getRelevantStocks(final @PathVariable("id") Integer id) {
         return ResponseEntity.ok().body(stockService.getRelevantStocks(id));
+    }
+
+    @GetMapping("/{id}/chart")
+    @Operation(summary = "차트 정보 제공 api", description = "조회 종목의 날짜별 가격 변동 폭 정보 제공 api")
+    ResponseEntity<Mono<StockChartResponse>> getStockChart(
+        @PathVariable("id") Integer id,
+        @RequestParam(required = false) String periodCode,
+        @RequestParam(required = false) LocalDate startDate) {
+        return ResponseEntity.ok().body(stockService.getStockChart(id, periodCode, startDate));
     }
 }

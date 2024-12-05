@@ -57,4 +57,15 @@ public class Stock extends Core {
         }
     }
 
+    @Override
+    public String toString() {
+        return "Stock{" +
+            "id=" + id +
+            ", scores=" + scores +
+            ", symbol='" + symbol + '\'' +
+            ", symbolName='" + symbolName + '\'' +
+            ", securityName='" + securityName + '\'' +
+            ", exchangeNum=" + exchangeNum +
+            '}';
+    }
 }
