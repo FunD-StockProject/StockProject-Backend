@@ -46,8 +46,11 @@ public class StockService {
 
     public Mono<StockInfoResponse> searchStockBySymbolName(final String symbolName) {
         // TODO: 비 블로킹 컨텍스트 관련 처리
-        Stock stock = stockRepository.findStockBySymbolName(symbolName).orElseThrow(() -> new RuntimeException("no stock found"));
-        return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(), stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum()));
+        Stock stock = stockRepository.findStockBySymbolName(symbolName)
+            .orElseThrow(() -> new RuntimeException("no stock found"));
+        return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
+            stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
+            getCountryFromExchangeNum(stock.getExchangeNum()));
     }
 
 
@@ -239,8 +242,7 @@ public class StockService {
      * @param scores Score 데이터 목록
      * @return 변환된 StockDiffResponse 목록
      */
-    private List<StockDiffResponse> convertToStockDiffResponses(List<Score> scores,
-        COUNTRY country) {
+    private List<StockDiffResponse> convertToStockDiffResponses(List<Score> scores, COUNTRY country) {
         return scores.stream()
             .map(score -> StockDiffResponse.builder()
                 .stockId(score.getStock().getId())
@@ -263,8 +265,7 @@ public class StockService {
 
     public List<StockRelevantResponse> getRelevantStocks(final Integer id) {
         Stock searchById = stockRepository.findStockById(id).orElse(null);
-        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(
-            searchById);
+        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(searchById);
 
         if (relevantStocksByExchangeNumAndScore.isEmpty()) {
             System.out.println("Stock " + id + " relevant Stocks are not found");
@@ -295,57 +296,118 @@ public class StockService {
 
     public Mono<StockInfoResponse> getStockInfo(Integer id, COUNTRY country) {
         // TODO: 비 블로킹 컨텍스트 관련 처리
-        Stock stock = stockRepository.findStockById(id).orElseThrow(() -> new RuntimeException("no stock found"));
-        return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(), stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum()));
+        Stock stock = stockRepository.findStockById(id)
+            .orElseThrow(() -> new RuntimeException("no stock found"));
+        return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
+            stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
+            getCountryFromExchangeNum(stock.getExchangeNum()));
     }
 
     private COUNTRY getCountryFromExchangeNum(EXCHANGENUM exchangenum) {
-        return List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF).contains(exchangenum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
+        return List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF)
+            .contains(exchangenum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
     }
 
-    public Mono<StockChartResponse> getStockChart(final Integer id, final String periodCode, LocalDate startDate) {
+    public Mono<StockChartResponse> getStockChart(final Integer id, String periodCode,
+        LocalDate startDate) {
         final Stock stock = stockRepository.findStockById(id).orElse(null);
 
-        LocalDate endDate = LocalDate.now();
-        String startDateToString;
-        String endDateToString = endDate.format(DateTimeFormatter.BASIC_ISO_DATE);
-
-        // 시작일자와 종료일자가 없는 경우, 기간분류코드를 기반으로 계산
-        if (startDate == null) {
-            switch (periodCode) {
-                case "D": // 일봉: 최근 30일
-                    startDate = endDate.minusDays(30);
-                    break;
-                case "W": // 주봉: 최근 6개월
-                    startDate = endDate.minusMonths(6);
-                    break;
-                case "M": // 월봉: 최근 2년
-                    startDate = endDate.minusYears(2);
-                    break;
-                case "Y": // 년봉: 최근 5년
-                    startDate = endDate.minusYears(5);
-                    break;
-                default:
-                    throw new IllegalArgumentException("Invalid period code: " + periodCode);
-            }
-        }
-
-        startDateToString = startDate.format(DateTimeFormatter.BASIC_ISO_DATE);
-
         if (stock == null) {
-            System.out.println("Stock " + id + " is not found");
+            System.out.println("Stock " + id + " can not found");
 
             return null;
         }
 
-        final Mono<List<PriceInfo>> itemChartPrice = securityService.getItemChartPrice(
-            stock.getSymbol(), startDateToString, endDateToString, periodCode, stock.getExchangeNum()
-        );
+        final LocalDate endDate = LocalDate.now();
+        final String endDateToString = endDate.format(DateTimeFormatter.BASIC_ISO_DATE);
 
-        return convertToStockChartResponse(itemChartPrice, stock);
+        if (startDate == null) {
+            startDate = getStartDate(periodCode, endDate);
+        }
+
+        final String startDateToString = startDate.format(DateTimeFormatter.BASIC_ISO_DATE);
+        final COUNTRY country = getCountry(stock);
+
+        final List<PriceInfo> itemChartPrices = securityService.getItemChartPrice(stock, startDateToString, endDateToString, periodCode, country).block();
+
+        List<Score> scores = stock.getScores();
+        List<StockChartResponse.PriceInfo> priceInfos = new ArrayList<>();
+
+        if(itemChartPrices == null){
+            System.out.println("There is no itemCharPrice data");
+
+            return null;
+        }
+
+        for (PriceInfo priceInfo : itemChartPrices) {
+            LocalDate priceDate = LocalDate.parse(priceInfo.getLocalDate(), DateTimeFormatter.BASIC_ISO_DATE);
+            Score matchingScore = null;
+
+            // 날짜에 맞는 Score 찾기
+            for (Score score : scores) {
+                if (score.getDate().equals(priceDate)) {
+                    matchingScore = score;
+                    break;
+                }
+            }
+
+            // PriceInfo와 Score 병합
+            StockChartResponse.PriceInfo enrichedPriceInfo = StockChartResponse.PriceInfo.builder()
+                .localDate(priceInfo.getLocalDate())
+                .closePrice(priceInfo.getClosePrice())
+                .openPrice(priceInfo.getOpenPrice())
+                .highPrice(priceInfo.getHighPrice())
+                .lowPrice(priceInfo.getLowPrice())
+                .accumulatedTradingVolume(priceInfo.getAccumulatedTradingVolume())
+                .accumulatedTradingValue(priceInfo.getAccumulatedTradingValue())
+                .score(matchingScore != null ? (country == COUNTRY.KOREA ? matchingScore.getScoreKorea() : matchingScore.getScoreOversea()) : null)
+                .diff(matchingScore != null ? matchingScore.getDiff() : null)
+                .build();
+
+            priceInfos.add(enrichedPriceInfo);
+        }
+
+        // StockChartResponse 생성
+        StockChartResponse response = StockChartResponse.builder()
+            .symbolName(stock.getSymbolName())
+            .symbol(stock.getSymbol())
+            .exchangenum(stock.getExchangeNum())
+            .securityName(stock.getSecurityName())
+            .country(country)
+            .priceInfos(priceInfos)
+            .build();
+
+        return Mono.just(response);
     }
 
-    public Mono<StockChartResponse> convertToStockChartResponse(Mono<List<PriceInfo>> itemChartPrice, Stock stock) {
+    private static LocalDate getStartDate(String periodCode, LocalDate endDate) {
+        // 시작일자와 종료일자가 없는 경우, 기간분류코드를 기반으로 계산
+        return switch (periodCode) {
+            case "D" -> // 일봉: 최근 30일
+                endDate.minusDays(30);
+            case "W" -> // 주봉: 최근 6개월
+                endDate.minusMonths(6);
+            case "M" -> // 월봉: 최근 2년
+                endDate.minusYears(2);
+            default -> throw new IllegalArgumentException("Invalid period code: " + periodCode);
+        };
+    }
+
+    private static COUNTRY getCountry(Stock stock) {
+        COUNTRY country;
+        if (stock.getExchangeNum() == EXCHANGENUM.KOSPI || stock.getExchangeNum() == EXCHANGENUM.KOSDAQ || stock.getExchangeNum() == EXCHANGENUM.KOREAN_ETF) {
+            country = COUNTRY.KOREA;
+        } else {
+            country = COUNTRY.OVERSEA;
+        }
+
+        return country;
+    }
+
+    public Mono<StockChartResponse> convertToStockChartResponse(Mono<List<PriceInfo>> itemChartPrice, Stock stock, COUNTRY country) {
+        final List<Score> scores = stock.getScores();
+        // priceinfos 의 각 날짜에 해당하는 score를 반환.
+
         return itemChartPrice.map(
             priceInfos -> StockChartResponse.builder()
                 .symbolName(stock.getSymbolName())

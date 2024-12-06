@@ -3,10 +3,10 @@ package com.fund.stockProject.stock.service;
 
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockChartResponse.PriceInfo;
+import com.fund.stockProject.stock.entity.Stock;
 import java.util.ArrayList;
 import java.util.List;
 
-import java.util.NoSuchElementException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -15,7 +15,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.global.config.SecurityHttpConfig;
 import com.fund.stockProject.stock.domain.COUNTRY;
-import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockInfoResponse;
 import com.fund.stockProject.stock.dto.response.StockKoreaVolumeRankResponse;
 import com.fund.stockProject.stock.dto.response.StockOverseaVolumeRankResponse;
@@ -271,16 +270,16 @@ public class SecurityService {
             return Mono.error(e);
         }
     }
-    public Mono<List<PriceInfo>> getItemChartPrice(String symbol, String startDate, String endDate, String periodCode, EXCHANGENUM exchangenum) {
+    public Mono<List<PriceInfo>> getItemChartPrice(Stock stock, String startDate, String endDate, String periodCode, COUNTRY country) {
         HttpHeaders headers = securityHttpConfig.createSecurityHeaders();
 
-        if (exchangenum == EXCHANGENUM.KOSPI || exchangenum == EXCHANGENUM.KOSDAQ || exchangenum == EXCHANGENUM.KOREAN_ETF) {
+        if (country.equals(COUNTRY.KOREA)) {
             headers.set("tr_id", "FHKST03010100");
 
             return webClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice")
                     .queryParam("fid_cond_mrkt_div_code", "J")
-                    .queryParam("fid_input_iscd", symbol)
+                    .queryParam("fid_input_iscd", stock.getSymbol())
                     .queryParam("fid_input_date_1", startDate)
                     .queryParam("fid_input_date_2", endDate)
                     .queryParam("fid_period_div_code", periodCode)
@@ -303,8 +302,8 @@ public class SecurityService {
             return webClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/uapi/overseas-price/v1/quotations/dailyprice")
                     .queryParam("AUTH", "") // 사용자 권한 정보
-                    .queryParam("EXCD", exchangenum) // 거래소 코드
-                    .queryParam("SYMB", symbol) // 종목 코드
+                    .queryParam("EXCD", stock.getExchangeNum()) // 거래소 코드
+                    .queryParam("SYMB", stock.getSymbol()) // 종목 코드
                     .queryParam("GUBN", gubn) // 일월주 구분
                     .queryParam("BYMD", endDate) // 조회 기준 일자
                     .queryParam("MODP", "1") // 수정 주가 반영 여부
