@@ -1,9 +1,12 @@
 package com.fund.stockProject.stock.service;
 
 
+import com.fund.stockProject.stock.domain.EXCHANGENUM;
+import com.fund.stockProject.stock.dto.response.StockChartResponse.PriceInfo;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.util.NoSuchElementException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -127,27 +130,27 @@ public class SecurityService {
      */
     public Mono<List<StockKoreaVolumeRankResponse>> getVolumeRankKorea() {
         return webClient.get()
-                        .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/quotations/volume-rank")
-                                                     .queryParam("FID_COND_MRKT_DIV_CODE", "J")
-                                                     .queryParam("FID_COND_SCR_DIV_CODE", "20171")
-                                                     .queryParam("FID_INPUT_ISCD", "0001")
-                                                     .queryParam("FID_DIV_CLS_CODE", "0")
-                                                     .queryParam("FID_BLNG_CLS_CODE", "0")
-                                                     .queryParam("FID_TRGT_CLS_CODE", "111111111")
-                                                     .queryParam("FID_TRGT_EXLS_CLS_CODE", "000000")
-                                                     .queryParam("FID_INPUT_PRICE_1", "")
-                                                     .queryParam("FID_INPUT_PRICE_2", "")
-                                                     .queryParam("FID_VOL_CNT", "0")
-                                                     .queryParam("FID_INPUT_DATE_1", "")
-                                                     .build())
-                        .headers(httpHeaders -> {
-                            HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
-                            headers.set("tr_id", "FHPST01710000"); // 추가 헤더 설정
-                            httpHeaders.addAll(headers);
-                        })
-                        .retrieve()
-                        .bodyToMono(String.class)
-                        .flatMap(this::parseFVolumeRankKorea);
+            .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/quotations/volume-rank")
+                .queryParam("FID_COND_MRKT_DIV_CODE", "J")
+                .queryParam("FID_COND_SCR_DIV_CODE", "20171")
+                .queryParam("FID_INPUT_ISCD", "0001")
+                .queryParam("FID_DIV_CLS_CODE", "0")
+                .queryParam("FID_BLNG_CLS_CODE", "0")
+                .queryParam("FID_TRGT_CLS_CODE", "111111111")
+                .queryParam("FID_TRGT_EXLS_CLS_CODE", "000000")
+                .queryParam("FID_INPUT_PRICE_1", "")
+                .queryParam("FID_INPUT_PRICE_2", "")
+                .queryParam("FID_VOL_CNT", "0")
+                .queryParam("FID_INPUT_DATE_1", "")
+                .build())
+            .headers(httpHeaders -> {
+                HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                headers.set("tr_id", "FHPST01710000"); // 추가 헤더 설정
+                httpHeaders.addAll(headers);
+            })
+            .retrieve()
+            .bodyToMono(String.class)
+            .flatMap(this::parseFVolumeRankKorea);
     }
 
     /**
@@ -155,42 +158,42 @@ public class SecurityService {
      */
     public Mono<List<StockOverseaVolumeRankResponse>> getVolumeRankOversea() {
         return webClient.get()
-                        .uri(uriBuilder -> uriBuilder.path("/uapi/overseas-price/v1/quotations/inquire-search")
-                                                     .queryParam("AUTH", "")
-                                                     .queryParam("EXCD", "NAS")
-                                                     .queryParam("CO_YN_PRICECUR", "")
-                                                     .queryParam("CO_ST_PRICECUR", "")
-                                                     .queryParam("CO_EN_PRICECUR", "")
-                                                     .queryParam("CO_YN_RATE", "")
-                                                     .queryParam("CO_ST_RATE", "")
-                                                     .queryParam("CO_EN_RATE", "")
-                                                     .queryParam("CO_YN_VALX", "")
-                                                     .queryParam("CO_ST_VALX", "")
-                                                     .queryParam("CO_EN_VALX", "")
-                                                     .queryParam("CO_YN_SHAR", "")
-                                                     .queryParam("CO_ST_SHAR", "")
-                                                     .queryParam("CO_EN_SHAR", "")
-                                                     .queryParam("CO_YN_VOLUME", "")
-                                                     .queryParam("CO_ST_VOLUME", "")
-                                                     .queryParam("CO_EN_VOLUME", "")
-                                                     .queryParam("CO_YN_AMT", "")
-                                                     .queryParam("CO_ST_AMT", "")
-                                                     .queryParam("CO_EN_AMT", "")
-                                                     .queryParam("CO_YN_EPS", "")
-                                                     .queryParam("CO_ST_EPS", "")
-                                                     .queryParam("CO_EN_EPS", "")
-                                                     .queryParam("CO_YN_PER", "")
-                                                     .queryParam("CO_ST_PER", "")
-                                                     .queryParam("CO_EN_PER", "")
-                                                     .build())
-                        .headers(httpHeaders -> {
-                            HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
-                            headers.set("tr_id", "HHDFS76410000"); // 추가 헤더 설정
-                            httpHeaders.addAll(headers);
-                        })
-                        .retrieve()
-                        .bodyToMono(String.class)
-                        .flatMap(this::parseFVolumeRankOversea);
+            .uri(uriBuilder -> uriBuilder.path("/uapi/overseas-price/v1/quotations/inquire-search")
+                .queryParam("AUTH", "")
+                .queryParam("EXCD", "NAS")
+                .queryParam("CO_YN_PRICECUR", "")
+                .queryParam("CO_ST_PRICECUR", "")
+                .queryParam("CO_EN_PRICECUR", "")
+                .queryParam("CO_YN_RATE", "")
+                .queryParam("CO_ST_RATE", "")
+                .queryParam("CO_EN_RATE", "")
+                .queryParam("CO_YN_VALX", "")
+                .queryParam("CO_ST_VALX", "")
+                .queryParam("CO_EN_VALX", "")
+                .queryParam("CO_YN_SHAR", "")
+                .queryParam("CO_ST_SHAR", "")
+                .queryParam("CO_EN_SHAR", "")
+                .queryParam("CO_YN_VOLUME", "")
+                .queryParam("CO_ST_VOLUME", "")
+                .queryParam("CO_EN_VOLUME", "")
+                .queryParam("CO_YN_AMT", "")
+                .queryParam("CO_ST_AMT", "")
+                .queryParam("CO_EN_AMT", "")
+                .queryParam("CO_YN_EPS", "")
+                .queryParam("CO_ST_EPS", "")
+                .queryParam("CO_EN_EPS", "")
+                .queryParam("CO_YN_PER", "")
+                .queryParam("CO_ST_PER", "")
+                .queryParam("CO_EN_PER", "")
+                .build())
+            .headers(httpHeaders -> {
+                HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                headers.set("tr_id", "HHDFS76410000"); // 추가 헤더 설정
+                httpHeaders.addAll(headers);
+            })
+            .retrieve()
+            .bodyToMono(String.class)
+            .flatMap(this::parseFVolumeRankOversea);
     }
 
     // 현재는 나스닥기준, 추후 변경 예정
@@ -203,7 +206,9 @@ public class SecurityService {
             if (outputNode != null) {
                 int count = 0; // 추가된 데이터 개수 추적
                 for (JsonNode node : outputNode) {
-                    if (count >= 3) break; // 3개까지만 추가
+                    if (count >= 3) {
+                        break; // 3개까지만 추가
+                    }
 
                     StockOverseaVolumeRankResponse responseData = new StockOverseaVolumeRankResponse();
                     responseData.setSymb(node.get("symb").asText());
@@ -230,7 +235,9 @@ public class SecurityService {
             if (outputNode != null) {
                 int count = 0; // 추가된 데이터 개수 추적
                 for (JsonNode node : outputNode) {
-                    if (count >= 3) break; // 3개까지만 추가
+                    if (count >= 3) {
+                        break; // 3개까지만 추가
+                    }
 
                     StockKoreaVolumeRankResponse responseData = new StockKoreaVolumeRankResponse();
                     responseData.setHtsKorIsnm(node.get("hts_kor_isnm").asText());
@@ -244,7 +251,8 @@ public class SecurityService {
                     responseData.setPrdyVol(node.get("prdy_vol").asText());
                     responseData.setLstnStcn(node.get("lstn_stcn").asText());
                     responseData.setAvrgVol(node.get("avrg_vol").asText());
-                    responseData.setNBefrClprVrssPrprRate(node.get("n_befr_clpr_vrss_prpr_rate").asText());
+                    responseData.setNBefrClprVrssPrprRate(
+                        node.get("n_befr_clpr_vrss_prpr_rate").asText());
                     responseData.setVolInrt(node.get("vol_inrt").asText());
                     responseData.setVolTnrt(node.get("vol_tnrt").asText());
                     responseData.setNdayVolTnrt(node.get("nday_vol_tnrt").asText());
@@ -263,4 +271,107 @@ public class SecurityService {
             return Mono.error(e);
         }
     }
+    public Mono<List<PriceInfo>> getItemChartPrice(String symbol, String startDate, String endDate, String periodCode, EXCHANGENUM exchangenum) {
+        HttpHeaders headers = securityHttpConfig.createSecurityHeaders();
+
+        if (exchangenum == EXCHANGENUM.KOSPI || exchangenum == EXCHANGENUM.KOSDAQ || exchangenum == EXCHANGENUM.KOREAN_ETF) {
+            headers.set("tr_id", "FHKST03010100");
+
+            return webClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice")
+                    .queryParam("fid_cond_mrkt_div_code", "J")
+                    .queryParam("fid_input_iscd", symbol)
+                    .queryParam("fid_input_date_1", startDate)
+                    .queryParam("fid_input_date_2", endDate)
+                    .queryParam("fid_period_div_code", periodCode)
+                    .queryParam("fid_org_adj_prc", "0") // 0: 수정주가, 1: 원주가
+                    .build())
+                .headers(httpHeaders -> httpHeaders.addAll(headers))
+                .retrieve()
+                .bodyToMono(String.class)
+                .flatMap(this::parseFStockChartPriceKorea);
+        } else {
+            headers.set("tr_id", "HHDFS76240000");
+
+            String gubn = switch (periodCode) {
+                case "D" -> "0";
+                case "W" -> "1";
+                case "M" -> "2";
+                default -> "";
+            };
+
+            return webClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/uapi/overseas-price/v1/quotations/dailyprice")
+                    .queryParam("AUTH", "") // 사용자 권한 정보
+                    .queryParam("EXCD", exchangenum) // 거래소 코드
+                    .queryParam("SYMB", symbol) // 종목 코드
+                    .queryParam("GUBN", gubn) // 일월주 구분
+                    .queryParam("BYMD", endDate) // 조회 기준 일자
+                    .queryParam("MODP", "1") // 수정 주가 반영 여부
+                    .build())
+                .headers(httpHeaders -> httpHeaders.addAll(headers))
+                .retrieve()
+                .bodyToMono(String.class)
+                .flatMap(this::parseFStockChartPriceOverseas);
+        }
+    }
+
+    private Mono<List<PriceInfo>> parseFStockChartPriceKorea(String response) {
+        List<PriceInfo> responseDataList = new ArrayList<>();
+
+        try {
+            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode outputNode = rootNode.get("output2");
+
+            if (outputNode != null) {
+                for (JsonNode node : outputNode) {
+                    final PriceInfo responseData = PriceInfo.builder()
+                        .closePrice(node.get("stck_clpr").asText()) // 종가
+                        .openPrice(node.get("stck_oprc").asText()) // 시가
+                        .highPrice(node.get("stck_hgpr").asText()) // 고가
+                        .lowPrice(node.get("stck_lwpr").asText()) // 저가
+                        .accumulatedTradingVolume(node.get("acml_vol").asText()) // 누적거래량
+                        .accumulatedTradingValue(node.get("acml_tr_pbmn").asText()) // 누적거래대금
+                        .localDate(node.get("stck_bsop_date").asText()) // 거래일
+                        .build();
+
+                    responseDataList.add(responseData);
+                }
+            }
+
+            return Mono.just(responseDataList);
+        } catch (Exception e) {
+            return Mono.error(new UnsupportedOperationException("국내 종목 정보가 없습니다"));
+        }
+    }
+
+    private Mono<List<PriceInfo>> parseFStockChartPriceOverseas(String response) {
+        List<PriceInfo> responseDataList = new ArrayList<>();
+
+        try {
+            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode outputNode = rootNode.get("output2");
+
+            if (outputNode != null) {
+                for (JsonNode node : outputNode) {
+                    final PriceInfo responseData = PriceInfo.builder()
+                        .closePrice(node.get("clos").asText()) // 종가
+                        .openPrice(node.get("open").asText()) // 시가
+                        .highPrice(node.get("high").asText()) // 고가
+                        .lowPrice(node.get("low").asText()) // 저가
+                        .accumulatedTradingVolume(node.get("tvol").asText()) // 누적거래량
+                        .accumulatedTradingValue(node.get("tamt").asText()) // 누적거래대금
+                        .localDate(node.get("xymd").asText()) // 거래일
+                        .build();
+
+                    responseDataList.add(responseData);
+                }
+            }
+
+            return Mono.just(responseDataList);
+        } catch (Exception e) {
+            return Mono.error(new UnsupportedOperationException("해외 종목 정보가 없습니다"));
+        }
+    }
+
 }
