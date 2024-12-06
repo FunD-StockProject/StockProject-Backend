@@ -12,6 +12,8 @@ jasypt:
     password: ${JASYPT_ENCRYPTOR_PASSWORD}
 
 spring:
+  jackson:
+    time-zone: Asia/Seoul
   application:
     name: stockProject
   datasource:
