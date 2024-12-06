@@ -74,6 +74,7 @@ pipeline {
                         # 컨테이너 실행
                         sudo docker run -d --name ${CONTAINER_NAME} -p 443:443 \
                             -e JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD} \
+                            -e TZ=Asia/Seoul \
                             ${DOCKER_IMAGE_NAME}:latest
 
                         # 불필요한 이미지 제거
@@ -83,6 +84,9 @@ pipeline {
                         else
                             echo "No dangling images to remove."
                         fi
+
+                        # 이전 버전의 이미지 삭제
+                        sudo docker images | grep ${DOCKER_IMAGE_NAME} | awk '{print \$3}' | tail -n +3 | xargs --no-run-if-empty sudo docker rmi -f
 EOF
                     """
                 }

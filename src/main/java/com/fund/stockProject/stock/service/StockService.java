@@ -11,6 +11,7 @@ import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockChartResponse;
 import com.fund.stockProject.stock.dto.response.StockChartResponse.PriceInfo;
 import com.fund.stockProject.stock.dto.response.StockDiffResponse;
+import com.fund.stockProject.stock.dto.response.StockInfoResponse;
 import com.fund.stockProject.stock.dto.response.StockRelevantResponse;
 import com.fund.stockProject.stock.dto.response.StockSearchResponse;
 import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
@@ -22,7 +23,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -44,24 +44,10 @@ public class StockService {
     private final ObjectMapper objectMapper;
 
 
-    public StockSearchResponse searchStockBySymbolName(final String symbolName) {
-        final Optional<Stock> optionalStock = stockRepository.findStockBySymbolName(symbolName);
-
-        if (optionalStock.isEmpty()) {
-            return null;
-        }
-
-        final Stock stock = optionalStock.get();
-
-        return StockSearchResponse.builder()
-            .stockId(stock.getId())
-            .symbol(stock.getSymbol())
-            .symbolName(stock.getSymbolName())
-            .securityName(stock.getSecurityName())
-            .exchangeNum(stock.getExchangeNum())
-            .country(List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF)
-                .contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA)
-            .build();
+    public Mono<StockInfoResponse> searchStockBySymbolName(final String symbolName) {
+        // TODO: 비 블로킹 컨텍스트 관련 처리
+        Stock stock = stockRepository.findStockBySymbolName(symbolName).orElseThrow(() -> new RuntimeException("no stock found"));
+        return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(), stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum()));
     }
 
 
@@ -79,8 +65,7 @@ public class StockService {
                 .symbolName(stock.getSymbolName())
                 .securityName(stock.getSecurityName())
                 .exchangeNum(stock.getExchangeNum())
-                .country(List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF)
-                    .contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA)
+                .country(getCountryFromExchangeNum(stock.getExchangeNum()))
                 .build())
             .collect(Collectors.toList());
     }
@@ -306,6 +291,16 @@ public class StockService {
         }
 
         return stockRelevantResponses;
+    }
+
+    public Mono<StockInfoResponse> getStockInfo(Integer id, COUNTRY country) {
+        // TODO: 비 블로킹 컨텍스트 관련 처리
+        Stock stock = stockRepository.findStockById(id).orElseThrow(() -> new RuntimeException("no stock found"));
+        return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(), stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum()));
+    }
+
+    private COUNTRY getCountryFromExchangeNum(EXCHANGENUM exchangenum) {
+        return List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF).contains(exchangenum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
     }
 
     public Mono<StockChartResponse> getStockChart(final Integer id, final String periodCode, LocalDate startDate) {

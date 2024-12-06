@@ -4,9 +4,9 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum EXCHANGENUM {
-    NASDAQ("512"),
-    NYSE("513"),
-    AMEX("529"),
+    NAS("512"),
+    NYS("513"),
+    AMS("529"),
     KOSPI("001"),
     KOSDAQ("002"),
     KOREAN_ETF("003");

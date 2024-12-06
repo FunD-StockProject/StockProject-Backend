@@ -14,6 +14,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.global.config.SecurityHttpConfig;
+import com.fund.stockProject.stock.domain.COUNTRY;
+import com.fund.stockProject.stock.domain.EXCHANGENUM;
+import com.fund.stockProject.stock.dto.response.StockInfoResponse;
 import com.fund.stockProject.stock.dto.response.StockKoreaVolumeRankResponse;
 import com.fund.stockProject.stock.dto.response.StockOverseaVolumeRankResponse;
 
@@ -27,6 +30,100 @@ public class SecurityService {
     private final SecurityHttpConfig securityHttpConfig;
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
+
+    /**
+     * 국내, 해외 주식 정보 조회
+     */
+    public Mono<StockInfoResponse> getSecurityStockInfoKorea(Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum, COUNTRY country) {
+        if (country == COUNTRY.KOREA) {
+            return webClient.get()
+                            .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/quotations/inquire-price")
+                                                         .queryParam("fid_cond_mrkt_div_code", "J")
+                                                         .queryParam("fid_input_iscd", symbol)
+                                                         .build())
+                            .headers(httpHeaders -> {
+                                HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                                headers.set("tr_id", "FHKST01010100"); // 추가 헤더 설정
+                                httpHeaders.addAll(headers);
+                            })
+                            .retrieve()
+                            .bodyToMono(String.class)
+                            .flatMap(response -> parseFStockInfoKorea(response, id, symbolName, securityName, symbol, exchangenum, country));
+        } else if (country == COUNTRY.OVERSEA) {
+            return webClient.get()
+                            .uri(uriBuilder -> uriBuilder.path("/uapi/overseas-price/v1/quotations/price")
+                                                         .queryParam("AUTH", "")
+                                                         .queryParam("EXCD", exchangenum.name())
+                                                         .queryParam("SYMB", symbol)
+                                                         .build())
+                            .headers(httpHeaders -> {
+                                HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                                headers.set("tr_id", "HHDFS00000300"); // 추가 헤더 설정
+                                httpHeaders.addAll(headers);
+                            })
+                            .retrieve()
+                            .bodyToMono(String.class)
+                            .flatMap(response -> parseFStockInfoOversea(response, id, symbolName, securityName, symbol, exchangenum, country));
+        } else {
+            return Mono.error(new UnsupportedOperationException("COUNTRY 입력 에러"));
+        }
+    }
+
+    private Mono<StockInfoResponse> parseFStockInfoKorea(String response, Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum, COUNTRY country) {
+        try {
+            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode outputNode = rootNode.get("output");
+            StockInfoResponse stockInfoResponse = new StockInfoResponse();
+
+            if (outputNode != null) {
+                stockInfoResponse.setStockId(id);
+                stockInfoResponse.setSymbolName(symbolName);
+                stockInfoResponse.setSecurityName(securityName);
+                stockInfoResponse.setSymbol(symbol);
+                stockInfoResponse.setExchangeNum(exchangenum);
+                stockInfoResponse.setCountry(country);
+                stockInfoResponse.setPrice(outputNode.get("stck_prpr").asDouble());
+                stockInfoResponse.setPriceDiff(outputNode.get("prdy_vrss").asDouble());
+                stockInfoResponse.setPriceDiffPerCent(outputNode.get("prdy_ctrt").asDouble());
+                stockInfoResponse.setPriceSign(outputNode.get("prdy_vrss_sign").asInt());
+            }
+
+            return Mono.just(stockInfoResponse);
+        } catch (Exception e) {
+            return Mono.error(new UnsupportedOperationException("국내 종목 정보가 없습니다"));
+        }
+    }
+
+    private Mono<StockInfoResponse> parseFStockInfoOversea(String response, Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum, COUNTRY country) {
+        try {
+            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode outputNode = rootNode.get("output");
+            StockInfoResponse stockInfoResponse = new StockInfoResponse();
+
+            if (outputNode != null) {
+                stockInfoResponse.setStockId(id);
+                stockInfoResponse.setSymbolName(symbolName);
+                stockInfoResponse.setSecurityName(securityName);
+                stockInfoResponse.setCountry(country);
+                stockInfoResponse.setSymbol(symbol);
+                stockInfoResponse.setExchangeNum(exchangenum);
+                stockInfoResponse.setPrice(outputNode.get("last").asDouble());
+                // 해외는 diff가 절대값이므로 절대값에 따라 음수로 변경
+                if(outputNode.get("rate").asDouble() < 0) {
+                    stockInfoResponse.setPriceDiff(outputNode.get("diff").asDouble() * -1);
+                }
+                else{
+                    stockInfoResponse.setPriceDiff(outputNode.get("diff").asDouble());
+                }
+                stockInfoResponse.setPriceDiffPerCent(outputNode.get("rate").asDouble());
+                stockInfoResponse.setPriceSign(outputNode.get("sign").asInt());
+            }
+
+            return Mono.just(stockInfoResponse);
+        } catch (Exception e) {
+            return Mono.error(new UnsupportedOperationException("국내 종목 정보가 없습니다"));
+        }
+    }
 
     /**
      * 한국 거래량 순위 조회
