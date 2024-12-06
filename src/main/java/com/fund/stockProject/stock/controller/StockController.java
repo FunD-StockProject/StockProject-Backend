@@ -34,7 +34,8 @@ public class StockController {
 
     @GetMapping("/search/{symbolName}")
     @Operation(summary = "주식 종목 검색 API", description = "주식 종목 및 인간지표 데이터 검색")
-    public ResponseEntity<Mono<StockInfoResponse>> searchStockBySymbolName(final @PathVariable String symbolName) {
+    public ResponseEntity<Mono<StockInfoResponse>> searchStockBySymbolName(
+        final @PathVariable String symbolName) {
         return ResponseEntity.ok().body(stockService.searchStockBySymbolName(symbolName));
     }
 
@@ -72,18 +73,19 @@ public class StockController {
         return ResponseEntity.ok().body(stockService.getRelevantStocks(id));
     }
 
-    @GetMapping("/{id}/chart")
+    @GetMapping("/{id}/chart/{country}")
     @Operation(summary = "차트 정보 제공 api", description = "조회 종목의 날짜별 가격 변동 폭 정보 제공 api")
     ResponseEntity<Mono<StockChartResponse>> getStockChart(
-        @PathVariable("id") Integer id,
-        @RequestParam(required = false) String periodCode,
-        @RequestParam(required = false) LocalDate startDate) {
+        final @PathVariable("id") Integer id,
+        final @RequestParam(required = false) String periodCode,
+        final @RequestParam(required = false) LocalDate startDate) {
         return ResponseEntity.ok().body(stockService.getStockChart(id, periodCode, startDate));
     }
 
     @GetMapping("/{id}/info/{country}")
     @Operation(summary = "주식 정보 api", description = "주식 정보 api")
-    ResponseEntity<Mono<StockInfoResponse>> getStockInfo(final @PathVariable("id") Integer id, final @PathVariable("country") COUNTRY country) {
+    ResponseEntity<Mono<StockInfoResponse>> getStockInfo(final @PathVariable("id") Integer id,
+        final @PathVariable("country") COUNTRY country) {
         return ResponseEntity.ok().body(stockService.getStockInfo(id, country));
     }
 }

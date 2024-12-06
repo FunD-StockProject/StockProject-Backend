@@ -1,5 +1,6 @@
 package com.fund.stockProject.stock.dto.response;
 
+import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import java.util.List;
@@ -39,9 +40,13 @@ public class StockChartResponse {
         private final String accumulatedTradingVolume;
         private final String accumulatedTradingValue;
 
+        private final Integer score;
+        private final Integer diff;
+
         @Builder
         public PriceInfo(String localDate, String closePrice, String openPrice, String highPrice,
-            String lowPrice, String accumulatedTradingVolume, String accumulatedTradingValue) {
+            String lowPrice, String accumulatedTradingVolume, String accumulatedTradingValue,
+            Integer score, Integer diff) {
             this.localDate = localDate;
             this.closePrice = closePrice;
             this.openPrice = openPrice;
@@ -49,6 +54,8 @@ public class StockChartResponse {
             this.lowPrice = lowPrice;
             this.accumulatedTradingVolume = accumulatedTradingVolume;
             this.accumulatedTradingValue = accumulatedTradingValue;
+            this.score = score;
+            this.diff = diff;
         }
     }
 
