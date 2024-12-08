@@ -46,7 +46,7 @@ public class StockService {
 
     public Mono<StockInfoResponse> searchStockBySymbolName(final String symbolName) {
         // TODO: 비 블로킹 컨텍스트 관련 처리
-        Stock stock = stockRepository.findStockBySymbolName(symbolName)
+        Stock stock = stockRepository.findFirstBySymbolOrSymbolName(symbolName)
             .orElseThrow(() -> new RuntimeException("no stock found"));
         return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
             stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
