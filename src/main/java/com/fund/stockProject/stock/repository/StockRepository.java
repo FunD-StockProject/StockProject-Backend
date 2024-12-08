@@ -11,7 +11,8 @@ import java.util.Optional;
 
 @Repository
 public interface StockRepository extends JpaRepository<Stock, Integer> {
-    Optional<Stock> findStockBySymbolName(final String symbolName);
+    @Query("SELECT s FROM Stock s WHERE s.symbol = :symbolName OR s.symbolName = :symbolName")
+    Optional<Stock> findFirstBySymbolOrSymbolName(@Param("symbolName") String symbolName);
 
     @Query("SELECT s FROM Stock s JOIN FETCH s.scores WHERE s.symbolName = :symbolName")
     Optional<Stock> findStockBySymbolNameWithScores(@Param("symbolName") String symbolName);
