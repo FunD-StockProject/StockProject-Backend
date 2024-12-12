@@ -26,6 +26,8 @@ spring:
     database: mysql
     hibernate:
       ddl-auto: update
+    properties:
+      hibernate.jdbc.time_zone: Asia/Seoul
     show-sql: false
 
   batch:

@@ -8,10 +8,13 @@ RUN gradle build -x test
 FROM openjdk:17-jdk-slim
 WORKDIR /app
 
-# 1. Python3 및 pip 설치
+# Python3 및 pip 설치, 시간대 설정
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
+    tzdata \
+    && ln -sf /usr/share/zoneinfo/Asia/Seoul /etc/localtime \
+    && echo "Asia/Seoul" > /etc/timezone \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 2. PyTorch 및 관련 라이브러리 설치 (CPU 전용)
