@@ -3,7 +3,7 @@ server:
   ssl:
     enabled: true
     key-store: /app/config/keystore.p12
-    key-store-password: ENC(0XTW44izU5HxXDDdiFc8m65uTBTAshty)
+    key-store-password: ENC(vvUgNR9gTKm6jTSuHQDLC9QzqN3wH+vU)
     key-store-type: PKCS12
 
 jasypt:
