@@ -207,7 +207,13 @@ public class StockService {
         TreeSet<Score> topScores = new TreeSet<>(Comparator.comparing(Score::getDiff).reversed());
 
         allScores.stream()
-                 .filter(score -> !score.getDate().isEqual(today) || !todayIdSet.contains(score.getStockId()))
+                 .filter(score -> {
+                     if (score.getDate().isEqual(today)) {
+                         return true; // 오늘 데이터는 무조건 포함
+                     }
+                     // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
+                     return !todayIdSet.contains(score.getStockId());
+                 })
                  .forEach(topScores::add);
 
         // 상위 9개만 반환
@@ -243,7 +249,13 @@ public class StockService {
         TreeSet<Score> topScores = new TreeSet<>(Comparator.comparing(Score::getDiff));
 
         allScores.stream()
-                 .filter(score -> !score.getDate().isEqual(today) || !todayIdSet.contains(score.getStockId()))
+                 .filter(score -> {
+                     if (score.getDate().isEqual(today)) {
+                         return true; // 오늘 데이터는 무조건 포함
+                     }
+                     // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
+                     return !todayIdSet.contains(score.getStockId());
+                 })
                  .forEach(topScores::add);
 
         // 상위 9개만 반환
