@@ -17,45 +17,6 @@ import com.fund.stockProject.score.entity.Score;
 @Repository
 @EnableJpaRepositories
 public interface ScoreRepository extends JpaRepository<Score, Integer> {
-    @Query(value = """
-SELECT DISTINCT s
-FROM Score s
-WHERE s.date = :date
-  AND s.scoreOversea = 9999
-ORDER BY s.diff DESC
-LIMIT 9
-""")
-    List<Score> findTopScoresKorea(@Param("date") LocalDate date);
-
-    @Query(value = """
-SELECT DISTINCT s
-FROM Score s
-WHERE s.date = :date
-  AND s.scoreKorea = 9999
-ORDER BY s.diff DESC
-LIMIT 9
-""")
-    List<Score> findTopScoresOversea(@Param("date") LocalDate date);
-
-    @Query(value = """
-SELECT DISTINCT s
-FROM Score s
-WHERE s.date = :date
-  AND s.scoreOversea = 9999
-ORDER BY s.diff
-LIMIT 9
-""")
-    List<Score> findBottomScoresKorea(@Param("date") LocalDate date);
-
-    @Query(value = """
-SELECT DISTINCT s
-FROM Score s
-WHERE s.date = :date
-  AND s.scoreKorea = 9999
-ORDER BY s.diff
-LIMIT 9
-""")
-    List<Score> findBottomScoresOversea(@Param("date") LocalDate date);
 
     /**
      * stock_id와 date로 특정 데이터가 존재하는지 확인
@@ -81,4 +42,10 @@ LIMIT 9
       AND s2.stockId IS NULL
 """)
     List<Score> findScoresWithoutTodayData(@Param("yesterday") LocalDate yesterday, @Param("today") LocalDate today);
+
+    @Query("SELECT s FROM Score s WHERE s.date IN (:today, :yesterday) AND s.scoreKorea = 9999")
+    List<Score> findScoresByDatesOversea(@Param("today") LocalDate today, @Param("yesterday") LocalDate yesterday);
+
+    @Query("SELECT s FROM Score s WHERE s.date IN (:today, :yesterday) AND s.scoreOversea = 9999")
+    List<Score> findScoresByDatesKorea(@Param("today") LocalDate today, @Param("yesterday") LocalDate yesterday);
 }

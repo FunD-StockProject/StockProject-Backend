@@ -21,8 +21,11 @@ import com.fund.stockProject.stock.repository.StockRepository;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -43,6 +46,7 @@ public class StockService {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
+    private final int LIMITS = 9;
 
     public Mono<StockInfoResponse> searchStockBySymbolName(final String symbolName) {
         // TODO: 비 블로킹 컨텍스트 관련 처리
@@ -185,25 +189,31 @@ public class StockService {
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
 
-        List<Score> topScores;
+        List<Score> allScores;
 
         if (country == COUNTRY.KOREA) {
-            topScores = scoreRepository.findTopScoresKorea(today);
-
-            // 오늘 날짜 데이터가 없을 경우 어제 날짜로 재조회
-            if (topScores.isEmpty()) {
-                topScores = scoreRepository.findTopScoresKorea(yesterday);
-            }
+            allScores = scoreRepository.findScoresByDatesKorea(today, yesterday);
         } else {
-            topScores = scoreRepository.findTopScoresOversea(today);
-
-            // 오늘 날짜 데이터가 없을 경우 어제 날짜로 재조회
-            if (topScores.isEmpty()) {
-                topScores = scoreRepository.findTopScoresOversea(yesterday);
-            }
+            allScores = scoreRepository.findScoresByDatesOversea(today, yesterday);
         }
 
-        return topScores;
+        // 오늘 데이터와 어제 데이터를 구분
+        Set<Integer> todayIdSet = allScores.stream()
+                                           .filter(score -> score.getDate().isEqual(today))
+                                           .map(Score::getStockId)
+                                           .collect(Collectors.toSet());
+
+        // TreeSet을 사용해 정렬된 상태 유지
+        TreeSet<Score> topScores = new TreeSet<>(Comparator.comparing(Score::getDiff).reversed());
+
+        allScores.stream()
+                 .filter(score -> !score.getDate().isEqual(today) || !todayIdSet.contains(score.getStockId()))
+                 .forEach(topScores::add);
+
+        // 상위 9개만 반환
+        return topScores.stream()
+                        .limit(LIMITS)
+                        .toList();
     }
 
     /**
@@ -215,25 +225,31 @@ public class StockService {
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
 
-        List<Score> bottomScores;
+        List<Score> allScores;
 
         if (country == COUNTRY.KOREA) {
-            bottomScores = scoreRepository.findBottomScoresKorea(today);
-
-            // 오늘 날짜 데이터가 없을 경우 어제 날짜로 재조회
-            if (bottomScores.isEmpty()) {
-                bottomScores = scoreRepository.findBottomScoresKorea(yesterday);
-            }
+            allScores = scoreRepository.findScoresByDatesKorea(today, yesterday);
         } else {
-            bottomScores = scoreRepository.findBottomScoresOversea(today);
-
-            // 오늘 날짜 데이터가 없을 경우 어제 날짜로 재조회
-            if (bottomScores.isEmpty()) {
-                bottomScores = scoreRepository.findBottomScoresOversea(yesterday);
-            }
+            allScores = scoreRepository.findScoresByDatesOversea(today, yesterday);
         }
 
-        return bottomScores;
+        // 오늘 데이터와 어제 데이터를 구분
+        Set<Integer> todayIdSet = allScores.stream()
+                                           .filter(score -> score.getDate().isEqual(today))
+                                           .map(Score::getStockId)
+                                           .collect(Collectors.toSet());
+
+        // TreeSet을 사용해 정렬된 상태 유지
+        TreeSet<Score> topScores = new TreeSet<>(Comparator.comparing(Score::getDiff));
+
+        allScores.stream()
+                 .filter(score -> !score.getDate().isEqual(today) || !todayIdSet.contains(score.getStockId()))
+                 .forEach(topScores::add);
+
+        // 상위 9개만 반환
+        return topScores.stream()
+                        .limit(LIMITS)
+                        .toList();
     }
 
     /**
