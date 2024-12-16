@@ -32,11 +32,12 @@ public class StockController {
 
     private final StockService stockService;
 
-    @GetMapping("/search/{symbolName}")
+    @GetMapping("/search/{symbolName}/{country}")
     @Operation(summary = "주식 종목 검색 API", description = "주식 종목 및 인간지표 데이터 검색")
     public ResponseEntity<Mono<StockInfoResponse>> searchStockBySymbolName(
-        final @PathVariable String symbolName) {
-        return ResponseEntity.ok().body(stockService.searchStockBySymbolName(symbolName));
+        final @PathVariable String symbolName,
+        final @PathVariable String country) {
+        return ResponseEntity.ok().body(stockService.searchStockBySymbolName(symbolName, country));
     }
 
     @GetMapping("/autocomplete")
