@@ -48,10 +48,12 @@ public class StockService {
 
     private final int LIMITS = 9;
 
-    public Mono<StockInfoResponse> searchStockBySymbolName(final String symbolName) {
-        // TODO: 비 블로킹 컨텍스트 관련 처리
-        Stock stock = stockRepository.findFirstBySymbolOrSymbolName(symbolName)
-            .orElseThrow(() -> new RuntimeException("no stock found"));
+    public Mono<StockInfoResponse> searchStockBySymbolName(final String symbolName, final String country) {
+        List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF);
+        List<EXCHANGENUM> overseaExchanges = List.of(EXCHANGENUM.NAS, EXCHANGENUM.NYS, EXCHANGENUM.AMS);
+
+        Stock stock = stockRepository.findBySymbolNameAndCountryWithEnums(symbolName, country, koreaExchanges, overseaExchanges).orElseThrow(() -> new RuntimeException("no stock found"));
+
         return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
             stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
             getCountryFromExchangeNum(stock.getExchangeNum()));
