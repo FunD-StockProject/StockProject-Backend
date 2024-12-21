@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.fund.stockProject.global.entity.Core;
+import com.fund.stockProject.keyword.entity.StockKeyword;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 
@@ -31,6 +32,9 @@ public class Stock extends Core {
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "stock_seq")
     @SequenceGenerator(name = "stock_seq", sequenceName = "stock_sequence", allocationSize = 1)
     private Integer id;
+
+    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<StockKeyword> stockKeywords = new ArrayList<>();
 
     @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("date DESC") // date 기준 내림차순 정렬
