@@ -154,54 +154,7 @@ public class ScoreService {
 
     }
 
-    private COUNTRY determineCountry(Score score) {
-        if (score.getScoreKorea() == 9999) {
-            return COUNTRY.OVERSEA;
-        } else if (score.getScoreOversea() == 9999) {
-            return COUNTRY.KOREA;
-        } else {
-            throw new IllegalArgumentException("Invalid score data: stock_id=" + score.getStockId());
-        }
-    }
-
-    @Transactional
-    public void test() {
-        LocalDate today = LocalDate.now();
-
-        // 오늘 데이터를 조회
-        List<Score> scores = scoreRepository.findScoresByTodayOversea(today);
-
-        for (Score score : scores) {
-            try {
-                // COUNTRY를 설정하고 updateScore 실행
-                COUNTRY country = determineCountry(score);
-                if (country == COUNTRY.KOREA) {
-                    Stock stock = stockRepository.findById(score.getStockId()).orElseThrow(() -> new RuntimeException("Could not find stock"));
-                    System.out.println("stock.getSymbol() = " + stock.getSymbol());
-                    // Python 스크립트를 실행하여 결과 가져오기
-                    ScoreKeywordResponse scoreKeywordResponse = executeUpdateAI(stock.getSymbol(), country);
-
-                    System.out.println("scoreKeywordResponse.getTopKeywords().get(0).getWord() = " + scoreKeywordResponse.getTopKeywords().get(0).getWord());
-                    scoreKeywordResponse.getTopKeywords().forEach(keywordDto -> {
-                        Keyword newKeyword = Keyword.builder()
-                                .name(keywordDto.getWord())
-                                .frequency(keywordDto.getFreq())
-                                .build();
-
-                        keywordRepository.save(newKeyword);
-
-                        // StockKeyword 테이블에 매핑 정보 저장
-                        StockKeyword stockKeyword = new StockKeyword(stock, newKeyword);
-                        stockKeywordRepository.save(stockKeyword);
-                    });
-
-                }
-            } catch (Exception e) {
-                System.err.println("Error processing score " + score.getStockId() + " - " + e.getMessage());
-            }
-        }
-    }
-
+    // TODO: 키워드 업데이트 로직 개발 중
     @Transactional
     public void updateScoreAndKeyword(Integer id, COUNTRY country, int yesterdayScore) {
         Stock stock = stockRepository.findById(id)
@@ -211,41 +164,37 @@ public class ScoreService {
             ScoreKeywordResponse scoreKeywordResponse = executeUpdateAI(stock.getSymbol(), country);
 
             // STEP2: SCORE 데이터 저장
-//            int finalScore = scoreKeywordResponse.getFinalScore();
-//            Score newScore = Score.builder()
-//                                  .stockId(stock.getId())
-//                                  .date(LocalDate.now())
-//                                  .scoreKorea(country == COUNTRY.KOREA? finalScore : 9999)
-//                                  .scoreNaver(finalScore)
-//                                  .scoreReddit(9999)
-//                                  .scoreOversea(country == COUNTRY.OVERSEA? finalScore : 9999)
-//                                  .diff(finalScore - yesterdayScore)
-//                                  .build();
+            int finalScore = scoreKeywordResponse.getFinalScore();
+            Score newScore = Score.builder()
+                                  .stockId(stock.getId())
+                                  .date(LocalDate.now())
+                                  .scoreKorea(country == COUNTRY.KOREA? finalScore : 9999)
+                                  .scoreNaver(finalScore)
+                                  .scoreReddit(9999)
+                                  .scoreOversea(country == COUNTRY.OVERSEA? finalScore : 9999)
+                                  .diff(finalScore - yesterdayScore)
+                                  .build();
 
-//            // `stock` 연관 설정
-//            newScore.setStock(stock);
-//            scoreRepository.save(newScore);
+            // `stock` 연관 설정
+            newScore.setStock(stock);
+            scoreRepository.save(newScore);
 
-                scoreKeywordResponse.getTopKeywords().forEach(keyword -> {
-                    System.out.println("keyword = " + keyword.getWord() + "freq = " + keyword.getFreq());
-                                                              });
+            // 기존 StockKeyword 삭제
+            stockKeywordRepository.deleteByStock(stock);
+            System.out.println("scoreKeywordResponse.getTopKeywords().get(0).getWord() = " + scoreKeywordResponse.getTopKeywords().get(0).getWord());
+            scoreKeywordResponse.getTopKeywords().forEach(keywordDto -> {
+                Keyword newKeyword = Keyword.builder()
+                                            .name(keywordDto.getWord())
+                                            .frequency(keywordDto.getFreq())
+                                            .build();
 
-//            // STEP2: 기존 키워드 삭제
-//            stockKeywordRepository.deleteByStock(stock);
-//
-//            // STEP3: 키워드 저장
-//            scoreKeywordResponse.getTopKeywords().forEach(keyword -> {
-//                Keyword savedKeyword = keywordRepository.findByName(keyword.getWord())
-//                                                        .orElseGet(() -> {
-//                                                            Keyword newKeyword = new Keyword(keyword.getWord(), keyword.getFreq());
-//                                                            keywordRepository.save(newKeyword);
-//                                                            return newKeyword;
-//                                                        });
-//
-//                StockKeyword stockKeyword = new StockKeyword(stock, savedKeyword);
-//                stockKeywordRepository.save(stockKeyword);
-//            });
+                newKeyword.updateFrequency(keywordDto.getFreq());
+                keywordRepository.save(newKeyword);
 
+                // StockKeyword 테이블에 매핑 정보 저장
+                StockKeyword stockKeyword = new StockKeyword(stock, newKeyword);
+                stockKeywordRepository.save(stockKeyword);
+            });
         } catch (Exception e) {
             throw new RuntimeException("Failed to update score and keyword", e);
         }
