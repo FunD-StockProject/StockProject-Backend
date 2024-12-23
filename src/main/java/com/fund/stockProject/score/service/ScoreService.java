@@ -14,6 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fund.stockProject.keyword.dto.KeywordDto;
+import com.fund.stockProject.keyword.entity.Keyword;
+import com.fund.stockProject.keyword.entity.StockKeyword;
+import com.fund.stockProject.keyword.repository.KeywordRepository;
+import com.fund.stockProject.keyword.repository.StockKeywordRepository;
+import com.fund.stockProject.score.dto.response.ScoreKeywordResponse;
 import com.fund.stockProject.score.dto.response.ScoreResponse;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
@@ -30,6 +36,8 @@ public class ScoreService {
 
     private final ScoreRepository scoreRepository;
     private final StockRepository stockRepository;
+    private final KeywordRepository keywordRepository;
+    private final StockKeywordRepository stockKeywordRepository;
 
     @Transactional(readOnly = true)
     public List<Score> findScoresByDate(LocalDate yesterday, LocalDate today) {
@@ -100,8 +108,6 @@ public class ScoreService {
                              .collect(Collectors.joining("\n"));
             }).get(60, TimeUnit.SECONDS); // Maximum 60 seconds wait
 
-            System.out.println("Filtered output = " + output);
-
             // Check the process exit code
             int exitCode = process.waitFor();
             if (exitCode != 0) {
@@ -148,6 +154,52 @@ public class ScoreService {
 
     }
 
+    // TODO: 키워드 업데이트 로직 개발 중
+    @Transactional
+    public void updateScoreAndKeyword(Integer id, COUNTRY country, int yesterdayScore) {
+        Stock stock = stockRepository.findById(id)
+                                     .orElseThrow(() -> new RuntimeException("Could not find stock"));
+        try {
+            // Python 스크립트를 실행하여 결과 가져오기
+            ScoreKeywordResponse scoreKeywordResponse = executeUpdateAI(stock.getSymbol(), country);
+
+            // STEP2: SCORE 데이터 저장
+            int finalScore = scoreKeywordResponse.getFinalScore();
+            Score newScore = Score.builder()
+                                  .stockId(stock.getId())
+                                  .date(LocalDate.now())
+                                  .scoreKorea(country == COUNTRY.KOREA? finalScore : 9999)
+                                  .scoreNaver(finalScore)
+                                  .scoreReddit(9999)
+                                  .scoreOversea(country == COUNTRY.OVERSEA? finalScore : 9999)
+                                  .diff(finalScore - yesterdayScore)
+                                  .build();
+
+            // `stock` 연관 설정
+            newScore.setStock(stock);
+            scoreRepository.save(newScore);
+
+            // 기존 StockKeyword 삭제
+            stockKeywordRepository.deleteByStock(stock);
+            System.out.println("scoreKeywordResponse.getTopKeywords().get(0).getWord() = " + scoreKeywordResponse.getTopKeywords().get(0).getWord());
+            scoreKeywordResponse.getTopKeywords().forEach(keywordDto -> {
+                Keyword newKeyword = Keyword.builder()
+                                            .name(keywordDto.getWord())
+                                            .frequency(keywordDto.getFreq())
+                                            .build();
+
+                newKeyword.updateFrequency(keywordDto.getFreq());
+                keywordRepository.save(newKeyword);
+
+                // StockKeyword 테이블에 매핑 정보 저장
+                StockKeyword stockKeyword = new StockKeyword(stock, newKeyword);
+                stockKeywordRepository.save(stockKeyword);
+            });
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to update score and keyword", e);
+        }
+    }
+
     private boolean isFirst(Integer id) {
         // 1111-11-11 날짜의 데이터가 존재하면 첫 인간지표로 판단
         return scoreRepository.existsByStockIdAndDate(id, LocalDate.of(1111, 11, 11));
@@ -171,8 +223,6 @@ public class ScoreService {
                              .collect(Collectors.joining("\n"));
             }).get(60, TimeUnit.SECONDS); // 최대 120초 대기
 
-            System.out.println("Filtered output = " + output);
-
             // 프로세스 종료 코드 확인
             int exitCode = process.waitFor();
             if (exitCode != 0) {
@@ -187,5 +237,58 @@ public class ScoreService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute Python script", e);
         }
+    }
+
+    private ScoreKeywordResponse executeUpdateAI(String symbol, COUNTRY country) {
+        try {
+            // Python 스크립트 경로
+            String scriptPath = "update.py";
+
+            // ProcessBuilder를 사용하여 Python 스크립트 실행
+            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol, country.toString());
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
+
+            // 비동기 스트림 읽기
+            String output = Executors.newSingleThreadExecutor().submit(() -> {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                return reader.lines().collect(Collectors.joining("\n"));
+            }).get(60, TimeUnit.SECONDS); // 최대 60초 대기
+
+            // 프로세스 종료 코드 확인
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
+            }
+
+            // Python 스크립트에서 출력된 JSON 파싱
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode jsonNode = objectMapper.readTree(output);
+
+            int finalScore = jsonNode.get("final_score").asInt();
+            List<KeywordDto> topKeywords = new ArrayList<>();
+            for (JsonNode keywordNode : jsonNode.get("top_keywords")) {
+                String word = keywordNode.get("word").asText();
+                int freq = keywordNode.get("freq").asInt();
+                topKeywords.add(new KeywordDto(word, freq));
+            }
+
+            return new ScoreKeywordResponse(finalScore, topKeywords);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to execute Python script", e);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<KeywordDto> getKeywordsByStock(Integer stockId) {
+        Stock stock = stockRepository.findById(stockId)
+                                     .orElseThrow(() -> new RuntimeException("Stock not found"));
+
+        return stockKeywordRepository.findByStock(stock)
+                                     .stream()
+                                     .map(stockKeyword -> new KeywordDto(stockKeyword.getKeyword().getName(),
+                                                                         stockKeyword.getKeyword().getFrequency()))
+                                     .collect(Collectors.toList());
     }
 }
