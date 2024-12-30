@@ -3,6 +3,8 @@ package com.fund.stockProject.stock.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.global.config.SecurityHttpConfig;
+import com.fund.stockProject.keyword.entity.Keyword;
+import com.fund.stockProject.keyword.repository.KeywordRepository;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
 import com.fund.stockProject.score.service.ScoreService;
@@ -45,6 +47,7 @@ public class StockService {
     private final SecurityHttpConfig securityHttpConfig;
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
+    private final KeywordRepository keywordRepository;
 
     private final int LIMITS = 9;
 
@@ -138,8 +141,11 @@ public class StockService {
                             stock.getScores().get(0).setScoreKorea(newScore);
                         }
 
+                        final List<Keyword> keywordsByStockId = keywordRepository.findKeywordsByStockId(stock.getId());
+
                         return StockSimpleResponse.builder()
                             .stockId(stock.getId())
+                            .keywords(keywordsByStockId)
                             .symbolName(stock.getSymbolName())
                             .score(stock.getScores().get(0).getScoreKorea()) // 최신 데이터를 보장
                             .build();
@@ -161,8 +167,11 @@ public class StockService {
                             stock.getScores().get(0).setScoreOversea(newScore);
                         }
 
+                        final List<Keyword> keywordsByStockId = keywordRepository.findKeywordsByStockId(stock.getId());
+
                         return StockSimpleResponse.builder()
                             .stockId(stock.getId())
+                            .keywords(keywordsByStockId)
                             .symbolName(stock.getSymbolName())
                             .score(stock.getScores().get(0).getScoreOversea())
                             .build();
