@@ -1,5 +1,6 @@
 package com.fund.stockProject.keyword.controller;
 
+import com.fund.stockProject.keyword.dto.PopularKeywordResponse;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
@@ -26,5 +27,12 @@ public class KeywordController {
     public ResponseEntity<List<Stock>> getStocksByKeyword(@PathVariable String keywordName) {
         List<Stock> stocks = keywordService.findStocksByKeyword(keywordName);
         return ResponseEntity.ok(stocks);
+    }
+
+    @GetMapping("/popular")
+    @Operation(summary = "인기 키워드 조회 API", description = "인기 키워드 조회 API")
+    public ResponseEntity<List<PopularKeywordResponse>> getPopularKeyword() {
+        final List<PopularKeywordResponse> popularKeyword = keywordService.findPopularKeyword();
+        return ResponseEntity.ok(popularKeyword);
     }
 }

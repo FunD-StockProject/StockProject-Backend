@@ -20,4 +20,7 @@ public interface KeywordRepository extends JpaRepository<Keyword, Integer> {
 
     @Query("SELECT k FROM Keyword k WHERE k.lastUsedAt < :cutoffDate")
     List<Keyword> findByLastUsedAtBefore(@Param("cutoffDate") LocalDate cutoffDate);
+
+    @Query("SELECT k FROM Keyword k order by frequency DESC limit 9")
+    List<Keyword> findPopularKeyword();
 }
