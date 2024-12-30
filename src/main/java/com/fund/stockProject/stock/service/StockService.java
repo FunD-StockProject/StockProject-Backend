@@ -288,6 +288,7 @@ public class StockService {
                 .symbolName(score.getStock().getSymbolName())
                 .score(country == COUNTRY.KOREA ? score.getScoreKorea() : score.getScoreOversea())
                 .diff(score.getDiff())
+                .keywords(keywordRepository.findKeywordsByStockId(score.getStockId()))
                 .build())
             .collect(Collectors.toList());
     }
