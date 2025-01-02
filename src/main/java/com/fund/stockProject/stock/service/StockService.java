@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -51,11 +52,16 @@ public class StockService {
 
     private final int LIMITS = 9;
 
-    public Mono<StockInfoResponse> searchStockBySymbolName(final String symbolName, final String country) {
-        List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF);
-        List<EXCHANGENUM> overseaExchanges = List.of(EXCHANGENUM.NAS, EXCHANGENUM.NYS, EXCHANGENUM.AMS);
+    public Mono<StockInfoResponse> searchStockBySymbolName(final String symbolName,
+        final String country) {
+        List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ,
+            EXCHANGENUM.KOREAN_ETF);
+        List<EXCHANGENUM> overseaExchanges = List.of(EXCHANGENUM.NAS, EXCHANGENUM.NYS,
+            EXCHANGENUM.AMS);
 
-        Stock stock = stockRepository.findBySymbolNameAndCountryWithEnums(symbolName, country, koreaExchanges, overseaExchanges).orElseThrow(() -> new RuntimeException("no stock found"));
+        Stock stock = stockRepository.findBySymbolNameAndCountryWithEnums(symbolName, country,
+                koreaExchanges, overseaExchanges)
+            .orElseThrow(() -> new RuntimeException("no stock found"));
 
         return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
             stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
@@ -141,11 +147,9 @@ public class StockService {
                             stock.getScores().get(0).setScoreKorea(newScore);
                         }
 
-                        final List<Keyword> keywordsByStockId = keywordRepository.findKeywordsByStockId(stock.getId());
-
                         return StockSimpleResponse.builder()
                             .stockId(stock.getId())
-                            .keywords(keywordsByStockId)
+                            .keywords(keywordRepository.findKeywordsByStockId(stock.getId(), PageRequest.of(0, 2)))
                             .symbolName(stock.getSymbolName())
                             .score(stock.getScores().get(0).getScoreKorea()) // 최신 데이터를 보장
                             .build();
@@ -167,11 +171,9 @@ public class StockService {
                             stock.getScores().get(0).setScoreOversea(newScore);
                         }
 
-                        final List<Keyword> keywordsByStockId = keywordRepository.findKeywordsByStockId(stock.getId());
-
                         return StockSimpleResponse.builder()
                             .stockId(stock.getId())
-                            .keywords(keywordsByStockId)
+                            .keywords(keywordRepository.findKeywordsByStockId(stock.getId(), PageRequest.of(0, 2)))
                             .symbolName(stock.getSymbolName())
                             .score(stock.getScores().get(0).getScoreOversea())
                             .build();
@@ -210,27 +212,27 @@ public class StockService {
 
         // 오늘 데이터와 어제 데이터를 구분
         Set<Integer> todayIdSet = allScores.stream()
-                                           .filter(score -> score.getDate().isEqual(today))
-                                           .map(Score::getStockId)
-                                           .collect(Collectors.toSet());
+            .filter(score -> score.getDate().isEqual(today))
+            .map(Score::getStockId)
+            .collect(Collectors.toSet());
 
         // TreeSet을 사용해 정렬된 상태 유지
         TreeSet<Score> topScores = new TreeSet<>(Comparator.comparing(Score::getDiff).reversed());
 
         allScores.stream()
-                 .filter(score -> {
-                     if (score.getDate().isEqual(today)) {
-                         return true; // 오늘 데이터는 무조건 포함
-                     }
-                     // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
-                     return !todayIdSet.contains(score.getStockId());
-                 })
-                 .forEach(topScores::add);
+            .filter(score -> {
+                if (score.getDate().isEqual(today)) {
+                    return true; // 오늘 데이터는 무조건 포함
+                }
+                // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
+                return !todayIdSet.contains(score.getStockId());
+            })
+            .forEach(topScores::add);
 
         // 상위 9개만 반환
         return topScores.stream()
-                        .limit(LIMITS)
-                        .toList();
+            .limit(LIMITS)
+            .toList();
     }
 
     /**
@@ -252,27 +254,27 @@ public class StockService {
 
         // 오늘 데이터와 어제 데이터를 구분
         Set<Integer> todayIdSet = allScores.stream()
-                                           .filter(score -> score.getDate().isEqual(today))
-                                           .map(Score::getStockId)
-                                           .collect(Collectors.toSet());
+            .filter(score -> score.getDate().isEqual(today))
+            .map(Score::getStockId)
+            .collect(Collectors.toSet());
 
         // TreeSet을 사용해 정렬된 상태 유지
         TreeSet<Score> topScores = new TreeSet<>(Comparator.comparing(Score::getDiff));
 
         allScores.stream()
-                 .filter(score -> {
-                     if (score.getDate().isEqual(today)) {
-                         return true; // 오늘 데이터는 무조건 포함
-                     }
-                     // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
-                     return !todayIdSet.contains(score.getStockId());
-                 })
-                 .forEach(topScores::add);
+            .filter(score -> {
+                if (score.getDate().isEqual(today)) {
+                    return true; // 오늘 데이터는 무조건 포함
+                }
+                // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
+                return !todayIdSet.contains(score.getStockId());
+            })
+            .forEach(topScores::add);
 
         // 상위 9개만 반환
         return topScores.stream()
-                        .limit(LIMITS)
-                        .toList();
+            .limit(LIMITS)
+            .toList();
     }
 
     /**
@@ -288,7 +290,7 @@ public class StockService {
                 .symbolName(score.getStock().getSymbolName())
                 .score(country == COUNTRY.KOREA ? score.getScoreKorea() : score.getScoreOversea())
                 .diff(score.getDiff())
-                .keywords(keywordRepository.findKeywordsByStockId(score.getStockId()))
+                .keywords(keywordRepository.findKeywordsByStockId(score.getStock().getId(), PageRequest.of(0, 2)))
                 .build())
             .collect(Collectors.toList());
     }
@@ -368,19 +370,21 @@ public class StockService {
         final String startDateToString = startDate.format(DateTimeFormatter.BASIC_ISO_DATE);
         final COUNTRY country = getCountry(stock);
 
-        final List<PriceInfo> itemChartPrices = securityService.getItemChartPrice(stock, startDateToString, endDateToString, periodCode, country).block();
+        final List<PriceInfo> itemChartPrices = securityService.getItemChartPrice(stock,
+            startDateToString, endDateToString, periodCode, country).block();
 
         List<Score> scores = stock.getScores();
         List<StockChartResponse.PriceInfo> priceInfos = new ArrayList<>();
 
-        if(itemChartPrices == null){
+        if (itemChartPrices == null) {
             System.out.println("There is no itemCharPrice data");
 
             return null;
         }
 
         for (PriceInfo priceInfo : itemChartPrices) {
-            LocalDate priceDate = LocalDate.parse(priceInfo.getLocalDate(), DateTimeFormatter.BASIC_ISO_DATE);
+            LocalDate priceDate = LocalDate.parse(priceInfo.getLocalDate(),
+                DateTimeFormatter.BASIC_ISO_DATE);
             Score matchingScore = null;
 
             // 날짜에 맞는 Score 찾기
@@ -400,7 +404,8 @@ public class StockService {
                 .lowPrice(priceInfo.getLowPrice())
                 .accumulatedTradingVolume(priceInfo.getAccumulatedTradingVolume())
                 .accumulatedTradingValue(priceInfo.getAccumulatedTradingValue())
-                .score(matchingScore != null ? (country == COUNTRY.KOREA ? matchingScore.getScoreKorea() : matchingScore.getScoreOversea()) : null)
+                .score(matchingScore != null ? (country == COUNTRY.KOREA
+                    ? matchingScore.getScoreKorea() : matchingScore.getScoreOversea()) : null)
                 .diff(matchingScore != null ? matchingScore.getDiff() : null)
                 .build();
 
@@ -435,7 +440,9 @@ public class StockService {
 
     private static COUNTRY getCountry(Stock stock) {
         COUNTRY country;
-        if (stock.getExchangeNum() == EXCHANGENUM.KOSPI || stock.getExchangeNum() == EXCHANGENUM.KOSDAQ || stock.getExchangeNum() == EXCHANGENUM.KOREAN_ETF) {
+        if (stock.getExchangeNum() == EXCHANGENUM.KOSPI
+            || stock.getExchangeNum() == EXCHANGENUM.KOSDAQ
+            || stock.getExchangeNum() == EXCHANGENUM.KOREAN_ETF) {
             country = COUNTRY.KOREA;
         } else {
             country = COUNTRY.OVERSEA;
@@ -444,7 +451,8 @@ public class StockService {
         return country;
     }
 
-    public Mono<StockChartResponse> convertToStockChartResponse(Mono<List<PriceInfo>> itemChartPrice, Stock stock, COUNTRY country) {
+    public Mono<StockChartResponse> convertToStockChartResponse(
+        Mono<List<PriceInfo>> itemChartPrice, Stock stock, COUNTRY country) {
         final List<Score> scores = stock.getScores();
         // priceinfos 의 각 날짜에 해당하는 score를 반환.
 
