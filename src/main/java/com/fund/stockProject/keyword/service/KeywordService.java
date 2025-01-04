@@ -5,10 +5,8 @@ import com.fund.stockProject.keyword.repository.KeywordRepository;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.entity.Stock;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -37,19 +35,6 @@ public class KeywordService {
             popularKeywords = stockKeywordRepository.findPopularKeyword(exchanges, pageable);
         }
 
-        final Set<String> keywordNames = new HashSet<>();
-
-        for (Keyword keyword : popularKeywords) {
-            if (keywordNames.size() >= 9) {
-                break; // 크기 조건을 먼저 확인해 불필요한 작업 방지
-            }
-
-            String name = keyword.getName();
-            if (!keywordNames.contains(name) && name.matches("^[a-zA-Z0-9가-힣\\s]+$")) {
-                keywordNames.add(name);
-            }
-        }
-
-        return new ArrayList<>(keywordNames);
+        return popularKeywords.stream().map(Keyword::getName).limit(9).collect(Collectors.toList());
     }
 }

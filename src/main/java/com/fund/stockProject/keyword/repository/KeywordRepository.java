@@ -31,7 +31,7 @@ public interface KeywordRepository extends JpaRepository<Keyword, Integer> {
     @Query("SELECT k FROM StockKeyword sk " +
         "JOIN sk.stock s " +
         "JOIN sk.keyword k " +
-        "WHERE sk.stock.id = :stockId" +
+        "WHERE sk.stock.id = :stockId " +
         "ORDER BY k.frequency DESC")
     List<Keyword> findKeywordsByStockId(@Param("stockId") Integer stockId, Pageable pageable);
 
