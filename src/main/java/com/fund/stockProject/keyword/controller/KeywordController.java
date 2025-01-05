@@ -27,7 +27,7 @@ public class KeywordController {
     }
 
     @GetMapping("/popular/{country}")
-    @Operation(summary = "인기 키워드 조회 API", description = "인기 키워드 조회 API")
+    @Operation(summary = "자주 언급되는 키워드 조회 API", description = "자주 언급되는 키워드 조회 API")
     public ResponseEntity<List<String>> getPopularKeyword(@PathVariable("country") COUNTRY country) {
         final List<String> popularKeyword = keywordService.findPopularKeyword(country);
         return ResponseEntity.ok(popularKeyword);
