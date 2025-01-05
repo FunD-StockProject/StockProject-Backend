@@ -36,6 +36,10 @@ COPY score.py /app/score.py
 COPY wc.py /app/wc.py
 COPY update.py /app/update.py
 COPY stockindex.py /app/stockindex.py
+COPY fear-and-greed-0.4.tar.gz /app/
+
+# tar.gz 압축 해제 및 설치
+RUN pip3 install /app/fear-and-greed-0.4.tar.gz
 
 # 5. Jasypt 암호화 비밀번호 환경 변수 설정
 ARG JASYPT_ENCRYPTOR_PASSWORD
