@@ -1,6 +1,8 @@
 package com.fund.stockProject.stock.controller;
 
+import com.fund.stockProject.stock.domain.CATEGORY;
 import com.fund.stockProject.stock.domain.COUNTRY;
+import com.fund.stockProject.stock.dto.response.StockCategoryResponse;
 import com.fund.stockProject.stock.dto.response.StockChartResponse;
 import com.fund.stockProject.stock.dto.response.StockDiffResponse;
 import com.fund.stockProject.stock.dto.response.StockInfoResponse;
@@ -10,8 +12,6 @@ import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
 import com.fund.stockProject.stock.service.StockService;
 
 import io.swagger.v3.oas.annotations.Operation;
-
-import io.swagger.v3.oas.annotations.Parameter;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -89,5 +89,11 @@ public class StockController {
     ResponseEntity<Mono<StockInfoResponse>> getStockInfo(final @PathVariable("id") Integer id,
         final @PathVariable("country") COUNTRY country) {
         return ResponseEntity.ok().body(stockService.getStockInfo(id, country));
+    }
+
+    @GetMapping("/category/{category}/{country}")
+    @Operation(summary = "종목 차트별 인간지표 api", description = "종목 차트별 인간지표 api")
+    ResponseEntity<Mono<List<StockCategoryResponse>>> getCategoryStocks(final @PathVariable("category") CATEGORY category, final @PathVariable("country") COUNTRY country) {
+        return ResponseEntity.ok().body(stockService.getCategoryStocks(category, country));
     }
 }
