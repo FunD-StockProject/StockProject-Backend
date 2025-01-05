@@ -149,7 +149,6 @@ public class StockService {
 
                         return StockSimpleResponse.builder()
                             .stockId(stock.getId())
-                            .keywords(keywordRepository.findKeywordsByStockId(stock.getId(), PageRequest.of(0, 2)))
                             .symbolName(stock.getSymbolName())
                             .score(stock.getScores().get(0).getScoreKorea()) // 최신 데이터를 보장
                             .build();
@@ -173,7 +172,6 @@ public class StockService {
 
                         return StockSimpleResponse.builder()
                             .stockId(stock.getId())
-                            .keywords(keywordRepository.findKeywordsByStockId(stock.getId(), PageRequest.of(0, 2)))
                             .symbolName(stock.getSymbolName())
                             .score(stock.getScores().get(0).getScoreOversea())
                             .build();

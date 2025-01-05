@@ -7,20 +7,17 @@ import lombok.Getter;
 
 @Getter
 public class StockSimpleResponse {
+
     private final Integer stockId;
 
     private final String symbolName;
 
     private final Integer score;
 
-    private final List<Keyword> keywords;
-
     @Builder
-    public StockSimpleResponse(Integer stockId, String symbolName, Integer score,
-        List<Keyword> keywords) {
+    public StockSimpleResponse(Integer stockId, String symbolName, Integer score) {
         this.stockId = stockId;
         this.symbolName = symbolName;
         this.score = score;
-        this.keywords = keywords;
     }
 }
