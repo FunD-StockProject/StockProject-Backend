@@ -25,7 +25,7 @@ public class KeywordService {
 
     public List<String> findPopularKeyword(final COUNTRY country) {
         List<Keyword> popularKeywords = null;
-        Pageable pageable = PageRequest.of(0, 100);
+        Pageable pageable = PageRequest.of(0, 50);
 
         if (COUNTRY.KOREA.equals(country)) {
             List<EXCHANGENUM> exchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF);
@@ -35,6 +35,8 @@ public class KeywordService {
             popularKeywords = stockKeywordRepository.findPopularKeyword(exchanges, pageable);
         }
 
-        return popularKeywords.stream().map(Keyword::getName).limit(9).collect(Collectors.toList());
+
+
+        return popularKeywords.stream().map(Keyword::getName).distinct().limit(9).collect(Collectors.toList());
     }
 }
