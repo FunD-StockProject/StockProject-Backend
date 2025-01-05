@@ -3,6 +3,7 @@ package com.fund.stockProject.stock.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.global.config.SecurityHttpConfig;
+import com.fund.stockProject.keyword.entity.Keyword;
 import com.fund.stockProject.keyword.repository.KeywordRepository;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
@@ -280,20 +281,28 @@ public class StockService {
      * @param scores Score 데이터 목록
      * @return 변환된 StockDiffResponse 목록
      */
-    private List<StockDiffResponse> convertToStockDiffResponses(List<Score> scores,
-        COUNTRY country) {
-        return scores.stream().map(score -> StockDiffResponse.builder()
-            .stockId(score.getStock().getId())
-            .symbolName(score.getStock().getSymbolName())
-            .score(country == COUNTRY.KOREA ? score.getScoreKorea() : score.getScoreOversea())
-            .diff(score.getDiff())
-            .keywords(keywordRepository.findKeywordsByStockId(score.getStock().getId(), PageRequest.of(0, 2))
+    private List<StockDiffResponse> convertToStockDiffResponses(List<Score> scores, COUNTRY country) {
+        final List<StockDiffResponse> stockDiffResponses = new ArrayList<>();
+
+        for (final Score score : scores) {
+            final List<String> uniqueKeywords = keywordRepository.findKeywordsByStockId(score.getStock().getId(), PageRequest.of(0, 10))
                 .stream()
-                .map(keyword -> keyword.getName())
-                .toList()
-                .stream()
-                .filter(keyword -> !keyword.equals(score.getStock().getSymbolName()))
-                .toList()).build()).toList();
+                .map(Keyword::getName)
+                .filter(keyword -> !keyword.equals(score.getStock().getSymbolName())) // symbolName과 일치하는 키워드 제거
+                .distinct()
+                .limit(2)
+                .toList();
+
+            stockDiffResponses.add(StockDiffResponse.builder()
+                .stockId(score.getStock().getId())
+                .symbolName(score.getStock().getSymbolName())
+                .score(country == COUNTRY.KOREA ? score.getScoreKorea() : score.getScoreOversea())
+                .diff(score.getDiff())
+                .keywords(uniqueKeywords)
+                .build());
+        }
+
+        return stockDiffResponses;
     }
 
     /**
