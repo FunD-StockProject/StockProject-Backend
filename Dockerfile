@@ -35,6 +35,7 @@ RUN pip3 install --no-cache-dir -r /app/requirements.txt
 COPY score.py /app/score.py
 COPY wc.py /app/wc.py
 COPY update.py /app/update.py
+COPY stockindex.py /app/stockindex.py
 
 # 5. Jasypt 암호화 비밀번호 환경 변수 설정
 ARG JASYPT_ENCRYPTOR_PASSWORD
