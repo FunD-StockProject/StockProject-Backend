@@ -4,7 +4,9 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -12,6 +14,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.keyword.dto.KeywordDto;
@@ -19,6 +22,7 @@ import com.fund.stockProject.keyword.entity.Keyword;
 import com.fund.stockProject.keyword.entity.StockKeyword;
 import com.fund.stockProject.keyword.repository.KeywordRepository;
 import com.fund.stockProject.keyword.repository.StockKeywordRepository;
+import com.fund.stockProject.score.dto.response.ScoreIndexResponse;
 import com.fund.stockProject.score.dto.response.ScoreKeywordResponse;
 import com.fund.stockProject.score.dto.response.ScoreResponse;
 import com.fund.stockProject.score.entity.Score;
@@ -133,6 +137,77 @@ public class ScoreService {
         }
     }
 
+    public ScoreIndexResponse getIndexScore() {
+        // 심볼 리스트 정의
+        List<String> symbols = List.of(
+                "KOSPI_INDEX", "KOSDAQ_INDEX", "SNP500_INDEX", "NASDAQ_INDEX", "KOSPI_VIX", "SNP500_VIX"
+        );
+
+        // 오늘과 어제 날짜 계산
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+
+        // 심볼별 점수 맵 초기화
+        Integer kospiIndex = null, kospiIndexDiff = null;
+        Integer kosdaqIndex = null, kosdaqIndexDiff = null;
+        Integer snpIndex = null, snpIndexDiff = null;
+        Integer nasdaqIndex = null, nasdaqIndexDiff = null;
+        Integer kospiVix = null, kospiVixDiff = null;
+        Integer snpVix = null, snpVixDiff = null;
+
+        for (String symbol : symbols) {
+            // Stock 객체 가져오기
+            Stock stock = stockRepository.findBySymbol(symbol)
+                                         .orElseThrow(() -> new RuntimeException("Stock not found for symbol: " + symbol));
+
+            // 오늘 날짜 점수 조회
+            Score score = scoreRepository.findByStockIdAndDate(stock.getId(), today)
+                                         .orElseGet(() -> {
+                                             // 오늘 데이터가 없으면 어제 날짜 데이터 조회
+                                             return scoreRepository.findByStockIdAndDate(stock.getId(), yesterday)
+                                                                   .orElseThrow(() -> new RuntimeException("Score not found for stock: " + stock.getId()));
+                                         });
+
+            // 각 심볼에 따라 점수 할당
+            switch (symbol) {
+                case "KOSPI_INDEX":
+                    kospiIndex = score.getScoreKorea();
+                    kospiIndexDiff = score.getDiff();
+                    break;
+                case "KOSDAQ_INDEX":
+                    kosdaqIndex = score.getScoreKorea();
+                    kosdaqIndexDiff = score.getDiff();
+                    break;
+                case "SNP500_INDEX":
+                    snpIndex = score.getScoreKorea();
+                    snpIndexDiff = score.getDiff();
+                    break;
+                case "NASDAQ_INDEX":
+                    nasdaqIndex = score.getScoreKorea();
+                    nasdaqIndexDiff = score.getDiff();
+                    break;
+                case "KOSPI_VIX":
+                    kospiVix = score.getScoreKorea();
+                    kospiVixDiff = score.getDiff();
+                    break;
+                case "SNP500_VIX":
+                    snpVix = score.getScoreKorea();
+                    snpVixDiff = score.getDiff();
+                    break;
+            }
+        }
+
+        // ScoreIndexResponse 생성 및 반환
+        return new ScoreIndexResponse(
+                kospiVix, kospiVixDiff,
+                kospiIndex, kospiIndexDiff,
+                kosdaqIndex, kosdaqIndexDiff,
+                snpVix, snpVixDiff,
+                snpIndex, snpIndexDiff,
+                nasdaqIndex, nasdaqIndexDiff
+        );
+    }
+
     public void updateScore(Integer id, COUNTRY country, int yesterdayScore) {
         Stock stock = stockRepository.findById(id).orElseThrow(() -> new RuntimeException("Could not find stock"));
         // STEP1: AI 실행
@@ -154,55 +229,134 @@ public class ScoreService {
 
     }
 
-    // TODO: 키워드 업데이트 로직 개발 중
-    @Transactional
-    public void updateScoreAndKeyword(Integer id, COUNTRY country, int yesterdayScore) {
-        Stock stock = stockRepository.findById(id)
-                                     .orElseThrow(() -> new RuntimeException("Could not find stock"));
+    // 지수 업데이트 스케줄러 로직
+    public void updateIndexScore() {
         try {
-            // Python 스크립트를 실행하여 결과 가져오기
-            ScoreKeywordResponse scoreKeywordResponse = executeUpdateAI(stock.getSymbol(), country);
+            // STEP 1: Python 스크립트 실행하여 결과 가져오기
+            Map<String, Integer> indexScores = executeStockIndexUpdateAI();
 
-            // STEP2: SCORE 데이터 저장
-            int finalScore = scoreKeywordResponse.getFinalScore();
-            Score newScore = Score.builder()
-                                  .stockId(stock.getId())
-                                  .date(LocalDate.now())
-                                  .scoreKorea(country == COUNTRY.KOREA? finalScore : 9999)
-                                  .scoreNaver(finalScore)
-                                  .scoreReddit(9999)
-                                  .scoreOversea(country == COUNTRY.OVERSEA? finalScore : 9999)
-                                  .diff(finalScore - yesterdayScore)
-                                  .build();
+            // STEP 2: 심볼과 결과값 매핑
+            Map<String, String> symbolMapping = Map.of(
+                    "kospi", "KOSPI_INDEX",
+                    "kosdaq", "KOSDAQ_INDEX",
+                    "snp500", "SNP500_INDEX",
+                    "nasdaq", "NASDAQ_INDEX",
+                    "vixKospi", "KOSPI_VIX",
+                    "vixSnp", "SNP500_VIX"
+            );
 
-            // `stock` 연관 설정
-            newScore.setStock(stock);
-            scoreRepository.save(newScore);
+            // STEP 3: 매핑된 데이터로 점수 업데이트
+            for (Map.Entry<String, String> entry : symbolMapping.entrySet()) {
+                String resultKey = entry.getKey();
+                String stockSymbol = entry.getValue();
 
-            // 기존 StockKeyword 삭제
-            stockKeywordRepository.deleteByStock(stock);
-            System.out.println("scoreKeywordResponse.getTopKeywords().get(0).getWord() = " + scoreKeywordResponse.getTopKeywords().get(0).getWord());
-            scoreKeywordResponse.getTopKeywords().forEach(keywordDto -> {
-                Keyword newKeyword = Keyword.builder()
-                                            .name(keywordDto.getWord())
-                                            .frequency(keywordDto.getFreq())
-                                            .build();
+                // Stock 찾기
+                Stock stock = stockRepository.findBySymbol(stockSymbol)
+                                             .orElseThrow(() -> new RuntimeException("Stock not found for symbol: " + stockSymbol));
 
-                newKeyword.updateFrequency(keywordDto.getFreq());
-                keywordRepository.save(newKeyword);
+                // 어제 날짜 점수 조회 (없으면 기본값 0)
+                LocalDate yesterday = LocalDate.now().minusDays(1);
+                int yesterdayScore = scoreRepository.findByStockIdAndDate(stock.getId(), yesterday)
+                                                    .map(Score::getScoreKorea)
+                                                    .orElse(0);
 
-                // StockKeyword 테이블에 매핑 정보 저장
-                StockKeyword stockKeyword = new StockKeyword(stock, newKeyword);
-                stockKeywordRepository.save(stockKeyword);
-            });
+                // 오늘 점수 가져오기
+                int finalScore = indexScores.getOrDefault(resultKey, 0);
+
+                // 점수 저장
+                Score newScore = Score.builder()
+                                      .stockId(stock.getId())
+                                      .date(LocalDate.now())
+                                      .scoreKorea(finalScore)
+                                      .scoreNaver(finalScore)
+                                      .scoreReddit(9999)
+                                      .scoreOversea(finalScore)
+                                      .diff(finalScore - yesterdayScore)
+                                      .build();
+                newScore.setStock(stock);
+                scoreRepository.save(newScore);
+            }
+
         } catch (Exception e) {
-            throw new RuntimeException("Failed to update score and keyword", e);
+            throw new RuntimeException("Failed to update index scores", e);
         }
     }
+
+//    // TODO: 키워드 업데이트 로직 개발 중
+//    @Transactional
+//    public void updateScoreAndKeyword(Integer id, COUNTRY country, int yesterdayScore) {
+//        Stock stock = stockRepository.findById(id)
+//                                     .orElseThrow(() -> new RuntimeException("Could not find stock"));
+//        try {
+//            // Python 스크립트를 실행하여 결과 가져오기
+//            ScoreKeywordResponse scoreKeywordResponse = executeUpdateAI(stock.getSymbol(), country);
+//
+//            // STEP2: SCORE 데이터 저장
+//            int finalScore = scoreKeywordResponse.getFinalScore();
+//            Score newScore = Score.builder()
+//                                  .stockId(stock.getId())
+//                                  .date(LocalDate.now())
+//                                  .scoreKorea(country == COUNTRY.KOREA? finalScore : 9999)
+//                                  .scoreNaver(finalScore)
+//                                  .scoreReddit(9999)
+//                                  .scoreOversea(country == COUNTRY.OVERSEA? finalScore : 9999)
+//                                  .diff(finalScore - yesterdayScore)
+//                                  .build();
+//
+//            // `stock` 연관 설정
+//            newScore.setStock(stock);
+//            scoreRepository.save(newScore);
+//
+//            // 기존 StockKeyword 삭제
+//            stockKeywordRepository.deleteByStock(stock);
+//            System.out.println("scoreKeywordResponse.getTopKeywords().get(0).getWord() = " + scoreKeywordResponse.getTopKeywords().get(0).getWord());
+//            scoreKeywordResponse.getTopKeywords().forEach(keywordDto -> {
+//                Keyword newKeyword = Keyword.builder()
+//                                            .name(keywordDto.getWord())
+//                                            .frequency(keywordDto.getFreq())
+//                                            .build();
+//
+//                newKeyword.updateFrequency(keywordDto.getFreq());
+//                keywordRepository.save(newKeyword);
+//
+//                // StockKeyword 테이블에 매핑 정보 저장
+//                StockKeyword stockKeyword = new StockKeyword(stock, newKeyword);
+//                stockKeywordRepository.save(stockKeyword);
+//            });
+//        } catch (Exception e) {
+//            throw new RuntimeException("Failed to update score and keyword", e);
+//        }
+//    }
 
     private boolean isFirst(Integer id) {
         // 1111-11-11 날짜의 데이터가 존재하면 첫 인간지표로 판단
         return scoreRepository.existsByStockIdAndDate(id, LocalDate.of(1111, 11, 11));
+    }
+
+    private Map<String, Integer> executeStockIndexUpdateAI() {
+        try {
+            String scriptPath = "stockindex.py"; // 스크립트 경로
+            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath);
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
+
+            // Python 출력 읽기
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String output = reader.lines().collect(Collectors.joining("\n"));
+            int exitCode = process.waitFor();
+
+            if (exitCode != 0) {
+                throw new RuntimeException("Python script execution failed with exit code: " + exitCode + "\nOutput: " + output);
+            }
+
+            // JSON 파싱
+            ObjectMapper objectMapper = new ObjectMapper();
+            Map<String, Integer> result = objectMapper.readValue(output, new TypeReference<>() {});
+            return result;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to execute Python script", e);
+        }
     }
 
     private int executeScoreAI(String symbol, COUNTRY country) {

@@ -27,14 +27,17 @@ pipeline {
             }
         }
 
-        stage('Fetch score.py, wc.py and requirements.txt') {
+        stage('Fetch score.py, wc.py, update.py, stockindex.py, requirements.txt, fear-and-greed-0.4.tar.gz') {
             steps {
                 sshagent (credentials: ['EC2_API_SSH']) { // EC2_API_SSH는 Jenkins에 등록된 SSH 키
                     sh """
                     # EC2에서 score.py와 requirements.txt 가져오기
                     scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/score.py ${WORKSPACE}/score.py
                     scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/wc.py ${WORKSPACE}/wc.py
+                    scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/update.py ${WORKSPACE}/update.py
+                    scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/stockindex.py ${WORKSPACE}/stockindex.py
                     scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/requirements.txt ${WORKSPACE}/requirements.txt
+                    scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/fear-and-greed-0.4.tar.gz ${WORKSPACE}/fear-and-greed-0.4.tar.gz
                     """
                 }
             }

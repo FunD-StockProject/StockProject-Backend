@@ -58,6 +58,11 @@ public class ScoreUpdateScheduler {
         }
     }
 
+    @Scheduled(cron = "0 5 7 * * ?", zone = "Asia/Seoul") // 매일 7시 5분 실행
+    public void processIndexScores() {
+        scoreService.updateIndexScore();
+    }
+
     private COUNTRY determineCountry(Score score) {
         if (score.getScoreKorea() == 9999) {
             return COUNTRY.OVERSEA;
