@@ -280,14 +280,17 @@ public class StockService {
      * @param scores Score 데이터 목록
      * @return 변환된 StockDiffResponse 목록
      */
-    private List<StockDiffResponse> convertToStockDiffResponses(List<Score> scores, COUNTRY country) {
+    private List<StockDiffResponse> convertToStockDiffResponses(List<Score> scores,
+        COUNTRY country) {
         return scores.stream().map(score -> StockDiffResponse.builder()
             .stockId(score.getStock().getId())
             .symbolName(score.getStock().getSymbolName())
             .score(country == COUNTRY.KOREA ? score.getScoreKorea() : score.getScoreOversea())
             .diff(score.getDiff())
-            .keywords(keywordRepository.findKeywordsByStockId(score.getStock().getId(),
-                    PageRequest.of(0, 2))
+            .keywords(keywordRepository.findKeywordsByStockId(score.getStock().getId(), PageRequest.of(0, 2))
+                .stream()
+                .map(keyword -> keyword.getName())
+                .toList()
                 .stream()
                 .filter(keyword -> !keyword.equals(score.getStock().getSymbolName()))
                 .toList()).build()).toList();

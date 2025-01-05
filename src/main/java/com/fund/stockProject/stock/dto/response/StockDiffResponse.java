@@ -15,11 +15,11 @@ public class StockDiffResponse {
 
     private final Integer diff;
 
-    private final List<Keyword> keywords;
+    private final List<String> keywords;
 
     @Builder
     public StockDiffResponse(Integer stockId, String symbolName, Integer score, Integer diff,
-        List<Keyword> keywords) {
+        List<String> keywords) {
         this.stockId = stockId;
         this.symbolName = symbolName;
         this.score = score;
