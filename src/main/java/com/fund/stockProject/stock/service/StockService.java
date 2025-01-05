@@ -3,7 +3,6 @@ package com.fund.stockProject.stock.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.global.config.SecurityHttpConfig;
-import com.fund.stockProject.keyword.entity.Keyword;
 import com.fund.stockProject.keyword.repository.KeywordRepository;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
@@ -282,15 +281,16 @@ public class StockService {
      * @return 변환된 StockDiffResponse 목록
      */
     private List<StockDiffResponse> convertToStockDiffResponses(List<Score> scores, COUNTRY country) {
-        return scores.stream()
-            .map(score -> StockDiffResponse.builder()
-                .stockId(score.getStock().getId())
-                .symbolName(score.getStock().getSymbolName())
-                .score(country == COUNTRY.KOREA ? score.getScoreKorea() : score.getScoreOversea())
-                .diff(score.getDiff())
-                .keywords(keywordRepository.findKeywordsByStockId(score.getStock().getId(), PageRequest.of(0, 2)))
-                .build())
-            .collect(Collectors.toList());
+        return scores.stream().map(score -> StockDiffResponse.builder()
+            .stockId(score.getStock().getId())
+            .symbolName(score.getStock().getSymbolName())
+            .score(country == COUNTRY.KOREA ? score.getScoreKorea() : score.getScoreOversea())
+            .diff(score.getDiff())
+            .keywords(keywordRepository.findKeywordsByStockId(score.getStock().getId(),
+                    PageRequest.of(0, 2))
+                .stream()
+                .filter(keyword -> !keyword.equals(score.getStock().getSymbolName()))
+                .toList()).build()).toList();
     }
 
     /**
@@ -305,7 +305,8 @@ public class StockService {
 
     public List<StockRelevantResponse> getRelevantStocks(final Integer id) {
         Stock searchById = stockRepository.findStockById(id).orElse(null);
-        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(searchById);
+        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(
+            searchById);
 
         if (relevantStocksByExchangeNumAndScore.isEmpty()) {
             System.out.println("Stock " + id + " relevant Stocks are not found");
