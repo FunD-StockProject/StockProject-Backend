@@ -3,8 +3,12 @@ package com.fund.stockProject.stock.service;
 
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockChartResponse.PriceInfo;
+import com.fund.stockProject.stock.dto.response.StockKoreaMarketCapResponse;
+import com.fund.stockProject.stock.dto.response.StockKoreaRisingDescentResponse;
+import com.fund.stockProject.stock.dto.response.StockOverseaRankResponse;
 import com.fund.stockProject.stock.entity.Stock;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.springframework.http.HttpHeaders;
@@ -125,6 +129,34 @@ public class SecurityService {
     }
 
     /**
+     * (종목차트) 한국 거래량 순위 조회
+     */
+    public Mono<List<StockKoreaVolumeRankResponse>> getVolumeRankKoreaForCategory() {
+        return webClient.get()
+                        .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/quotations/volume-rank")
+                                                     .queryParam("FID_COND_MRKT_DIV_CODE", "J")
+                                                     .queryParam("FID_COND_SCR_DIV_CODE", "20171")
+                                                     .queryParam("FID_INPUT_ISCD", "0001")
+                                                     .queryParam("FID_DIV_CLS_CODE", "0")
+                                                     .queryParam("FID_BLNG_CLS_CODE", "0")
+                                                     .queryParam("FID_TRGT_CLS_CODE", "111111111")
+                                                     .queryParam("FID_TRGT_EXLS_CLS_CODE", "000000")
+                                                     .queryParam("FID_INPUT_PRICE_1", "")
+                                                     .queryParam("FID_INPUT_PRICE_2", "")
+                                                     .queryParam("FID_VOL_CNT", "0")
+                                                     .queryParam("FID_INPUT_DATE_1", "")
+                                                     .build())
+                        .headers(httpHeaders -> {
+                            HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                            headers.set("tr_id", "FHPST01710000"); // 추가 헤더 설정
+                            httpHeaders.addAll(headers);
+                        })
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .flatMap(this::parseFVolumeRankKoreaForCategory);
+    }
+
+    /**
      * 한국 거래량 순위 조회
      */
     public Mono<List<StockKoreaVolumeRankResponse>> getVolumeRankKorea() {
@@ -150,6 +182,63 @@ public class SecurityService {
             .retrieve()
             .bodyToMono(String.class)
             .flatMap(this::parseFVolumeRankKorea);
+    }
+
+    /**
+     * 국내 시가총액 순위 조회
+     */
+    public Mono<List<StockKoreaMarketCapResponse>> getMarketCapRankKorea() {
+        return webClient.get()
+                        .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/ranking/market-cap")
+                                                     .queryParam("fid_cond_mrkt_div_code", "J")
+                                                     .queryParam("fid_cond_scr_div_code", "20174")
+                                                     .queryParam("fid_div_cls_code", "0")
+                                                     .queryParam("fid_input_iscd", "0000")
+                                                     .queryParam("fid_trgt_cls_code", "0")
+                                                     .queryParam("fid_trgt_exls_cls_code", "0")
+                                                     .queryParam("fid_input_price_1", "")
+                                                     .queryParam("fid_input_price_2", "")
+                                                     .queryParam("fid_vol_cnt", "")
+                                                     .build())
+                        .headers(httpHeaders -> {
+                            HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                            headers.set("tr_id", "FHPST01740000"); // 추가 헤더 설정
+                            httpHeaders.addAll(headers);
+                        })
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .flatMap(this::parseFMarketCapKorea);
+    }
+
+    /**
+     * 국내 상승/하락 순위 조회
+     */
+    public Mono<List<StockKoreaRisingDescentResponse>> getRisingDescentRankKorea(boolean isRising) {
+        return webClient.get()
+                        .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/ranking/fluctuation")
+                                                     .queryParam("fid_cond_mrkt_div_code", "J")
+                                                     .queryParam("fid_cond_scr_div_code", "20170")
+                                                     .queryParam("fid_input_iscd", "0000")
+                                                     .queryParam("fid_rank_sort_cls_code", isRising ? "0" : "1")
+                                                     .queryParam("fid_input_cnt_1", "0")
+                                                     .queryParam("fid_prc_cls_code", "0")
+                                                     .queryParam("fid_input_price_1", "")
+                                                     .queryParam("fid_input_price_2", "")
+                                                     .queryParam("fid_vol_cnt", "")
+                                                     .queryParam("fid_trgt_cls_code", "0")
+                                                     .queryParam("fid_trgt_exls_cls_code", "0")
+                                                     .queryParam("fid_div_cls_code", "0")
+                                                     .queryParam("fid_rsfl_rate1", "")
+                                                     .queryParam("fid_rsfl_rate2", "")
+                                                     .build())
+                        .headers(httpHeaders -> {
+                            HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                            headers.set("tr_id", "FHPST01700000"); // 추가 헤더 설정
+                            httpHeaders.addAll(headers);
+                        })
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .flatMap(this::parseFRisingDescentKorea);
     }
 
     /**
@@ -195,6 +284,256 @@ public class SecurityService {
             .flatMap(this::parseFVolumeRankOversea);
     }
 
+    /**
+     * (종목차트용) 해외 거래량 순위 조회
+     */
+    public Mono<List<StockOverseaRankResponse>> getVolumeRankOverseaForCategory() {
+        return webClient.get()
+                        .uri(uriBuilder -> uriBuilder.path("/uapi/overseas-price/v1/quotations/inquire-search")
+                                                     .queryParam("AUTH", "")
+                                                     .queryParam("EXCD", "NAS")
+                                                     .queryParam("CO_YN_PRICECUR", "")
+                                                     .queryParam("CO_ST_PRICECUR", "")
+                                                     .queryParam("CO_EN_PRICECUR", "")
+                                                     .queryParam("CO_YN_RATE", "")
+                                                     .queryParam("CO_ST_RATE", "")
+                                                     .queryParam("CO_EN_RATE", "")
+                                                     .queryParam("CO_YN_VALX", "")
+                                                     .queryParam("CO_ST_VALX", "")
+                                                     .queryParam("CO_EN_VALX", "")
+                                                     .queryParam("CO_YN_SHAR", "")
+                                                     .queryParam("CO_ST_SHAR", "")
+                                                     .queryParam("CO_EN_SHAR", "")
+                                                     .queryParam("CO_YN_VOLUME", "")
+                                                     .queryParam("CO_ST_VOLUME", "")
+                                                     .queryParam("CO_EN_VOLUME", "")
+                                                     .queryParam("CO_YN_AMT", "")
+                                                     .queryParam("CO_ST_AMT", "")
+                                                     .queryParam("CO_EN_AMT", "")
+                                                     .queryParam("CO_YN_EPS", "")
+                                                     .queryParam("CO_ST_EPS", "")
+                                                     .queryParam("CO_EN_EPS", "")
+                                                     .queryParam("CO_YN_PER", "")
+                                                     .queryParam("CO_ST_PER", "")
+                                                     .queryParam("CO_EN_PER", "")
+                                                     .build())
+                        .headers(httpHeaders -> {
+                            HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                            headers.set("tr_id", "HHDFS76410000"); // 추가 헤더 설정
+                            httpHeaders.addAll(headers);
+                        })
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .flatMap(this::parseFVolumeRankOverseaForCategory);
+    }
+
+    /**
+     * 해외 급상승/하락 순위 조회
+     */
+    public Mono<List<StockOverseaRankResponse>> getRisingDescentRankOversea(boolean isRising) {
+        return webClient.get()
+                        .uri(uriBuilder -> uriBuilder.path("/uapi/overseas-price/v1/quotations/inquire-search")
+                                                     .queryParam("AUTH", "")
+                                                     .queryParam("EXCD", "NAS")
+                                                     .queryParam("CO_YN_PRICECUR", "")
+                                                     .queryParam("CO_ST_PRICECUR", "")
+                                                     .queryParam("CO_EN_PRICECUR", "")
+                                                     .queryParam("CO_YN_RATE", "1")
+                                                     .queryParam("CO_ST_RATE", isRising ? "0" : "-100")
+                                                     .queryParam("CO_EN_RATE", isRising ? "5000" : "-15")
+                                                     .queryParam("CO_YN_VALX", "")
+                                                     .queryParam("CO_ST_VALX", "")
+                                                     .queryParam("CO_EN_VALX", "")
+                                                     .queryParam("CO_YN_SHAR", "")
+                                                     .queryParam("CO_ST_SHAR", "")
+                                                     .queryParam("CO_EN_SHAR", "")
+                                                     .queryParam("CO_YN_VOLUME", "")
+                                                     .queryParam("CO_ST_VOLUME", "")
+                                                     .queryParam("CO_EN_VOLUME", "")
+                                                     .queryParam("CO_YN_AMT", "")
+                                                     .queryParam("CO_ST_AMT", "")
+                                                     .queryParam("CO_EN_AMT", "")
+                                                     .queryParam("CO_YN_EPS", "")
+                                                     .queryParam("CO_ST_EPS", "")
+                                                     .queryParam("CO_EN_EPS", "")
+                                                     .queryParam("CO_YN_PER", "")
+                                                     .queryParam("CO_ST_PER", "")
+                                                     .queryParam("CO_EN_PER", "")
+                                                     .build())
+                        .headers(httpHeaders -> {
+                            HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                            headers.set("tr_id", "HHDFS76410000"); // 추가 헤더 설정
+                            httpHeaders.addAll(headers);
+                        })
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .flatMap(response -> parseFRisingDescentOversea(response, isRising));
+    }
+
+    /**
+     * 해외 시가총액 순위 조회
+     */
+    public Mono<List<StockOverseaRankResponse>> getMarketCapOversea() {
+        return webClient.get()
+                        .uri(uriBuilder -> uriBuilder.path("/uapi/overseas-price/v1/quotations/inquire-search")
+                                                     .queryParam("AUTH", "")
+                                                     .queryParam("EXCD", "NAS")
+                                                     .queryParam("CO_YN_PRICECUR", "")
+                                                     .queryParam("CO_ST_PRICECUR", "")
+                                                     .queryParam("CO_EN_PRICECUR", "")
+                                                     .queryParam("CO_YN_RATE", "")
+                                                     .queryParam("CO_ST_RATE", "")
+                                                     .queryParam("CO_EN_RATE", "")
+                                                     .queryParam("CO_YN_VALX", "1")
+                                                     .queryParam("CO_ST_VALX", "100000000")
+                                                     .queryParam("CO_EN_VALX", "100000000000")
+                                                     .queryParam("CO_YN_SHAR", "")
+                                                     .queryParam("CO_ST_SHAR", "")
+                                                     .queryParam("CO_EN_SHAR", "")
+                                                     .queryParam("CO_YN_VOLUME", "")
+                                                     .queryParam("CO_ST_VOLUME", "")
+                                                     .queryParam("CO_EN_VOLUME", "")
+                                                     .queryParam("CO_YN_AMT", "")
+                                                     .queryParam("CO_ST_AMT", "")
+                                                     .queryParam("CO_EN_AMT", "")
+                                                     .queryParam("CO_YN_EPS", "")
+                                                     .queryParam("CO_ST_EPS", "")
+                                                     .queryParam("CO_EN_EPS", "")
+                                                     .queryParam("CO_YN_PER", "")
+                                                     .queryParam("CO_ST_PER", "")
+                                                     .queryParam("CO_EN_PER", "")
+                                                     .build())
+                        .headers(httpHeaders -> {
+                            HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                            headers.set("tr_id", "HHDFS76410000"); // 추가 헤더 설정
+                            httpHeaders.addAll(headers);
+                        })
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .flatMap(this::parseFMarketCapOversea);
+    }
+
+    private Mono<List<StockOverseaRankResponse>> parseFRisingDescentOversea(String response, boolean isRising) {
+        try {
+            // 응답 데이터를 담을 리스트 초기화
+            List<StockOverseaRankResponse> responseDataList = new ArrayList<>();
+
+            // JSON 파싱
+            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode outputNode = rootNode.get("output2"); // "output2"에서 데이터 추출
+
+            if (outputNode != null) {
+                // outputNode를 ArrayList로 변환
+                List<JsonNode> nodeList = new ArrayList<>();
+                outputNode.forEach(nodeList::add);
+
+                // isRising이 false이면 데이터 순서를 반대로 변경
+                if (!isRising) {
+                    Collections.reverse(nodeList);
+                }
+
+                int count = 0; // 추가된 데이터 개수 추적
+                for (JsonNode node : nodeList) {
+                    if (count >= 6) { // 최대 6개의 데이터만 처리
+                        break;
+                    }
+
+                    // 각 데이터 노드를 StockOverseaRankResponse에 매핑
+                    StockOverseaRankResponse responseData = new StockOverseaRankResponse();
+                    responseData.setSymb(node.get("symb").asText());
+                    responseData.setName(node.get("name").asText());
+                    responseData.setLast(node.get("last").asText());
+                    responseData.setSign(node.get("sign").asText());
+                    responseData.setDiff(node.get("diff").asText());
+                    responseData.setRate(node.get("rate").asText());
+                    responseData.setTvol(node.get("tvol").asText());
+                    responseData.setValx(node.get("valx").asText());
+                    responseData.setRank(node.get("rank").asText());
+
+                    responseDataList.add(responseData); // 리스트에 추가
+                    count++; // 추가된 데이터 개수 증가
+                }
+            }
+
+            return Mono.just(responseDataList);
+        } catch (Exception e) {
+            // 예외 발생 시 Mono.error 반환
+            return Mono.error(new UnsupportedOperationException("해외 상승/하락 정보를 처리하는 중 오류가 발생했습니다.", e));
+        }
+    }
+
+    // 현재는 나스닥기준, 추후 변경 예정
+    private Mono<List<StockOverseaRankResponse>> parseFMarketCapOversea(String response) {
+        try {
+            List<StockOverseaRankResponse> responseDataList = new ArrayList<>();
+            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode outputNode = rootNode.get("output2");
+
+            if (outputNode != null) {
+                int count = 0; // 추가된 데이터 개수 추적
+                for (JsonNode node : outputNode) {
+                    if (count >= 6) {
+                        break; // 6개까지만 추가
+                    }
+
+                    StockOverseaRankResponse responseData = new StockOverseaRankResponse();
+                    responseData.setSymb(node.get("symb").asText());
+                    responseData.setName(node.get("name").asText());
+                    responseData.setLast(node.get("last").asText());
+                    responseData.setSign(node.get("sign").asText());
+                    responseData.setDiff(node.get("diff").asText());
+                    responseData.setRate(node.get("rate").asText());
+                    responseData.setTvol(node.get("tvol").asText());
+                    responseData.setValx(node.get("valx").asText());
+                    responseData.setRank(node.get("rank").asText());
+
+                    responseDataList.add(responseData);
+                    count++; // 추가된 데이터 개수 증가
+                }
+            }
+
+            return Mono.just(responseDataList);
+        } catch (Exception e) {
+            return Mono.error(e);
+        }
+    }
+
+    // 현재는 나스닥기준, 추후 변경 예정
+    private Mono<List<StockOverseaRankResponse>> parseFVolumeRankOverseaForCategory(String response) {
+        try {
+            List<StockOverseaRankResponse> responseDataList = new ArrayList<>();
+            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode outputNode = rootNode.get("output2");
+
+            if (outputNode != null) {
+                int count = 0; // 추가된 데이터 개수 추적
+                for (JsonNode node : outputNode) {
+                    if (count >= 6) {
+                        break; // 6개까지만 추가
+                    }
+
+                    StockOverseaRankResponse responseData = new StockOverseaRankResponse();
+                    responseData.setSymb(node.get("symb").asText());
+                    responseData.setName(node.get("name").asText());
+                    responseData.setLast(node.get("last").asText());
+                    responseData.setSign(node.get("sign").asText());
+                    responseData.setDiff(node.get("diff").asText());
+                    responseData.setRate(node.get("rate").asText());
+                    responseData.setTvol(node.get("tvol").asText());
+                    responseData.setValx(node.get("valx").asText());
+                    responseData.setRank(node.get("rank").asText());
+
+                    responseDataList.add(responseData);
+                    count++; // 추가된 데이터 개수 증가
+                }
+            }
+
+            return Mono.just(responseDataList);
+        } catch (Exception e) {
+            return Mono.error(e);
+        }
+    }
+
     // 현재는 나스닥기준, 추후 변경 예정
     private Mono<List<StockOverseaVolumeRankResponse>> parseFVolumeRankOversea(String response) {
         try {
@@ -213,6 +552,52 @@ public class SecurityService {
                     responseData.setSymb(node.get("symb").asText());
                     responseData.setName(node.get("name").asText());
                     responseData.setTvol(node.get("tvol").asText());
+
+                    responseDataList.add(responseData);
+                    count++; // 추가된 데이터 개수 증가
+                }
+            }
+
+            return Mono.just(responseDataList);
+        } catch (Exception e) {
+            return Mono.error(e);
+        }
+    }
+
+    private Mono<List<StockKoreaVolumeRankResponse>> parseFVolumeRankKoreaForCategory(String response) {
+        try {
+            List<StockKoreaVolumeRankResponse> responseDataList = new ArrayList<>();
+            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode outputNode = rootNode.get("output");
+
+            if (outputNode != null) {
+                int count = 0; // 추가된 데이터 개수 추적
+                for (JsonNode node : outputNode) {
+                    if (count >= 6) {
+                        break; // 6개까지만 추가
+                    }
+
+                    StockKoreaVolumeRankResponse responseData = new StockKoreaVolumeRankResponse();
+                    responseData.setHtsKorIsnm(node.get("hts_kor_isnm").asText());
+                    responseData.setMkscShrnIscd(node.get("mksc_shrn_iscd").asText());
+                    responseData.setDataRank(node.get("data_rank").asText());
+                    responseData.setStckPrpr(node.get("stck_prpr").asText());
+                    responseData.setPrdyVrssSign(node.get("prdy_vrss_sign").asText());
+                    responseData.setPrdyVrss(node.get("prdy_vrss").asText());
+                    responseData.setPrdyCtrt(node.get("prdy_ctrt").asText());
+                    responseData.setAcmlVol(node.get("acml_vol").asText());
+                    responseData.setPrdyVol(node.get("prdy_vol").asText());
+                    responseData.setLstnStcn(node.get("lstn_stcn").asText());
+                    responseData.setAvrgVol(node.get("avrg_vol").asText());
+                    responseData.setNBefrClprVrssPrprRate(
+                            node.get("n_befr_clpr_vrss_prpr_rate").asText());
+                    responseData.setVolInrt(node.get("vol_inrt").asText());
+                    responseData.setVolTnrt(node.get("vol_tnrt").asText());
+                    responseData.setNdayVolTnrt(node.get("nday_vol_tnrt").asText());
+                    responseData.setAvrgTrPbmn(node.get("avrg_tr_pbmn").asText());
+                    responseData.setTrPbmnTnrt(node.get("tr_pbmn_tnrt").asText());
+                    responseData.setNdayTrPbmnTnrt(node.get("nday_tr_pbmn_tnrt").asText());
+                    responseData.setAcmlTrPbmn(node.get("acml_tr_pbmn").asText());
 
                     responseDataList.add(responseData);
                     count++; // 추가된 데이터 개수 증가
@@ -270,6 +655,77 @@ public class SecurityService {
             return Mono.error(e);
         }
     }
+
+    private Mono<List<StockKoreaMarketCapResponse>> parseFMarketCapKorea(String response) {
+        try {
+            List<StockKoreaMarketCapResponse> responseDataList = new ArrayList<>();
+            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode outputNode = rootNode.get("output");
+
+            if (outputNode != null) {
+                int count = 0; // 추가된 데이터 개수 추적
+                for (JsonNode node : outputNode) {
+                    if (count >= 6) {
+                        break; // 최대 6개의 데이터만 처리
+                    }
+
+                    StockKoreaMarketCapResponse responseData = new StockKoreaMarketCapResponse();
+                    responseData.setMkscShrnIscd(node.get("mksc_shrn_iscd").asText());
+                    responseData.setDataRank(node.get("data_rank").asText());
+                    responseData.setHtsKorIsnm(node.get("hts_kor_isnm").asText());
+                    responseData.setStckPrpr(node.get("stck_prpr").asText());
+                    responseData.setPrdyVrss(node.get("prdy_vrss").asText());
+                    responseData.setPrdyVrssSign(node.get("prdy_vrss_sign").asText());
+                    responseData.setPrdyCtrt(node.get("prdy_ctrt").asText());
+                    responseData.setAcmlVol(node.get("acml_vol").asText());
+                    responseData.setLstnStcn(node.get("lstn_stcn").asText());
+                    responseData.setStckAvls(node.get("stck_avls").asText());
+                    responseData.setMrktWholAvlsRlim(node.get("mrkt_whol_avls_rlim").asText());
+
+                    responseDataList.add(responseData);
+                    count++; // 추가된 데이터 개수 증가
+                }
+            }
+
+            return Mono.just(responseDataList);
+        } catch (Exception e) {
+            return Mono.error(new UnsupportedOperationException("국내 시가총액 정보를 처리하는 중 오류가 발생했습니다."));
+        }
+    }
+
+    private Mono<List<StockKoreaRisingDescentResponse>> parseFRisingDescentKorea(String response) {
+        try {
+            List<StockKoreaRisingDescentResponse> responseDataList = new ArrayList<>();
+            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode outputNode = rootNode.get("output");
+
+            if (outputNode != null) {
+                int count = 0; // 추가된 데이터 개수 추적
+                for (JsonNode node : outputNode) {
+                    if (count >= 6) {
+                        break; // 최대 6개의 데이터만 처리
+                    }
+
+                    StockKoreaRisingDescentResponse responseData = new StockKoreaRisingDescentResponse();
+                    responseData.setStckShrnIscd(node.get("stck_shrn_iscd").asText());
+                    responseData.setDataRank(node.get("data_rank").asText());
+                    responseData.setHtsKorIsnm(node.get("hts_kor_isnm").asText());
+                    responseData.setStckPrpr(node.get("stck_prpr").asText());
+                    responseData.setPrdyVrss(node.get("prdy_vrss").asText());
+                    responseData.setPrdyVrssSign(node.get("prdy_vrss_sign").asText());
+                    responseData.setPrdyCtrt(node.get("prdy_ctrt").asText());
+
+                    responseDataList.add(responseData);
+                    count++; // 추가된 데이터 개수 증가
+                }
+            }
+
+            return Mono.just(responseDataList);
+        } catch (Exception e) {
+            return Mono.error(new UnsupportedOperationException("국내 상승/하락 정보를 처리하는 중 오류가 발생했습니다.", e));
+        }
+    }
+
     public Mono<List<PriceInfo>> getItemChartPrice(Stock stock, String startDate, String endDate, String periodCode, COUNTRY country) {
         HttpHeaders headers = securityHttpConfig.createSecurityHeaders();
 
