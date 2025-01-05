@@ -3,6 +3,8 @@ package com.fund.stockProject.stock.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.global.config.SecurityHttpConfig;
+import com.fund.stockProject.keyword.entity.Keyword;
+import com.fund.stockProject.keyword.repository.KeywordRepository;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
 import com.fund.stockProject.score.service.ScoreService;
@@ -30,6 +32,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -47,14 +50,20 @@ public class StockService {
     private final SecurityHttpConfig securityHttpConfig;
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
+    private final KeywordRepository keywordRepository;
 
     private final int LIMITS = 9;
 
-    public Mono<StockInfoResponse> searchStockBySymbolName(final String symbolName, final String country) {
-        List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF);
-        List<EXCHANGENUM> overseaExchanges = List.of(EXCHANGENUM.NAS, EXCHANGENUM.NYS, EXCHANGENUM.AMS);
+    public Mono<StockInfoResponse> searchStockBySymbolName(final String symbolName,
+        final String country) {
+        List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ,
+            EXCHANGENUM.KOREAN_ETF);
+        List<EXCHANGENUM> overseaExchanges = List.of(EXCHANGENUM.NAS, EXCHANGENUM.NYS,
+            EXCHANGENUM.AMS);
 
-        Stock stock = stockRepository.findBySymbolNameAndCountryWithEnums(symbolName, country, koreaExchanges, overseaExchanges).orElseThrow(() -> new RuntimeException("no stock found"));
+        Stock stock = stockRepository.findBySymbolNameAndCountryWithEnums(symbolName, country,
+                koreaExchanges, overseaExchanges)
+            .orElseThrow(() -> new RuntimeException("no stock found"));
 
         return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
             stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
@@ -394,27 +403,27 @@ public class StockService {
 
         // 오늘 데이터와 어제 데이터를 구분
         Set<Integer> todayIdSet = allScores.stream()
-                                           .filter(score -> score.getDate().isEqual(today))
-                                           .map(Score::getStockId)
-                                           .collect(Collectors.toSet());
+            .filter(score -> score.getDate().isEqual(today))
+            .map(Score::getStockId)
+            .collect(Collectors.toSet());
 
         // TreeSet을 사용해 정렬된 상태 유지
         TreeSet<Score> topScores = new TreeSet<>(Comparator.comparing(Score::getDiff).reversed());
 
         allScores.stream()
-                 .filter(score -> {
-                     if (score.getDate().isEqual(today)) {
-                         return true; // 오늘 데이터는 무조건 포함
-                     }
-                     // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
-                     return !todayIdSet.contains(score.getStockId());
-                 })
-                 .forEach(topScores::add);
+            .filter(score -> {
+                if (score.getDate().isEqual(today)) {
+                    return true; // 오늘 데이터는 무조건 포함
+                }
+                // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
+                return !todayIdSet.contains(score.getStockId());
+            })
+            .forEach(topScores::add);
 
         // 상위 9개만 반환
         return topScores.stream()
-                        .limit(LIMITS)
-                        .toList();
+            .limit(LIMITS)
+            .toList();
     }
 
     /**
@@ -436,27 +445,27 @@ public class StockService {
 
         // 오늘 데이터와 어제 데이터를 구분
         Set<Integer> todayIdSet = allScores.stream()
-                                           .filter(score -> score.getDate().isEqual(today))
-                                           .map(Score::getStockId)
-                                           .collect(Collectors.toSet());
+            .filter(score -> score.getDate().isEqual(today))
+            .map(Score::getStockId)
+            .collect(Collectors.toSet());
 
         // TreeSet을 사용해 정렬된 상태 유지
         TreeSet<Score> topScores = new TreeSet<>(Comparator.comparing(Score::getDiff));
 
         allScores.stream()
-                 .filter(score -> {
-                     if (score.getDate().isEqual(today)) {
-                         return true; // 오늘 데이터는 무조건 포함
-                     }
-                     // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
-                     return !todayIdSet.contains(score.getStockId());
-                 })
-                 .forEach(topScores::add);
+            .filter(score -> {
+                if (score.getDate().isEqual(today)) {
+                    return true; // 오늘 데이터는 무조건 포함
+                }
+                // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
+                return !todayIdSet.contains(score.getStockId());
+            })
+            .forEach(topScores::add);
 
         // 상위 9개만 반환
         return topScores.stream()
-                        .limit(LIMITS)
-                        .toList();
+            .limit(LIMITS)
+            .toList();
     }
 
     /**
@@ -466,14 +475,27 @@ public class StockService {
      * @return 변환된 StockDiffResponse 목록
      */
     private List<StockDiffResponse> convertToStockDiffResponses(List<Score> scores, COUNTRY country) {
-        return scores.stream()
-            .map(score -> StockDiffResponse.builder()
+        final List<StockDiffResponse> stockDiffResponses = new ArrayList<>();
+
+        for (final Score score : scores) {
+            final List<String> uniqueKeywords = keywordRepository.findKeywordsByStockId(score.getStock().getId(), PageRequest.of(0, 10))
+                .stream()
+                .map(Keyword::getName)
+                .filter(keyword -> !keyword.equals(score.getStock().getSymbolName())) // symbolName과 일치하는 키워드 제거
+                .distinct()
+                .limit(2)
+                .toList();
+
+            stockDiffResponses.add(StockDiffResponse.builder()
                 .stockId(score.getStock().getId())
                 .symbolName(score.getStock().getSymbolName())
                 .score(country == COUNTRY.KOREA ? score.getScoreKorea() : score.getScoreOversea())
                 .diff(score.getDiff())
-                .build())
-            .collect(Collectors.toList());
+                .keywords(uniqueKeywords)
+                .build());
+        }
+
+        return stockDiffResponses;
     }
 
     /**
@@ -488,7 +510,8 @@ public class StockService {
 
     public List<StockRelevantResponse> getRelevantStocks(final Integer id) {
         Stock searchById = stockRepository.findStockById(id).orElse(null);
-        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(searchById);
+        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(
+            searchById);
 
         if (relevantStocksByExchangeNumAndScore.isEmpty()) {
             System.out.println("Stock " + id + " relevant Stocks are not found");
@@ -551,19 +574,21 @@ public class StockService {
         final String startDateToString = startDate.format(DateTimeFormatter.BASIC_ISO_DATE);
         final COUNTRY country = getCountry(stock);
 
-        final List<PriceInfo> itemChartPrices = securityService.getItemChartPrice(stock, startDateToString, endDateToString, periodCode, country).block();
+        final List<PriceInfo> itemChartPrices = securityService.getItemChartPrice(stock,
+            startDateToString, endDateToString, periodCode, country).block();
 
         List<Score> scores = stock.getScores();
         List<StockChartResponse.PriceInfo> priceInfos = new ArrayList<>();
 
-        if(itemChartPrices == null){
+        if (itemChartPrices == null) {
             System.out.println("There is no itemCharPrice data");
 
             return null;
         }
 
         for (PriceInfo priceInfo : itemChartPrices) {
-            LocalDate priceDate = LocalDate.parse(priceInfo.getLocalDate(), DateTimeFormatter.BASIC_ISO_DATE);
+            LocalDate priceDate = LocalDate.parse(priceInfo.getLocalDate(),
+                DateTimeFormatter.BASIC_ISO_DATE);
             Score matchingScore = null;
 
             // 날짜에 맞는 Score 찾기
@@ -583,7 +608,8 @@ public class StockService {
                 .lowPrice(priceInfo.getLowPrice())
                 .accumulatedTradingVolume(priceInfo.getAccumulatedTradingVolume())
                 .accumulatedTradingValue(priceInfo.getAccumulatedTradingValue())
-                .score(matchingScore != null ? (country == COUNTRY.KOREA ? matchingScore.getScoreKorea() : matchingScore.getScoreOversea()) : null)
+                .score(matchingScore != null ? (country == COUNTRY.KOREA
+                    ? matchingScore.getScoreKorea() : matchingScore.getScoreOversea()) : null)
                 .diff(matchingScore != null ? matchingScore.getDiff() : null)
                 .build();
 
@@ -618,7 +644,9 @@ public class StockService {
 
     private static COUNTRY getCountry(Stock stock) {
         COUNTRY country;
-        if (stock.getExchangeNum() == EXCHANGENUM.KOSPI || stock.getExchangeNum() == EXCHANGENUM.KOSDAQ || stock.getExchangeNum() == EXCHANGENUM.KOREAN_ETF) {
+        if (stock.getExchangeNum() == EXCHANGENUM.KOSPI
+            || stock.getExchangeNum() == EXCHANGENUM.KOSDAQ
+            || stock.getExchangeNum() == EXCHANGENUM.KOREAN_ETF) {
             country = COUNTRY.KOREA;
         } else {
             country = COUNTRY.OVERSEA;
@@ -627,7 +655,8 @@ public class StockService {
         return country;
     }
 
-    public Mono<StockChartResponse> convertToStockChartResponse(Mono<List<PriceInfo>> itemChartPrice, Stock stock, COUNTRY country) {
+    public Mono<StockChartResponse> convertToStockChartResponse(
+        Mono<List<PriceInfo>> itemChartPrice, Stock stock, COUNTRY country) {
         final List<Score> scores = stock.getScores();
         // priceinfos 의 각 날짜에 해당하는 score를 반환.
 

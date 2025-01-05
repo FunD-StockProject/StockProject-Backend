@@ -1,13 +1,16 @@
 package com.fund.stockProject.keyword.service;
 
-import java.util.List;
-
-import org.springframework.stereotype.Service;
-
+import com.fund.stockProject.keyword.entity.Keyword;
 import com.fund.stockProject.keyword.repository.KeywordRepository;
+import com.fund.stockProject.stock.domain.COUNTRY;
+import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.entity.Stock;
-
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
@@ -17,5 +20,23 @@ public class KeywordService {
 
     public List<Stock> findStocksByKeyword(String keywordName) {
         return stockKeywordRepository.findStocksByKeywordName(keywordName);
+    }
+
+
+    public List<String> findPopularKeyword(final COUNTRY country) {
+        List<Keyword> popularKeywords = null;
+        Pageable pageable = PageRequest.of(0, 50);
+
+        if (COUNTRY.KOREA.equals(country)) {
+            List<EXCHANGENUM> exchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF);
+            popularKeywords = stockKeywordRepository.findPopularKeyword(exchanges, pageable);
+        } else if (COUNTRY.OVERSEA.equals(country)) {
+            List<EXCHANGENUM> exchanges = List.of(EXCHANGENUM.NAS, EXCHANGENUM.NYS, EXCHANGENUM.AMS);
+            popularKeywords = stockKeywordRepository.findPopularKeyword(exchanges, pageable);
+        }
+
+
+
+        return popularKeywords.stream().map(Keyword::getName).distinct().limit(9).collect(Collectors.toList());
     }
 }

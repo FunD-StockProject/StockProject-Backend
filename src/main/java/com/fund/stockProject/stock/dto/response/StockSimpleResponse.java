@@ -1,10 +1,13 @@
 package com.fund.stockProject.stock.dto.response;
 
+import com.fund.stockProject.keyword.entity.Keyword;
+import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
 
 @Getter
 public class StockSimpleResponse {
+
     private final Integer stockId;
 
     private final String symbolName;
