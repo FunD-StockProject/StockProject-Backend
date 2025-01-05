@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fund.stockProject.keyword.dto.KeywordDto;
+import com.fund.stockProject.score.dto.response.ScoreIndexResponse;
 import com.fund.stockProject.score.dto.response.ScoreResponse;
 import com.fund.stockProject.score.service.ScoreService;
 import com.fund.stockProject.stock.domain.COUNTRY;
@@ -37,5 +38,10 @@ public class ScoreController {
     public ResponseEntity<List<KeywordDto>> getKeywordsByStock(@PathVariable Integer id) {
         List<KeywordDto> keywords = scoreService.getKeywordsByStock(id);
         return ResponseEntity.ok(keywords);
+    }
+
+    @GetMapping("score/index")
+    public ResponseEntity<ScoreIndexResponse> getIndexScore() {
+        return ResponseEntity.ok(scoreService.getIndexScore());
     }
 }
