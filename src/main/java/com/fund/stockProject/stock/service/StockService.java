@@ -8,8 +8,10 @@ import com.fund.stockProject.keyword.repository.KeywordRepository;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
 import com.fund.stockProject.score.service.ScoreService;
+import com.fund.stockProject.stock.domain.CATEGORY;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
+import com.fund.stockProject.stock.dto.response.StockCategoryResponse;
 import com.fund.stockProject.stock.dto.response.StockChartResponse;
 import com.fund.stockProject.stock.dto.response.StockChartResponse.PriceInfo;
 import com.fund.stockProject.stock.dto.response.StockDiffResponse;
@@ -179,6 +181,197 @@ public class StockService {
                     .collect(Collectors.toList()));
         }
         return Mono.error(new IllegalArgumentException("Invalid country: " + country));
+    }
+
+    /**
+     * 종목 차트별 인간지표 api
+     * @param category 종목 카테고리
+     * @param country 국내/해외 분류
+     * @return 종목 차트별 인간지표
+     */
+    public Mono<List<StockCategoryResponse>> getCategoryStocks(CATEGORY category, COUNTRY country) {
+        Mono<List<StockCategoryResponse>> response;
+
+        switch (category) {
+            case MARKET:
+                response = fetchMarketCapStocks(country);
+                break;
+            case VOLUME:
+                response = fetchVolumeStocks(country);
+                break;
+            case RISING:
+                response = fetchRisingStocks(country);
+                break;
+            case DESCENT:
+                response = fetchDescentStocks(country);
+                break;
+            default:
+                return Mono.error(new IllegalArgumentException("Invalid category"));
+        }
+
+        return response;
+    }
+
+    private Mono<List<StockCategoryResponse>> fetchMarketCapStocks(COUNTRY country) {
+        if (country == COUNTRY.KOREA) {
+            return securityService.getMarketCapRankKorea()
+                                  .flatMapIterable(list -> list)
+                                  .flatMap(response -> mapToStockCategoryResponseKorea(
+                                          response.getMkscShrnIscd(),
+                                          country,
+                                          response.getStckPrpr(),
+                                          response.getPrdyVrss(),
+                                          response.getPrdyCtrt()))
+                                  .collectList();
+        } else {
+            return securityService.getMarketCapOversea()
+                                  .flatMapIterable(list -> list)
+                                  .flatMap(response -> mapToStockCategoryResponseOversea(
+                                          response.getSymb(),
+                                          country,
+                                          response.getLast(),
+                                          response.getDiff(),
+                                          response.getRate()))
+                                  .collectList();
+        }
+    }
+
+    private Mono<List<StockCategoryResponse>> fetchVolumeStocks(COUNTRY country) {
+        if (country == COUNTRY.KOREA) {
+            return securityService.getVolumeRankKoreaForCategory()
+                                  .flatMapIterable(list -> list)
+                                  .flatMap(response -> mapToStockCategoryResponseKorea(
+                                          response.getMkscShrnIscd(),
+                                          country,
+                                          response.getStckPrpr(),
+                                          response.getPrdyVrss(),
+                                          response.getPrdyCtrt()))
+                                  .collectList();
+        } else {
+            return securityService.getVolumeRankOverseaForCategory()
+                                  .flatMapIterable(list -> list)
+                                  .flatMap(response -> mapToStockCategoryResponseOversea(
+                                          response.getSymb(),
+                                          country,
+                                          response.getLast(),
+                                          response.getDiff(),
+                                          response.getRate()))
+                                  .collectList();
+        }
+    }
+
+    private Mono<List<StockCategoryResponse>> fetchRisingStocks(COUNTRY country) {
+        if (country == COUNTRY.KOREA) {
+            return securityService.getRisingDescentRankKorea(true)
+                                  .flatMapIterable(list -> list)
+                                  .flatMap(response -> mapToStockCategoryResponseKorea(
+                                          response.getStckShrnIscd(),
+                                          country,
+                                          response.getStckPrpr(),
+                                          response.getPrdyVrss(),
+                                          response.getPrdyCtrt()))
+                                  .collectList();
+        } else {
+            return securityService.getRisingDescentRankOversea(true)
+                                  .flatMapIterable(list -> list)
+                                  .flatMap(response -> mapToStockCategoryResponseOversea(
+                                          response.getSymb(),
+                                          country,
+                                          response.getLast(),
+                                          response.getDiff(),
+                                          response.getRate()))
+                                  .collectList();
+        }
+    }
+
+    private Mono<List<StockCategoryResponse>> fetchDescentStocks(COUNTRY country) {
+        if (country == COUNTRY.KOREA) {
+            return securityService.getRisingDescentRankKorea(false)
+                                  .flatMapIterable(list -> list)
+                                  .flatMap(response -> mapToStockCategoryResponseKorea(
+                                          response.getStckShrnIscd(),
+                                          country,
+                                          response.getStckPrpr(),
+                                          response.getPrdyVrss(),
+                                          response.getPrdyCtrt()))
+                                  .collectList();
+        } else {
+            return securityService.getRisingDescentRankOversea(false)
+                                  .flatMapIterable(list -> list)
+                                  .flatMap(response -> mapToStockCategoryResponseOversea(
+                                          response.getSymb(),
+                                          country,
+                                          response.getLast(),
+                                          response.getDiff(),
+                                          response.getRate()))
+                                  .collectList();
+        }
+    }
+
+    private Mono<StockCategoryResponse> mapToStockCategoryResponseKorea(String symbol, COUNTRY country, String price,
+                                                                        String priceDiff, String priceDiffPercent) {
+        return Mono.justOrEmpty(stockRepository.findStockBySymbolWithScores(symbol)) // Optional -> Mono 변환
+                   .flatMap(stock -> {
+                       // 가격 및 변동률 파싱
+                       Double parsedPrice = parseDouble(price);
+                       Double parsedPriceDiff = parseDouble(priceDiff);
+                       Double parsedPriceDiffPercent = parseDouble(priceDiffPercent);
+
+                       // 점수 확인
+                       List<Score> scores = stock.getScores();
+                       if (scores.isEmpty()) {
+                           return Mono.empty(); // 점수가 없는 경우
+                       }
+
+                       Score latestScore = scores.get(0); // 최신 점수 가져오기
+                       return Mono.just(StockCategoryResponse.builder()
+                                                             .stockId(stock.getId())
+                                                             .symbolName(stock.getSymbolName())
+                                                             .country(country)
+                                                             .price(parsedPrice)
+                                                             .priceDiff(parsedPriceDiff)
+                                                             .priceDiffPerCent(parsedPriceDiffPercent)
+                                                             .score(latestScore.getScoreKorea())
+                                                             .scoreDiff(latestScore.getDiff())
+                                                             .build());
+                   });
+    }
+
+    private Mono<StockCategoryResponse> mapToStockCategoryResponseOversea(String symbol, COUNTRY country, String price,
+                                                                          String priceDiff, String priceDiffPercent) {
+        return Mono.justOrEmpty(stockRepository.findStockBySymbolWithScores(symbol))
+                              .flatMap(stock -> {
+                                  // 가격 및 변동률 파싱
+                                  Double parsedPrice = parseDouble(price);
+                                  Double parsedPriceDiff = parseDouble(priceDiff);
+                                  Double parsedPriceDiffPercent = parseDouble(priceDiffPercent);
+
+                                  // 점수 확인
+                                  List<Score> scores = stock.getScores();
+                                  if (scores.isEmpty()) {
+                                      return Mono.empty(); // 점수가 없는 경우
+                                  }
+
+                                  Score latestScore = scores.get(0); // 최신 점수 가져오기
+                                  return Mono.just(StockCategoryResponse.builder()
+                                                                        .stockId(stock.getId())
+                                                                        .symbolName(stock.getSymbolName())
+                                                                        .country(country)
+                                                                        .price(parsedPrice)
+                                                                        .priceDiff(parsedPriceDiff)
+                                                                        .priceDiffPerCent(parsedPriceDiffPercent)
+                                                                        .score(latestScore.getScoreOversea())
+                                                                        .scoreDiff(latestScore.getDiff())
+                                                                        .build());
+                              });
+    }
+
+    private Double parseDouble(String value) {
+        try {
+            return value != null ? Double.parseDouble(value) : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**
