@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -29,6 +30,7 @@ public class StockKeyword {
     @JoinColumn(name = "keyword_id", nullable = false)
     private Keyword keyword;
 
+    @Builder
     public StockKeyword(Stock stock, Keyword keyword) {
         this.stock = stock;
         this.keyword = keyword;

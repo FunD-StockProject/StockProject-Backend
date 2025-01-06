@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -208,25 +207,51 @@ public class ScoreService {
         );
     }
 
-    public void updateScore(Integer id, COUNTRY country, int yesterdayScore) {
-        Stock stock = stockRepository.findById(id).orElseThrow(() -> new RuntimeException("Could not find stock"));
-        // STEP1: AI 실행
-        int finalScore = executeScoreAI(stock.getSymbol(), country);
+    // 점수 & 키워드 업데이트
+    @Transactional
+    public void updateScoreAndKeyword(Integer id, COUNTRY country, int yesterdayScore) {
+        Stock stock = stockRepository.findById(id)
+                                     .orElseThrow(() -> new RuntimeException("Could not find stock"));
+        try {
+            // STEP1: AI 결과 가져오기
+            ScoreKeywordResponse scoreKeywordResponse = executeUpdateAI(stock.getSymbol(), country);
 
-        // STEP2: SCORE 데이터 저장
-        Score newScore = Score.builder()
-                              .stockId(stock.getId())
-                              .date(LocalDate.now())
-                              .scoreKorea(country == COUNTRY.KOREA? finalScore : 9999)
-                              .scoreNaver(finalScore)
-                              .scoreReddit(9999)
-                              .scoreOversea(country == COUNTRY.OVERSEA? finalScore : 9999)
-                              .diff(finalScore - yesterdayScore)
-                              .build();
-        // `stock` 연관 설정
-        newScore.setStock(stock);
-        scoreRepository.save(newScore);
+            // STEP2: SCORE 데이터 저장
+            int finalScore = scoreKeywordResponse.getFinalScore();
+            Score newScore = Score.builder()
+                                  .stockId(stock.getId())
+                                  .date(LocalDate.now())
+                                  .scoreKorea(country == COUNTRY.KOREA? finalScore : 9999)
+                                  .scoreNaver(finalScore)
+                                  .scoreReddit(9999)
+                                  .scoreOversea(country == COUNTRY.OVERSEA? finalScore : 9999)
+                                  .diff(finalScore - yesterdayScore)
+                                  .build();
 
+            // `stock` 연관 설정
+            newScore.setStock(stock);
+            scoreRepository.save(newScore);
+
+            // 기존 StockKeyword 삭제
+            stockKeywordRepository.deleteByStock(stock);
+            scoreKeywordResponse.getTopKeywords().forEach(keywordDto -> {
+                Keyword newKeyword = Keyword.builder()
+                                            .name(keywordDto.getWord())
+                                            .frequency(keywordDto.getFreq())
+                                            .build();
+
+                keywordRepository.save(newKeyword);
+
+                // StockKeyword 테이블에 매핑 정보 저장
+                StockKeyword stockKeyword = StockKeyword.builder()
+                                                        .stock(stock)
+                                                        .keyword(newKeyword)
+                                                        .build();
+                stockKeywordRepository.save(stockKeyword);
+            });
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to update score and keyword", e);
+        }
     }
 
     // 지수 업데이트 스케줄러 로직
@@ -281,52 +306,6 @@ public class ScoreService {
             throw new RuntimeException("Failed to update index scores", e);
         }
     }
-
-//    // TODO: 키워드 업데이트 로직 개발 중
-//    @Transactional
-//    public void updateScoreAndKeyword(Integer id, COUNTRY country, int yesterdayScore) {
-//        Stock stock = stockRepository.findById(id)
-//                                     .orElseThrow(() -> new RuntimeException("Could not find stock"));
-//        try {
-//            // Python 스크립트를 실행하여 결과 가져오기
-//            ScoreKeywordResponse scoreKeywordResponse = executeUpdateAI(stock.getSymbol(), country);
-//
-//            // STEP2: SCORE 데이터 저장
-//            int finalScore = scoreKeywordResponse.getFinalScore();
-//            Score newScore = Score.builder()
-//                                  .stockId(stock.getId())
-//                                  .date(LocalDate.now())
-//                                  .scoreKorea(country == COUNTRY.KOREA? finalScore : 9999)
-//                                  .scoreNaver(finalScore)
-//                                  .scoreReddit(9999)
-//                                  .scoreOversea(country == COUNTRY.OVERSEA? finalScore : 9999)
-//                                  .diff(finalScore - yesterdayScore)
-//                                  .build();
-//
-//            // `stock` 연관 설정
-//            newScore.setStock(stock);
-//            scoreRepository.save(newScore);
-//
-//            // 기존 StockKeyword 삭제
-//            stockKeywordRepository.deleteByStock(stock);
-//            System.out.println("scoreKeywordResponse.getTopKeywords().get(0).getWord() = " + scoreKeywordResponse.getTopKeywords().get(0).getWord());
-//            scoreKeywordResponse.getTopKeywords().forEach(keywordDto -> {
-//                Keyword newKeyword = Keyword.builder()
-//                                            .name(keywordDto.getWord())
-//                                            .frequency(keywordDto.getFreq())
-//                                            .build();
-//
-//                newKeyword.updateFrequency(keywordDto.getFreq());
-//                keywordRepository.save(newKeyword);
-//
-//                // StockKeyword 테이블에 매핑 정보 저장
-//                StockKeyword stockKeyword = new StockKeyword(stock, newKeyword);
-//                stockKeywordRepository.save(stockKeyword);
-//            });
-//        } catch (Exception e) {
-//            throw new RuntimeException("Failed to update score and keyword", e);
-//        }
-//    }
 
     private boolean isFirst(Integer id) {
         // 1111-11-11 날짜의 데이터가 존재하면 첫 인간지표로 판단
