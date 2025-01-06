@@ -16,6 +16,9 @@ public class ScoreUpdateScheduler {
 
     private final ScoreService scoreService;
 
+    /**
+     * 해외 점수&키워드 업데이트 스케줄러
+     */
     @Scheduled(cron = "0 0 6 * * ?", zone = "Asia/Seoul") // 6시에 실행
     public void processScoresOversea() {
         LocalDate today = LocalDate.now();
@@ -29,7 +32,7 @@ public class ScoreUpdateScheduler {
                 // COUNTRY를 설정하고 updateScore 실행
                 COUNTRY country = determineCountry(score);
                 if (country == COUNTRY.OVERSEA) {
-                    scoreService.updateScore(score.getStockId(), country, score.getScoreOversea());
+                    scoreService.updateScoreAndKeyword(score.getStockId(), country, score.getScoreOversea());
                 }
             } catch (Exception e) {
                 System.err.println("Error processing score " + score.getStockId() + " - " + e.getMessage());
@@ -37,6 +40,9 @@ public class ScoreUpdateScheduler {
         }
     }
 
+    /**
+     * 국내 점수&키워드 업데이트 스케줄러
+     */
     @Scheduled(cron = "0 0 17 * * ?", zone = "Asia/Seoul") // 17시에 실행
     public void processScoresKorea() {
         LocalDate today = LocalDate.now();
@@ -50,7 +56,7 @@ public class ScoreUpdateScheduler {
                 // COUNTRY를 설정하고 updateScore 실행
                 COUNTRY country = determineCountry(score);
                 if (country == COUNTRY.KOREA) {
-                    scoreService.updateScore(score.getStockId(), country, score.getScoreKorea());
+                    scoreService.updateScoreAndKeyword(score.getStockId(), country, score.getScoreKorea());
                 }
             } catch (Exception e) {
                 System.err.println("Error processing score " + score.getStockId() + " - " + e.getMessage());
@@ -58,6 +64,9 @@ public class ScoreUpdateScheduler {
         }
     }
 
+    /**
+     * 공포지수, 지수 업데이트 스케줄러
+     */
     @Scheduled(cron = "0 5 7 * * ?", zone = "Asia/Seoul") // 매일 7시 5분 실행
     public void processIndexScores() {
         scoreService.updateIndexScore();
