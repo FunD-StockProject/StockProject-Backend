@@ -10,14 +10,14 @@ public class StockRelevantResponse {
     private final String symbolName;
     private final Integer score;
     private final Integer diff;
-    private final List<String> keyword;
+    private final List<String> keywords;
 
     @Builder
-    public StockRelevantResponse(Integer stockId, String symbolName, Integer score, Integer diff, List<String> keyword) {
+    public StockRelevantResponse(Integer stockId, String symbolName, Integer score, Integer diff, List<String> keywords) {
         this.stockId = stockId;
         this.symbolName = symbolName;
         this.score = score;
         this.diff = diff;
-        this.keyword = keyword;
+        this.keywords = keywords;
     }
 }
