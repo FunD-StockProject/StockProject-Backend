@@ -20,15 +20,7 @@ public class StockQueryRepository {
     }
 
     public List<Stock> autocompleteKeyword(String keyword) {
-        final String[] keywordParts = keyword.split("");
-
-        BooleanExpression condition = null;
-
-        for (String part : keywordParts) {
-            BooleanExpression containsPart = stock.symbolName.contains(part);
-            condition = (condition == null) ? containsPart : condition.and(containsPart);
-        }
-
+        final BooleanExpression condition = stock.symbolName.like("%"+keyword+"%");
         return jpaQueryFactory.selectFrom(stock)
             .where(condition)
             .limit(30)
