@@ -54,22 +54,9 @@ public class Stock extends Core {
     @Convert(converter = ExchangeNumConverter.class)
     private EXCHANGENUM exchangeNum;
 
-    // symbolName을 안전하게 설정하는 비즈니스 메서드
     public void updateSymbolNameIfNull(String symbolName) {
         if (this.symbolName == null) {
             this.symbolName = symbolName;
         }
-    }
-
-    @Override
-    public String toString() {
-        return "Stock{" +
-            "id=" + id +
-            ", scores=" + scores +
-            ", symbol='" + symbol + '\'' +
-            ", symbolName='" + symbolName + '\'' +
-            ", securityName='" + securityName + '\'' +
-            ", exchangeNum=" + exchangeNum +
-            '}';
     }
 }
