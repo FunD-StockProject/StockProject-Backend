@@ -550,7 +550,7 @@ public class StockService {
             stockRelevantResponses.add(StockRelevantResponse.builder()
                 .stockId(stock.getId())
                 .symbolName(stock.getSymbolName())
-                .keyword(uniqueKeywords)
+                .keywords(uniqueKeywords)
                 .score(stock.getExchangeNum()
                     .equals(EXCHANGENUM.KOSPI) || stock.getExchangeNum()
                     .equals(EXCHANGENUM.KOSDAQ) || stock.getExchangeNum()
