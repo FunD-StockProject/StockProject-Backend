@@ -1,5 +1,6 @@
 package com.fund.stockProject.keyword.service;
 
+import com.fund.stockProject.keyword.dto.KeywordStockResponse;
 import com.fund.stockProject.keyword.entity.Keyword;
 import com.fund.stockProject.keyword.entity.StockKeyword;
 import com.fund.stockProject.keyword.repository.KeywordRepository;
@@ -26,9 +27,9 @@ public class KeywordService {
     private final StockKeywordRepository stockKeywordRepository;
     private final SecurityService securityService;
 
-    public List<StockInfoResponse> findStocksByKeyword(String keywordName) {
+    public List<KeywordStockResponse> findStocksByKeyword(String keywordName) {
         final List<StockKeyword> byKeywordName = stockKeywordRepository.findByKeywordName(keywordName);
-        final List<StockInfoResponse> stocks = new ArrayList<>();
+        final List<KeywordStockResponse> stocks = new ArrayList<>();
 
         for (final StockKeyword stockKeyword : byKeywordName) {
             if(stocks.size() >= 15){
@@ -36,10 +37,20 @@ public class KeywordService {
             }
 
             final Stock stock = stockKeyword.getStock();
-            final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(), stock.getSecurityName(), stock.getSymbol(),
-                stock.getExchangeNum(), List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF).contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA);
+            final StockInfoResponse stockInfoResponse = securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(), stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
+                List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF).contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA).block();
 
-            stocks.add(securityStockInfoKorea.block());
+            stocks.add(KeywordStockResponse.builder()
+                    .stockId(stockInfoResponse.getStockId())
+                    .keyword(keywordName)
+                    .country(stockInfoResponse.getCountry())
+                    .symbolName(stockInfoResponse.getSymbolName())
+                    .score(stock.getExchangeNum()
+                        .equals(EXCHANGENUM.KOSPI) || stock.getExchangeNum()
+                        .equals(EXCHANGENUM.KOSDAQ) || stock.getExchangeNum()
+                        .equals(EXCHANGENUM.KOREAN_ETF) ? stock.getScores().get(0).getScoreKorea() : stock.getScores().get(0).getScoreOversea())
+                    .diff(stock.getScores().get(0).getDiff())
+                .build());
         }
 
         return stocks;
