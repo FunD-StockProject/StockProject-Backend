@@ -74,7 +74,7 @@ public class KeywordService {
             .map(Keyword::getName)
             .filter(this::isValidKeyword)
             .distinct()
-            .limit(9)
+            .limit(10)
             .collect(Collectors.toList());
     }
 
