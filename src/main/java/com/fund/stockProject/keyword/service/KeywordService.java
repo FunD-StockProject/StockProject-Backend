@@ -39,12 +39,15 @@ public class KeywordService {
             final Stock stock = stockKeyword.getStock();
             final StockInfoResponse stockInfoResponse = securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(), stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
                 List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF).contains(stock.getExchangeNum()) ? COUNTRY.KOREA : COUNTRY.OVERSEA).block();
+            final List<String> keywordNames = keywordRepository.findKeywordsByStockId(stock.getId(), PageRequest.of(0, 2))
+                .stream().map(Keyword::getName).toList();
 
             stocks.add(KeywordStockResponse.builder()
                     .stockId(stockInfoResponse.getStockId())
                     .keyword(keywordName)
                     .country(stockInfoResponse.getCountry())
                     .symbolName(stockInfoResponse.getSymbolName())
+                    .keywordNames(keywordNames)
                     .score(stock.getExchangeNum()
                         .equals(EXCHANGENUM.KOSPI) || stock.getExchangeNum()
                         .equals(EXCHANGENUM.KOSDAQ) || stock.getExchangeNum()
