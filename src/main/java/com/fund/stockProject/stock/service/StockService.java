@@ -64,8 +64,7 @@ public class StockService {
         List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF);
         List<EXCHANGENUM> overseaExchanges = List.of(EXCHANGENUM.NAS, EXCHANGENUM.NYS, EXCHANGENUM.AMS);
 
-        final Optional<Stock> bySymbolNameAndCountryWithEnums = stockRepository.findBySymbolNameAndCountryWithEnums(
-            searchKeyword, country, koreaExchanges, overseaExchanges);
+        final Optional<Stock> bySymbolNameAndCountryWithEnums = stockRepository.findBySearchKeywordAndCountryWithEnums(searchKeyword, country, koreaExchanges, overseaExchanges);
 
         if(bySymbolNameAndCountryWithEnums.isPresent()){
             final Stock stock = bySymbolNameAndCountryWithEnums.get();
