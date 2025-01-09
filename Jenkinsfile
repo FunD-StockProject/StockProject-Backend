@@ -36,6 +36,7 @@ pipeline {
                     scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/wc.py ${WORKSPACE}/wc.py
                     scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/update.py ${WORKSPACE}/update.py
                     scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/stockindex.py ${WORKSPACE}/stockindex.py
+                    scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/hotsearch.py ${WORKSPACE}/hotsearch.py
                     scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/requirements.txt ${WORKSPACE}/requirements.txt
                     scp -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP}:/home/ubuntu/fear-and-greed-0.4.tar.gz ${WORKSPACE}/fear-and-greed-0.4.tar.gz
                     """

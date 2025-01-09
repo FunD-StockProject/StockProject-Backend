@@ -1,5 +1,6 @@
 package com.fund.stockProject.stock.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.global.config.SecurityHttpConfig;
@@ -15,6 +16,7 @@ import com.fund.stockProject.stock.dto.response.StockCategoryResponse;
 import com.fund.stockProject.stock.dto.response.StockChartResponse;
 import com.fund.stockProject.stock.dto.response.StockChartResponse.PriceInfo;
 import com.fund.stockProject.stock.dto.response.StockDiffResponse;
+import com.fund.stockProject.stock.dto.response.StockHotSearchResponse;
 import com.fund.stockProject.stock.dto.response.StockInfoResponse;
 import com.fund.stockProject.stock.dto.response.StockRelevantResponse;
 import com.fund.stockProject.stock.dto.response.StockSearchResponse;
@@ -22,6 +24,9 @@ import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockQueryRepository;
 import com.fund.stockProject.stock.repository.StockRepository;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -183,6 +188,61 @@ public class StockService {
                     .collect(Collectors.toList()));
         }
         return Mono.error(new IllegalArgumentException("Invalid country: " + country));
+    }
+
+    /**
+     * 인기 검색어 api
+     */
+    public Mono<List<StockHotSearchResponse>> getHotSearch() {
+        try {
+            // Python 스크립트 경로
+            String scriptPath = "hotsearch.py";
+
+            // Python 스크립트를 실행하는 ProcessBuilder
+            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath);
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
+
+            // Python 스크립트 출력 읽기
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String output = reader.lines().collect(Collectors.joining("\n"));
+            int exitCode = process.waitFor();
+
+            if (exitCode != 0) {
+                throw new RuntimeException("Python script execution failed with exit code: " + exitCode + "\nOutput: " + output);
+            }
+
+            // JSON 데이터 파싱
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(output);
+
+            // hot_stocks 리스트 추출
+            List<String> hotSymbols = objectMapper.convertValue(
+                    rootNode.get("hot_stocks"), new TypeReference<List<String>>() {});
+
+            // 각 symbol을 stock 테이블에서 조회하며 최대 10개만 추가
+            List<StockHotSearchResponse> responses = new ArrayList<>();
+            for (String symbol : hotSymbols) {
+                Optional<Stock> optionalStock = stockRepository.findBySymbol(symbol);
+                if (optionalStock.isPresent()) {
+                    Stock stock = optionalStock.get();
+                    responses.add(StockHotSearchResponse.builder()
+                                                        .stockId(stock.getId())
+                                                        .symbol(stock.getSymbol())
+                                                        .symbolName(stock.getSymbolName())
+                                                        .country(getCountryFromExchangeNum(stock.getExchangeNum()))
+                                                        .build());
+                }
+                // 결과 리스트가 10개가 되면 반환
+                if (responses.size() >= 10) {
+                    break;
+                }
+            }
+
+            return Mono.just(responses);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to execute Python script", e);
+        }
     }
 
     /**
