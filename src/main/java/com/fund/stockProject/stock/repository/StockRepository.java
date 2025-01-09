@@ -15,11 +15,11 @@ public interface StockRepository extends JpaRepository<Stock, Integer> {
     @Query("SELECT s FROM Stock s WHERE s.symbol = :symbolName OR s.symbolName = :symbolName")
     Optional<Stock> findFirstBySymbolOrSymbolName(@Param("symbolName") String symbolName);
 
-    @Query("SELECT s FROM Stock s WHERE s.symbolName = :symbolName AND " +
+    @Query("SELECT s FROM Stock s WHERE (s.symbolName = :searchKeyword OR s.symbol = :searchKeyword) AND " +
         "((:country = 'KOREA' AND s.exchangeNum IN :koreaExchanges) OR " +
         "(:country = 'OVERSEA' AND s.exchangeNum IN :overseaExchanges))")
-    Optional<Stock> findBySymbolNameAndCountryWithEnums(
-        @Param("symbolName") String symbolName,
+    Optional<Stock> findBySearchKeywordAndCountryWithEnums(
+        @Param("searchKeyword") String searchKeyword,
         @Param("country") String country,
         @Param("koreaExchanges") List<EXCHANGENUM> koreaExchanges,
         @Param("overseaExchanges") List<EXCHANGENUM> overseaExchanges
