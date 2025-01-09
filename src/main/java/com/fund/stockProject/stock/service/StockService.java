@@ -346,8 +346,9 @@ public class StockService {
             .flatMap(stock -> {
                 // 가격 및 변동률 파싱
                 Double parsedPrice = parseDouble(price);
-                Double parsedPriceDiff = parseDouble(priceDiff);
                 Double parsedPriceDiffPercent = parseDouble(priceDiffPercent);
+                // 해외는 diff가 절대값이므로 절대값에 따라 음수로 변경
+                Double parsedPriceDiff = parsedPriceDiffPercent < 0 ? parseDouble(priceDiff) * -1 : parsedPriceDiffPercent;
 
                 // 점수 확인
                 List<Score> scores = stock.getScores();
