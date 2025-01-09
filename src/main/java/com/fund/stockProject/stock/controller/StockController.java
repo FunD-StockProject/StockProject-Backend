@@ -34,12 +34,10 @@ public class StockController {
 
     private final StockService stockService;
 
-    @GetMapping("/search/{symbolName}/{country}")
+    @GetMapping("/search/{searchKeyword}/{country}")
     @Operation(summary = "주식 종목 검색 API", description = "주식 종목 및 인간지표 데이터 검색")
-    public ResponseEntity<Mono<StockInfoResponse>> searchStockBySymbolName(
-        final @PathVariable String symbolName,
-        final @PathVariable String country) {
-        return ResponseEntity.ok().body(stockService.searchStockBySymbolName(symbolName, country));
+    public ResponseEntity<Mono<StockInfoResponse>> searchStockBySymbolName(final @PathVariable String searchKeyword, final @PathVariable String country) {
+        return ResponseEntity.ok().body(stockService.searchStockBySymbolName(searchKeyword, country));
     }
 
     @GetMapping("/autocomplete")
