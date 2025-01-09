@@ -20,7 +20,7 @@ public class StockQueryRepository {
     }
 
     public List<Stock> autocompleteKeyword(String keyword) {
-        final BooleanExpression condition = stock.symbolName.like("%"+keyword+"%");
+        final BooleanExpression condition = stock.symbolName.like("%" + keyword + "%").or(stock.symbol.like("%" + keyword + "%"));
         return jpaQueryFactory.selectFrom(stock)
             .where(condition)
             .limit(30)

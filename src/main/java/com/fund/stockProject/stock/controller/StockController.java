@@ -42,8 +42,7 @@ public class StockController {
 
     @GetMapping("/autocomplete")
     @Operation(summary = "검색어 자동완성 API", description = "검색어 자동완성")
-    public ResponseEntity<List<StockSearchResponse>> autocompleteKeyword(
-        final @RequestParam String keyword) {
+    public ResponseEntity<List<StockSearchResponse>> autocompleteKeyword(final @RequestParam String keyword) {
         return ResponseEntity.ok().body(stockService.autoCompleteKeyword(keyword));
     }
 
