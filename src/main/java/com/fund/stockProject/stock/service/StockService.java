@@ -54,20 +54,18 @@ public class StockService {
 
     private final int LIMITS = 9;
 
-    public Mono<StockInfoResponse> searchStockBySymbolName(final String symbolName,
+    public Mono<StockInfoResponse> searchStockBySymbolName(final String searchKeyword,
         final String country) {
         List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ,
             EXCHANGENUM.KOREAN_ETF);
         List<EXCHANGENUM> overseaExchanges = List.of(EXCHANGENUM.NAS, EXCHANGENUM.NYS,
             EXCHANGENUM.AMS);
 
-        Stock stock = stockRepository.findBySymbolNameAndCountryWithEnums(symbolName, country,
-                koreaExchanges, overseaExchanges)
+        final Stock stock = stockRepository.findBySymbolNameAndCountryWithEnums(searchKeyword, country, koreaExchanges, overseaExchanges)
             .orElseThrow(() -> new RuntimeException("no stock found"));
 
         return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
-            stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
-            getCountryFromExchangeNum(stock.getExchangeNum()));
+            stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum()));
     }
 
 
@@ -528,7 +526,8 @@ public class StockService {
 
     public List<StockRelevantResponse> getRelevantStocks(final Integer id) {
         Stock searchById = stockRepository.findStockById(id).orElse(null);
-        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(searchById);
+        final List<Stock> relevantStocksByExchangeNumAndScore = stockQueryRepository.findRelevantStocksByExchangeNumAndScore(
+            searchById);
 
         if (relevantStocksByExchangeNumAndScore.isEmpty()) {
             System.out.println("Stock " + id + " relevant Stocks are not found");
@@ -539,10 +538,12 @@ public class StockService {
         final List<StockRelevantResponse> stockRelevantResponses = new ArrayList<>();
 
         for (final Stock stock : relevantStocksByExchangeNumAndScore) {
-            final List<String> uniqueKeywords = keywordRepository.findKeywordsByStockId(stock.getId(), PageRequest.of(0, 10))
+            final List<String> uniqueKeywords = keywordRepository.findKeywordsByStockId(
+                    stock.getId(), PageRequest.of(0, 10))
                 .stream()
                 .map(Keyword::getName)
-                .filter(keyword -> (!keyword.equals(stock.getSymbolName()) && isValidKeyword(keyword))) // symbolName과 일치하는 키워드 제거
+                .filter(keyword -> (!keyword.equals(stock.getSymbolName()) && isValidKeyword(
+                    keyword))) // symbolName과 일치하는 키워드 제거
                 .distinct()
                 .limit(2)
                 .toList();
