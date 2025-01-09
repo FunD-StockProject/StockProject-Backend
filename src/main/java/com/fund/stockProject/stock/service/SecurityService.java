@@ -88,7 +88,6 @@ public class SecurityService {
                 stockInfoResponse.setPrice(outputNode.get("stck_prpr").asDouble());
                 stockInfoResponse.setPriceDiff(outputNode.get("prdy_vrss").asDouble());
                 stockInfoResponse.setPriceDiffPerCent(outputNode.get("prdy_ctrt").asDouble());
-                stockInfoResponse.setPriceSign(outputNode.get("prdy_vrss_sign").asInt());
             }
 
             return Mono.just(stockInfoResponse);
@@ -119,7 +118,6 @@ public class SecurityService {
                     stockInfoResponse.setPriceDiff(outputNode.get("diff").asDouble());
                 }
                 stockInfoResponse.setPriceDiffPerCent(outputNode.get("rate").asDouble());
-                stockInfoResponse.setPriceSign(outputNode.get("sign").asInt());
             }
 
             return Mono.just(stockInfoResponse);
