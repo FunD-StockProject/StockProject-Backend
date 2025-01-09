@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -54,18 +55,21 @@ public class StockService {
 
     private final int LIMITS = 9;
 
-    public Mono<StockInfoResponse> searchStockBySymbolName(final String searchKeyword,
-        final String country) {
-        List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ,
-            EXCHANGENUM.KOREAN_ETF);
-        List<EXCHANGENUM> overseaExchanges = List.of(EXCHANGENUM.NAS, EXCHANGENUM.NYS,
-            EXCHANGENUM.AMS);
+    public Mono<StockInfoResponse> searchStockBySymbolName(final String searchKeyword, final String country) {
+        List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF);
+        List<EXCHANGENUM> overseaExchanges = List.of(EXCHANGENUM.NAS, EXCHANGENUM.NYS, EXCHANGENUM.AMS);
 
-        final Stock stock = stockRepository.findBySymbolNameAndCountryWithEnums(searchKeyword, country, koreaExchanges, overseaExchanges)
-            .orElseThrow(() -> new RuntimeException("no stock found"));
+        final Optional<Stock> bySymbolNameAndCountryWithEnums = stockRepository.findBySymbolNameAndCountryWithEnums(
+            searchKeyword, country, koreaExchanges, overseaExchanges);
 
-        return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
-            stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum()));
+        if(bySymbolNameAndCountryWithEnums.isPresent()){
+            final Stock stock = bySymbolNameAndCountryWithEnums.get();
+
+            return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
+                stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum()));
+        }
+
+        return Mono.empty();
     }
 
 
