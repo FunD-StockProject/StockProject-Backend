@@ -33,4 +33,11 @@ public class KeywordController {
         final List<String> popularKeywords = keywordService.findPopularKeyword(country);
         return ResponseEntity.ok(popularKeywords);
     }
+
+    @GetMapping("/rankings")
+    @Operation(summary = "인기 키워드 순위 조회 API", description = "인기 키워드 순위 조회 API")
+    public ResponseEntity<List<String>> getKeywordRanking() {
+        final List<String> popularKeywords = keywordService.findKeywordRanking();
+        return ResponseEntity.ok(popularKeywords);
+    }
 }
