@@ -742,7 +742,8 @@ public class SecurityService {
                 .headers(httpHeaders -> httpHeaders.addAll(headers))
                 .retrieve()
                 .bodyToMono(String.class)
-                .flatMap(this::parseFStockChartPriceKorea);
+                .flatMap(this::parseFStockChartPriceKorea)
+                .map(priceInfos -> priceInfos.stream().limit(100).toList());
         } else {
             headers.set("tr_id", "HHDFS76240000");
 
@@ -765,7 +766,8 @@ public class SecurityService {
                 .headers(httpHeaders -> httpHeaders.addAll(headers))
                 .retrieve()
                 .bodyToMono(String.class)
-                .flatMap(this::parseFStockChartPriceOverseas);
+                .flatMap(this::parseFStockChartPriceOverseas)
+                .map(priceInfos -> priceInfos.stream().limit(100).toList());
         }
     }
 
@@ -794,7 +796,7 @@ public class SecurityService {
 
             return Mono.just(responseDataList);
         } catch (Exception e) {
-            return Mono.error(new UnsupportedOperationException("국내 종목 정보가 없습니다"));
+            return Mono.error(new UnsupportedOperationException("국내 종목 정보가 없습니다."));
         }
     }
 

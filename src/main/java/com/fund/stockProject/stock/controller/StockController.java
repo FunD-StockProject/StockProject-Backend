@@ -81,8 +81,9 @@ public class StockController {
     ResponseEntity<Mono<StockChartResponse>> getStockChart(
         final @PathVariable("id") Integer id,
         final @RequestParam(required = false) String periodCode,
-        final @RequestParam(required = false) LocalDate startDate) {
-        return ResponseEntity.ok().body(stockService.getStockChart(id, periodCode, startDate));
+        final @RequestParam(required = false) LocalDate startDate,
+        final @RequestParam(required = false) LocalDate endDate) {
+        return ResponseEntity.ok().body(stockService.getStockChart(id, periodCode, startDate, endDate));
     }
 
     @GetMapping("/{id}/info/{country}")
