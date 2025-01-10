@@ -780,6 +780,10 @@ public class SecurityService {
 
             if (outputNode != null) {
                 for (JsonNode node : outputNode) {
+                    if(node.isEmpty()){
+                        continue;
+                    }
+
                     final PriceInfo responseData = PriceInfo.builder()
                         .closePrice(node.get("stck_clpr").asText()) // 종가
                         .openPrice(node.get("stck_oprc").asText()) // 시가
