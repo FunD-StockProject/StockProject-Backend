@@ -87,8 +87,14 @@ public class KeywordService {
         }
 
         String specialCharsPattern = "^[a-zA-Z0-9가-힣\\s]+$";
-        String postfixPattern = "^(이|가|을|를|의|에|로|으로|에서|와|과|은|는|도|만|까지|부터|마저|조차|나마|처럼|같이|크|등|또|전).*|.*(이|가|을|를|의|에|로|으로|에서|와|과|은|는|도|만|까지|부터|마저|조차|나마|처럼|같이|하|등|또|전)$";
+        String postfixPattern = "^(이|가|을|를|의|에|로|으로|에서|와|과|은|는|도|만|까지|부터|마저|조차|나마|처럼|같이|크|등|또|전|있다|있다.|이다|이다.|있는).*|.*(이|가|을|를|의|에|로|으로|에서|와|과|은|는|도|만|까지|부터|마저|조차|나마|처럼|같이|하|등|또|전)$";
 
         return name.matches(specialCharsPattern) && !name.matches(postfixPattern);
+    }
+
+    public List<String> findKeywordRanking() {
+        final List<Keyword> top10Keywords = keywordRepository.findKeywords(PageRequest.of(0, 100));
+
+        return top10Keywords.stream().map(Keyword::getName).filter(this::isValidKeyword).distinct().limit(10).toList();
     }
 }

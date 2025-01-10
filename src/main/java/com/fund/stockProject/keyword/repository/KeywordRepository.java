@@ -4,6 +4,7 @@ import com.fund.stockProject.keyword.entity.Keyword;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -29,4 +30,9 @@ public interface KeywordRepository extends JpaRepository<Keyword, Integer> {
         "WHERE sk.stock.id = :stockId " +
         "ORDER BY k.frequency DESC")
     List<Keyword> findKeywordsByStockId(@Param("stockId") Integer stockId, Pageable pageable);
+
+    @Query("SELECT k " +
+        "FROM Keyword k " +
+        "ORDER BY k.frequency DESC")
+    List<Keyword> findKeywords(PageRequest pageRequest);
 }
