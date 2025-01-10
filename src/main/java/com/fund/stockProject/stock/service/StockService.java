@@ -60,17 +60,22 @@ public class StockService {
 
     private final int LIMITS = 9;
 
-    public Mono<StockInfoResponse> searchStockBySymbolName(final String searchKeyword, final String country) {
-        List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF);
-        List<EXCHANGENUM> overseaExchanges = List.of(EXCHANGENUM.NAS, EXCHANGENUM.NYS, EXCHANGENUM.AMS);
+    public Mono<StockInfoResponse> searchStockBySymbolName(final String searchKeyword,
+        final String country) {
+        List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ,
+            EXCHANGENUM.KOREAN_ETF);
+        List<EXCHANGENUM> overseaExchanges = List.of(EXCHANGENUM.NAS, EXCHANGENUM.NYS,
+            EXCHANGENUM.AMS);
 
-        final Optional<Stock> bySymbolNameAndCountryWithEnums = stockRepository.findBySearchKeywordAndCountryWithEnums(searchKeyword, country, koreaExchanges, overseaExchanges);
+        final Optional<Stock> bySymbolNameAndCountryWithEnums = stockRepository.findBySearchKeywordAndCountryWithEnums(
+            searchKeyword, country, koreaExchanges, overseaExchanges);
 
-        if(bySymbolNameAndCountryWithEnums.isPresent()){
+        if (bySymbolNameAndCountryWithEnums.isPresent()) {
             final Stock stock = bySymbolNameAndCountryWithEnums.get();
 
             return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
-                stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum()));
+                stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
+                getCountryFromExchangeNum(stock.getExchangeNum()));
         }
 
         return Mono.empty();
@@ -203,12 +208,15 @@ public class StockService {
             Process process = processBuilder.start();
 
             // Python 스크립트 출력 읽기
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream()));
             String output = reader.lines().collect(Collectors.joining("\n"));
             int exitCode = process.waitFor();
 
             if (exitCode != 0) {
-                throw new RuntimeException("Python script execution failed with exit code: " + exitCode + "\nOutput: " + output);
+                throw new RuntimeException(
+                    "Python script execution failed with exit code: " + exitCode + "\nOutput: "
+                        + output);
             }
 
             // JSON 데이터 파싱
@@ -217,7 +225,8 @@ public class StockService {
 
             // hot_stocks 리스트 추출
             List<String> hotSymbols = objectMapper.convertValue(
-                    rootNode.get("hot_stocks"), new TypeReference<List<String>>() {});
+                rootNode.get("hot_stocks"), new TypeReference<List<String>>() {
+                });
 
             // 각 symbol을 stock 테이블에서 조회하며 최대 10개만 추가
             List<StockHotSearchResponse> responses = new ArrayList<>();
@@ -226,11 +235,11 @@ public class StockService {
                 if (optionalStock.isPresent()) {
                     Stock stock = optionalStock.get();
                     responses.add(StockHotSearchResponse.builder()
-                                                        .stockId(stock.getId())
-                                                        .symbol(stock.getSymbol())
-                                                        .symbolName(stock.getSymbolName())
-                                                        .country(getCountryFromExchangeNum(stock.getExchangeNum()))
-                                                        .build());
+                        .stockId(stock.getId())
+                        .symbol(stock.getSymbol())
+                        .symbolName(stock.getSymbolName())
+                        .country(getCountryFromExchangeNum(stock.getExchangeNum()))
+                        .build());
                 }
                 // 결과 리스트가 10개가 되면 반환
                 if (responses.size() >= 10) {
@@ -409,7 +418,8 @@ public class StockService {
                 Double parsedPrice = parseDouble(price);
                 Double parsedPriceDiffPercent = parseDouble(priceDiffPercent);
                 // 해외는 diff가 절대값이므로 절대값에 따라 음수로 변경
-                Double parsedPriceDiff = parsedPriceDiffPercent < 0 ? parseDouble(priceDiff) * -1 : parsedPriceDiffPercent;
+                Double parsedPriceDiff = parsedPriceDiffPercent < 0 ? parseDouble(priceDiff) * -1
+                    : parsedPriceDiffPercent;
 
                 // 점수 확인
                 List<Score> scores = stock.getScores();
@@ -642,41 +652,43 @@ public class StockService {
             .contains(exchangenum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
     }
 
-    public Mono<StockChartResponse> getStockChart(final Integer id, String periodCode,
-        LocalDate startDate) {
+    public Mono<StockChartResponse> getStockChart(final Integer id, String periodCode, LocalDate startDate, LocalDate endDate) {
         final Stock stock = stockRepository.findStockById(id).orElse(null);
 
         if (stock == null) {
-            System.out.println("Stock " + id + " can not found");
+            System.out.println("no stock found (stockId: " + id + ")");
 
             return null;
         }
 
-        final LocalDate endDate = LocalDate.now();
-        final String endDateToString = endDate.format(DateTimeFormatter.BASIC_ISO_DATE);
+        String startDateToString, endDateToString;
+
+        if (endDate == null) {
+            endDate = LocalDate.now();
+        }
+
+        endDateToString = endDate.format(DateTimeFormatter.BASIC_ISO_DATE);
 
         if (startDate == null) {
             startDate = getStartDate(periodCode, endDate);
         }
 
-        final String startDateToString = startDate.format(DateTimeFormatter.BASIC_ISO_DATE);
+        startDateToString = startDate.format(DateTimeFormatter.BASIC_ISO_DATE);
         final COUNTRY country = getCountry(stock);
 
-        final List<PriceInfo> itemChartPrices = securityService.getItemChartPrice(stock,
-            startDateToString, endDateToString, periodCode, country).block();
-
-        List<Score> scores = stock.getScores();
-        List<StockChartResponse.PriceInfo> priceInfos = new ArrayList<>();
+        final List<PriceInfo> itemChartPrices = securityService.getItemChartPrice(stock, startDateToString, endDateToString, periodCode, country).block();
 
         if (itemChartPrices == null) {
-            System.out.println("There is no itemCharPrice data");
+            System.out.println("no found itemCharPrice (stockId: " + stock.getId() + ")");
 
             return null;
         }
 
+        List<Score> scores = stock.getScores();
+        List<StockChartResponse.PriceInfo> priceInfos = new ArrayList<>();
+
         for (PriceInfo priceInfo : itemChartPrices) {
-            LocalDate priceDate = LocalDate.parse(priceInfo.getLocalDate(),
-                DateTimeFormatter.BASIC_ISO_DATE);
+            LocalDate priceDate = LocalDate.parse(priceInfo.getLocalDate(), DateTimeFormatter.BASIC_ISO_DATE);
             Score matchingScore = null;
 
             // 날짜에 맞는 Score 찾기
@@ -696,8 +708,7 @@ public class StockService {
                 .lowPrice(priceInfo.getLowPrice())
                 .accumulatedTradingVolume(priceInfo.getAccumulatedTradingVolume())
                 .accumulatedTradingValue(priceInfo.getAccumulatedTradingValue())
-                .score(matchingScore != null ? (country == COUNTRY.KOREA
-                    ? matchingScore.getScoreKorea() : matchingScore.getScoreOversea()) : null)
+                .score(matchingScore != null ? (country == COUNTRY.KOREA ? matchingScore.getScoreKorea() : matchingScore.getScoreOversea()) : null)
                 .diff(matchingScore != null ? matchingScore.getDiff() : null)
                 .build();
 
