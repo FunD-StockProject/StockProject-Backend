@@ -254,6 +254,52 @@ public class StockService {
     }
 
     /**
+     * 종목 요약 api
+     */
+    /**
+     * 종목 요약 데이터를 리턴.
+     *
+     * @param symbol 종목 심볼
+     * @param country 국내/해외 구분
+     * @return summarys 리스트
+     */
+    public Mono<List<String>> getSummarys(String symbol, COUNTRY country) {
+        try {
+            // Python 스크립트 경로
+            String scriptPath = "summary.py";
+
+            // Python 스크립트를 실행하기 위한 ProcessBuilder 설정
+            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol, country.toString());
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
+
+            // Python 스크립트 출력 읽기
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String output = reader.lines().collect(Collectors.joining("\n"));
+            int exitCode = process.waitFor();
+
+            // 프로세스 실행 결과 확인
+            if (exitCode != 0) {
+                throw new RuntimeException("Python 스크립트 실행 실패 (exit code: " + exitCode + ")\nOutput: " + output);
+            }
+
+            // Python 스크립트의 출력 JSON 데이터 파싱
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(output);
+
+            // summarys 리스트 추출
+            List<String> summarys = objectMapper.convertValue(
+                    rootNode.get("summarys"),
+                    new TypeReference<List<String>>() {}
+            );
+
+            return Mono.just(summarys);
+        } catch (Exception e) {
+            throw new RuntimeException("Python 스크립트 실행 중 오류 발생", e);
+        }
+    }
+
+    /**
      * 종목 차트별 인간지표 api
      * @param category 종목 카테고리
      * @param country 국내/해외 분류

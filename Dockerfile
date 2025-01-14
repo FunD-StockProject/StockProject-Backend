@@ -37,6 +37,7 @@ COPY wc.py /app/wc.py
 COPY update.py /app/update.py
 COPY stockindex.py /app/stockindex.py
 COPY hotsearch.py /app/hotsearch.py
+COPY summary.py /app/summary.py
 COPY fear-and-greed-0.4.tar.gz /app/fear-and-greed-0.4.tar.gz
 
 # tar.gz 압축 해제 및 설치

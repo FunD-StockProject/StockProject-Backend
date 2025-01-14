@@ -101,4 +101,10 @@ public class StockController {
     ResponseEntity<Mono<List<StockHotSearchResponse>>> getHotSearch() {
         return ResponseEntity.ok().body(stockService.getHotSearch());
     }
+
+    @GetMapping("/summary/{symbol}/{country}")
+    @Operation(summary = "종목 요약 api", description = "종목 요약 api")
+    ResponseEntity<Mono<List<String>>> getSummarys(@PathVariable("symbol") String symbol, @PathVariable("country") COUNTRY country) {
+        return ResponseEntity.ok().body(stockService.getSummarys(symbol, country));
+    }
 }
