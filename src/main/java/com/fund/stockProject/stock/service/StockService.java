@@ -164,6 +164,7 @@ public class StockService {
                             .stockId(stock.getId())
                             .symbolName(stock.getSymbolName())
                             .score(stock.getScores().get(0).getScoreKorea()) // 최신 데이터를 보장
+                            .diff(stock.getScores().get(0).getDiff())
                             .build();
                     })
                     .collect(Collectors.toList()));
@@ -187,6 +188,7 @@ public class StockService {
                             .stockId(stock.getId())
                             .symbolName(stock.getSymbolName())
                             .score(stock.getScores().get(0).getScoreOversea())
+                            .diff(stock.getScores().get(0).getDiff())
                             .build();
                     })
                     .collect(Collectors.toList()));
