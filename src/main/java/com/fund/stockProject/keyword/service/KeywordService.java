@@ -10,6 +10,8 @@ import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockInfoResponse;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.service.SecurityService;
+
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -17,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Mono;
 
 @Service
 @RequiredArgsConstructor
@@ -93,8 +94,19 @@ public class KeywordService {
     }
 
     public List<String> findKeywordRanking() {
-        final List<Keyword> top10Keywords = keywordRepository.findKeywords(PageRequest.of(0, 100));
+        // 현재 날짜와 어제 날짜를 선언
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
 
-        return top10Keywords.stream().map(Keyword::getName).filter(this::isValidKeyword).distinct().limit(10).toList();
+        // top 100 키워드를 조회 (오늘 또는 어제 날짜 조건을 포함)
+        final List<Keyword> topKeywords = keywordRepository.findKeywords(today, yesterday, PageRequest.of(0, 100));
+
+        // 유효한 키워드를 필터링하고 상위 10개만 반환
+        return topKeywords.stream()
+                          .map(Keyword::getName)
+                          .filter(this::isValidKeyword)
+                          .distinct()
+                          .limit(10)
+                          .toList();
     }
 }

@@ -32,7 +32,11 @@ public interface KeywordRepository extends JpaRepository<Keyword, Integer> {
     List<Keyword> findKeywordsByStockId(@Param("stockId") Integer stockId, Pageable pageable);
 
     @Query("SELECT k " +
-        "FROM Keyword k " +
-        "ORDER BY k.frequency DESC")
-    List<Keyword> findKeywords(PageRequest pageRequest);
+           "FROM Keyword k " +
+           "WHERE k.lastUsedAt = :today " +
+           "OR (k.lastUsedAt = :yesterday AND NOT EXISTS (SELECT 1 FROM Keyword k2 WHERE k2.lastUsedAt = :today)) " +
+           "ORDER BY k.frequency DESC")
+    List<Keyword> findKeywords(@Param("today") LocalDate today,
+                               @Param("yesterday") LocalDate yesterday,
+                               PageRequest pageRequest);
 }
