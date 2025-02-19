@@ -49,8 +49,7 @@ management:
       enabled: true
     prometheus:
       enabled: true
-
-endpoints:
-  web:
-    exposure:
-      include: health, info, metrics, prometheus
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
