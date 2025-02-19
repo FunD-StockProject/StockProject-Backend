@@ -64,7 +64,7 @@ dependencies {
 	implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.0'
 
 	// spring actuator
-	implementation 'org.springframework.boot:spring-boot-stater-actuator'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
 	// prometheus
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
