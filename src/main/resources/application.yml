@@ -43,7 +43,7 @@ security:
 
 management:
   server:
-    port: ENC(YM5iuhoueUzsQ7Cd5Prbug==)
+    port: 9090
   endpoint:
     metrics:
       enabled: true
