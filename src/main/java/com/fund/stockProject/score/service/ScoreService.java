@@ -50,20 +50,21 @@ public class ScoreService {
     public ScoreResponse getScoreById(Integer id, COUNTRY country) {
         // 첫 인간지표인경우
         if (isFirst(id)) {
-            Stock stock = stockRepository.findById(id).orElseThrow(() -> new RuntimeException("Could not find stock"));
+            Stock stock = stockRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Could not find stock"));
             // STEP1: AI 실행
             int finalScore = executeScoreAI(stock.getSymbol(), country);
 
             // STEP2: SCORE 데이터 저장
             Score newScore = Score.builder()
-                                  .stockId(stock.getId())
-                                  .date(LocalDate.now())
-                                  .scoreKorea(country == COUNTRY.KOREA? finalScore : 9999)
-                                  .scoreNaver(finalScore)
-                                  .scoreReddit(9999)
-                                  .scoreOversea(country == COUNTRY.OVERSEA? finalScore : 9999)
-                                  .diff(0)
-                                  .build();
+                .stockId(stock.getId())
+                .date(LocalDate.now())
+                .scoreKorea(country == COUNTRY.KOREA ? finalScore : 9999)
+                .scoreNaver(finalScore)
+                .scoreReddit(9999)
+                .scoreOversea(country == COUNTRY.OVERSEA ? finalScore : 9999)
+                .diff(0)
+                .build();
             // `stock` 연관 설정
             newScore.setStock(stock);
             scoreRepository.save(newScore);
@@ -72,26 +73,62 @@ public class ScoreService {
             scoreRepository.deleteByStockIdAndDate(id, LocalDate.of(1111, 11, 11));
 
             return ScoreResponse.builder()
-                                .score(finalScore)
-                                .build();
+                .score(finalScore)
+                .build();
+        } else if (isDateExist(id)) {
+            Stock stock = stockRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Could not find stock"));
+            // STEP1: AI 실행
+            int finalScore = executeScoreAI(stock.getSymbol(), country);
+
+            // STEP2: SCORE 데이터 저장
+            Score newScore = Score.builder()
+                .stockId(stock.getId())
+                .date(LocalDate.now())
+                .scoreKorea(country == COUNTRY.KOREA ? finalScore : 9999)
+                .scoreNaver(finalScore)
+                .scoreReddit(9999)
+                .scoreOversea(country == COUNTRY.OVERSEA ? finalScore : 9999)
+                .diff(0)
+                .build();
+            // `stock` 연관 설정
+            newScore.setStock(stock);
+            scoreRepository.save(newScore);
+
+            return ScoreResponse.builder()
+                .score(finalScore)
+                .build();
         } else {
             // 첫 인간지표가 아닌 경우: 오늘 날짜 데이터를 조회
             LocalDate today = LocalDate.now();
             Score score = scoreRepository.findByStockIdAndDate(id, today)
-                                         .orElseGet(() -> {
-                                             // 오늘 데이터가 없으면 하루 전 날짜 데이터 조회
-                                             LocalDate yesterday = today.minusDays(1);
-                                             return scoreRepository.findByStockIdAndDate(id, yesterday)
-                                                                   .orElseThrow(() -> new RuntimeException("Score not found for stock_id: " + id + " and date: " + today + " or " + yesterday));
-                                         });
+                .orElseGet(() -> {
+                    // 오늘 데이터가 없으면 하루 전 날짜 데이터 조회
+                    LocalDate yesterday = today.minusDays(1);
+                    return scoreRepository.findByStockIdAndDate(id, yesterday)
+                        .orElseThrow(() -> new RuntimeException(
+                            "Score not found for stock_id: " + id + " and date: " + today + " or "
+                                + yesterday));
+                });
 
             // country에 따라 점수 선택
-            int scoreValue = (country == COUNTRY.KOREA) ? score.getScoreKorea() : score.getScoreOversea();
+            int scoreValue =
+                (country == COUNTRY.KOREA) ? score.getScoreKorea() : score.getScoreOversea();
 
             return ScoreResponse.builder()
-                                .score(scoreValue)
-                                .build();
+                .score(scoreValue)
+                .build();
         }
+    }
+
+    private boolean isDateExist(Integer id) {
+        LocalDate today = LocalDate.now();
+
+        Score score = scoreRepository.findByStockIdAndDate(id, today)
+            .orElseGet(
+                () -> scoreRepository.findByStockIdAndDate(id, today.minusDays(1)).orElse(null));
+
+        return score == null;
     }
 
 
@@ -99,22 +136,26 @@ public class ScoreService {
         try {
             String scriptPath = "wc.py";
 
-            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol, country.toString());
+            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol,
+                country.toString());
             processBuilder.redirectErrorStream(true);
             Process process = processBuilder.start();
 
             // Asynchronously read the script output
             String output = Executors.newSingleThreadExecutor().submit(() -> {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()));
                 return reader.lines()
-                             .filter(line -> line.trim().startsWith("{") && line.trim().endsWith("}")) // JSON format filtering
-                             .collect(Collectors.joining("\n"));
+                    .filter(line -> line.trim().startsWith("{") && line.trim()
+                        .endsWith("}")) // JSON format filtering
+                    .collect(Collectors.joining("\n"));
             }).get(60, TimeUnit.SECONDS); // Maximum 60 seconds wait
 
             // Check the process exit code
             int exitCode = process.waitFor();
             if (exitCode != 0) {
-                throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
+                throw new RuntimeException(
+                    "Python script execution failed with exit code: " + exitCode);
             }
 
             // Parse the JSON output from the Python script
@@ -139,7 +180,7 @@ public class ScoreService {
     public ScoreIndexResponse getIndexScore() {
         // 심볼 리스트 정의
         List<String> symbols = List.of(
-                "KOSPI_INDEX", "KOSDAQ_INDEX", "SNP500_INDEX", "NASDAQ_INDEX", "KOSPI_VIX", "SNP500_VIX"
+            "KOSPI_INDEX", "KOSDAQ_INDEX", "SNP500_INDEX", "NASDAQ_INDEX", "KOSPI_VIX", "SNP500_VIX"
         );
 
         // 오늘과 어제 날짜 계산
@@ -157,15 +198,16 @@ public class ScoreService {
         for (String symbol : symbols) {
             // Stock 객체 가져오기
             Stock stock = stockRepository.findBySymbol(symbol)
-                                         .orElseThrow(() -> new RuntimeException("Stock not found for symbol: " + symbol));
+                .orElseThrow(() -> new RuntimeException("Stock not found for symbol: " + symbol));
 
             // 오늘 날짜 점수 조회
             Score score = scoreRepository.findByStockIdAndDate(stock.getId(), today)
-                                         .orElseGet(() -> {
-                                             // 오늘 데이터가 없으면 어제 날짜 데이터 조회
-                                             return scoreRepository.findByStockIdAndDate(stock.getId(), yesterday)
-                                                                   .orElseThrow(() -> new RuntimeException("Score not found for stock: " + stock.getId()));
-                                         });
+                .orElseGet(() -> {
+                    // 오늘 데이터가 없으면 어제 날짜 데이터 조회
+                    return scoreRepository.findByStockIdAndDate(stock.getId(), yesterday)
+                        .orElseThrow(() -> new RuntimeException(
+                            "Score not found for stock: " + stock.getId()));
+                });
 
             // 각 심볼에 따라 점수 할당
             switch (symbol) {
@@ -198,12 +240,12 @@ public class ScoreService {
 
         // ScoreIndexResponse 생성 및 반환
         return new ScoreIndexResponse(
-                kospiVix, kospiVixDiff,
-                kospiIndex, kospiIndexDiff,
-                kosdaqIndex, kosdaqIndexDiff,
-                snpVix, snpVixDiff,
-                snpIndex, snpIndexDiff,
-                nasdaqIndex, nasdaqIndexDiff
+            kospiVix, kospiVixDiff,
+            kospiIndex, kospiIndexDiff,
+            kosdaqIndex, kosdaqIndexDiff,
+            snpVix, snpVixDiff,
+            snpIndex, snpIndexDiff,
+            nasdaqIndex, nasdaqIndexDiff
         );
     }
 
@@ -211,7 +253,7 @@ public class ScoreService {
     @Transactional
     public void updateScoreAndKeyword(Integer id, COUNTRY country, int yesterdayScore) {
         Stock stock = stockRepository.findById(id)
-                                     .orElseThrow(() -> new RuntimeException("Could not find stock"));
+            .orElseThrow(() -> new RuntimeException("Could not find stock"));
         try {
             // STEP1: AI 결과 가져오기
             ScoreKeywordResponse scoreKeywordResponse = executeUpdateAI(stock.getSymbol(), country);
@@ -219,14 +261,14 @@ public class ScoreService {
             // STEP2: SCORE 데이터 저장
             int finalScore = scoreKeywordResponse.getFinalScore();
             Score newScore = Score.builder()
-                                  .stockId(stock.getId())
-                                  .date(LocalDate.now())
-                                  .scoreKorea(country == COUNTRY.KOREA? finalScore : 9999)
-                                  .scoreNaver(finalScore)
-                                  .scoreReddit(9999)
-                                  .scoreOversea(country == COUNTRY.OVERSEA? finalScore : 9999)
-                                  .diff(finalScore - yesterdayScore)
-                                  .build();
+                .stockId(stock.getId())
+                .date(LocalDate.now())
+                .scoreKorea(country == COUNTRY.KOREA ? finalScore : 9999)
+                .scoreNaver(finalScore)
+                .scoreReddit(9999)
+                .scoreOversea(country == COUNTRY.OVERSEA ? finalScore : 9999)
+                .diff(finalScore - yesterdayScore)
+                .build();
 
             // `stock` 연관 설정
             newScore.setStock(stock);
@@ -236,17 +278,17 @@ public class ScoreService {
             stockKeywordRepository.deleteByStock(stock);
             scoreKeywordResponse.getTopKeywords().forEach(keywordDto -> {
                 Keyword newKeyword = Keyword.builder()
-                                            .name(keywordDto.getWord())
-                                            .frequency(keywordDto.getFreq())
-                                            .build();
+                    .name(keywordDto.getWord())
+                    .frequency(keywordDto.getFreq())
+                    .build();
 
                 keywordRepository.save(newKeyword);
 
                 // StockKeyword 테이블에 매핑 정보 저장
                 StockKeyword stockKeyword = StockKeyword.builder()
-                                                        .stock(stock)
-                                                        .keyword(newKeyword)
-                                                        .build();
+                    .stock(stock)
+                    .keyword(newKeyword)
+                    .build();
                 stockKeywordRepository.save(stockKeyword);
             });
         } catch (Exception e) {
@@ -262,12 +304,12 @@ public class ScoreService {
 
             // STEP 2: 심볼과 결과값 매핑
             Map<String, String> symbolMapping = Map.of(
-                    "kospi", "KOSPI_INDEX",
-                    "kosdaq", "KOSDAQ_INDEX",
-                    "snp500", "SNP500_INDEX",
-                    "nasdaq", "NASDAQ_INDEX",
-                    "vixKospi", "KOSPI_VIX",
-                    "vixSnp", "SNP500_VIX"
+                "kospi", "KOSPI_INDEX",
+                "kosdaq", "KOSDAQ_INDEX",
+                "snp500", "SNP500_INDEX",
+                "nasdaq", "NASDAQ_INDEX",
+                "vixKospi", "KOSPI_VIX",
+                "vixSnp", "SNP500_VIX"
             );
 
             // STEP 3: 매핑된 데이터로 점수 업데이트
@@ -277,27 +319,28 @@ public class ScoreService {
 
                 // Stock 찾기
                 Stock stock = stockRepository.findBySymbol(stockSymbol)
-                                             .orElseThrow(() -> new RuntimeException("Stock not found for symbol: " + stockSymbol));
+                    .orElseThrow(
+                        () -> new RuntimeException("Stock not found for symbol: " + stockSymbol));
 
                 // 어제 날짜 점수 조회 (없으면 기본값 0)
                 LocalDate yesterday = LocalDate.now().minusDays(1);
                 int yesterdayScore = scoreRepository.findByStockIdAndDate(stock.getId(), yesterday)
-                                                    .map(Score::getScoreKorea)
-                                                    .orElse(0);
+                    .map(Score::getScoreKorea)
+                    .orElse(0);
 
                 // 오늘 점수 가져오기
                 int finalScore = indexScores.getOrDefault(resultKey, 0);
 
                 // 점수 저장
                 Score newScore = Score.builder()
-                                      .stockId(stock.getId())
-                                      .date(LocalDate.now())
-                                      .scoreKorea(finalScore)
-                                      .scoreNaver(finalScore)
-                                      .scoreReddit(9999)
-                                      .scoreOversea(finalScore)
-                                      .diff(finalScore - yesterdayScore)
-                                      .build();
+                    .stockId(stock.getId())
+                    .date(LocalDate.now())
+                    .scoreKorea(finalScore)
+                    .scoreNaver(finalScore)
+                    .scoreReddit(9999)
+                    .scoreOversea(finalScore)
+                    .diff(finalScore - yesterdayScore)
+                    .build();
                 newScore.setStock(stock);
                 scoreRepository.save(newScore);
             }
@@ -320,17 +363,21 @@ public class ScoreService {
             Process process = processBuilder.start();
 
             // Python 출력 읽기
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream()));
             String output = reader.lines().collect(Collectors.joining("\n"));
             int exitCode = process.waitFor();
 
             if (exitCode != 0) {
-                throw new RuntimeException("Python script execution failed with exit code: " + exitCode + "\nOutput: " + output);
+                throw new RuntimeException(
+                    "Python script execution failed with exit code: " + exitCode + "\nOutput: "
+                        + output);
             }
 
             // JSON 파싱
             ObjectMapper objectMapper = new ObjectMapper();
-            Map<String, Integer> result = objectMapper.readValue(output, new TypeReference<>() {});
+            Map<String, Integer> result = objectMapper.readValue(output, new TypeReference<>() {
+            });
             return result;
 
         } catch (Exception e) {
@@ -344,22 +391,26 @@ public class ScoreService {
             String scriptPath = "score.py";
 
             // ProcessBuilder를 사용하여 Python 스크립트 실행
-            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol, country.toString());
+            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol,
+                country.toString());
             processBuilder.redirectErrorStream(true);
             Process process = processBuilder.start();
 
             // 비동기 스트림 읽기
             String output = Executors.newSingleThreadExecutor().submit(() -> {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()));
                 return reader.lines()
-                             .filter(line -> line.trim().startsWith("{") && line.trim().endsWith("}")) // JSON 형식 필터링
-                             .collect(Collectors.joining("\n"));
+                    .filter(line -> line.trim().startsWith("{") && line.trim()
+                        .endsWith("}")) // JSON 형식 필터링
+                    .collect(Collectors.joining("\n"));
             }).get(60, TimeUnit.SECONDS); // 최대 120초 대기
 
             // 프로세스 종료 코드 확인
             int exitCode = process.waitFor();
             if (exitCode != 0) {
-                throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
+                throw new RuntimeException(
+                    "Python script execution failed with exit code: " + exitCode);
             }
 
             // Python 스크립트에서 출력된 JSON 파싱
@@ -378,20 +429,23 @@ public class ScoreService {
             String scriptPath = "update.py";
 
             // ProcessBuilder를 사용하여 Python 스크립트 실행
-            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol, country.toString());
+            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol,
+                country.toString());
             processBuilder.redirectErrorStream(true);
             Process process = processBuilder.start();
 
             // 비동기 스트림 읽기
             String output = Executors.newSingleThreadExecutor().submit(() -> {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()));
                 return reader.lines().collect(Collectors.joining("\n"));
             }).get(60, TimeUnit.SECONDS); // 최대 60초 대기
 
             // 프로세스 종료 코드 확인
             int exitCode = process.waitFor();
             if (exitCode != 0) {
-                throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
+                throw new RuntimeException(
+                    "Python script execution failed with exit code: " + exitCode);
             }
 
             // Python 스크립트에서 출력된 JSON 파싱
@@ -416,12 +470,12 @@ public class ScoreService {
     @Transactional(readOnly = true)
     public List<KeywordDto> getKeywordsByStock(Integer stockId) {
         Stock stock = stockRepository.findById(stockId)
-                                     .orElseThrow(() -> new RuntimeException("Stock not found"));
+            .orElseThrow(() -> new RuntimeException("Stock not found"));
 
         return stockKeywordRepository.findByStock(stock)
-                                     .stream()
-                                     .map(stockKeyword -> new KeywordDto(stockKeyword.getKeyword().getName(),
-                                                                         stockKeyword.getKeyword().getFrequency()))
-                                     .collect(Collectors.toList());
+            .stream()
+            .map(stockKeyword -> new KeywordDto(stockKeyword.getKeyword().getName(),
+                stockKeyword.getKeyword().getFrequency()))
+            .collect(Collectors.toList());
     }
 }
