@@ -21,7 +21,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                    sudo cp /home/ubuntu/keystore.p12 ${WORKSPACE}/keystore.p12
+                    cp /home/ubuntu/keystore.p12 ${WORKSPACE}/keystore.p12
                     """
                 }
             }
