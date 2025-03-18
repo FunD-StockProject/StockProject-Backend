@@ -43,13 +43,12 @@ security:
 
 management:
   server:
-    port: 9090
-  endpoint:
-    metrics:
-      enabled: true
-    prometheus:
-      enabled: true
+    port: 9292
   endpoints:
+    enabled-by-default: false
     web:
       exposure:
         include: health, info, metrics, prometheus
+  endpoint:
+    prometheus:
+      enabled: true
