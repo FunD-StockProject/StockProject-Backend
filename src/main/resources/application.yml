@@ -42,8 +42,6 @@ security:
   appsecret: ENC(cYfISHcPzRSI2OO/N17vf9MD7OOqfp8Zq8+DcsXY+X7PTpbECdwqEDXclOlJfWUwhYZl8yy5bSwvuveEOPpxd5LFg5NtQWIcV63oWdPBzZmaGeJIvu8owdrJd5V07EJWNAHl9z4dZ6nTNTKCgahQ/o6Gy15FHDwFk99hM1TgZzvZ7h1hOsKZt9xbvZvLMtq3UbumkxrCGLbJHSUYK2EhmVXsC6GQmZwSAKJdxAzIvB2PKUDwu3eI5RXcxDyhzRzd)
 
 management:
-  server:
-    port: 9292
   endpoints:
     enabled-by-default: false
     web:
