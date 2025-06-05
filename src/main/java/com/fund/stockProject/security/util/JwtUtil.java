@@ -16,6 +16,14 @@ public class JwtUtil {
 
     private final SecretKey secretKey;
 
+    public static final String JWT_CATEGORY_ACCESS = "access";
+    public static final String JWT_CATEGORY_REFRESH = "refresh";
+    public static final String JWT_CATEGORY_TEMP = "temp";
+    public static final String ACCESS_TOKEN_COOKIE_NAME = "ACCESS-TOKEN";
+    public static final String REFRESH_TOKEN_COOKIE_NAME = "REFRESH-TOKEN";
+    public static final String TEMP_TOKEN_COOKIE_NAME = "TEMP-TOKEN";
+    public static final String CSRF_TOKEN_COOKIE_NAME = "CSRF-TOKEN";
+
     public JwtUtil(@Value("${spring.jwt.secret}") String secret) {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }

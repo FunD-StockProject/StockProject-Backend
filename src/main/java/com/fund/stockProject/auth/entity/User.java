@@ -5,9 +5,12 @@ import com.fund.stockProject.auth.domain.PROVIDER;
 import com.fund.stockProject.auth.domain.ROLE;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.cglib.core.Local;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -27,7 +30,7 @@ public class User extends Core {
 
     private String nickname;
 
-    private String birthDate;
+    private LocalDate birthDate;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -45,7 +48,17 @@ public class User extends Core {
 
     private LocalDateTime accessTokenExpiresAt;
 
-    public void updateSocialUserInfo(String nickname, String birthDate) {
+    @Builder
+    public User(String email, String password, String nickname, LocalDate birthDate, ROLE role, PROVIDER provider) {
+        this.email = email;
+        this.password = password;
+        this.nickname = nickname;
+        this.birthDate = birthDate;
+        this.role = role;
+        this.provider = provider;
+    }
+
+    public void updateSocialUserInfo(String nickname, LocalDate birthDate) {
         if (nickname != null && !nickname.trim().isEmpty()) {
             this.nickname = nickname;
         }
