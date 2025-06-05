@@ -1,8 +1,8 @@
-package com.fund.stockProject.user.entity;
+package com.fund.stockProject.auth.entity;
 
 import com.fund.stockProject.global.entity.Core;
-import com.fund.stockProject.user.domain.PROVIDER;
-import com.fund.stockProject.user.domain.ROLE;
+import com.fund.stockProject.auth.domain.PROVIDER;
+import com.fund.stockProject.auth.domain.ROLE;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

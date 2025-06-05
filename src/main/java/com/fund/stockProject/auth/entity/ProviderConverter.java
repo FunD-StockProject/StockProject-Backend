@@ -1,6 +1,6 @@
-package com.fund.stockProject.user.entity;
+package com.fund.stockProject.auth.entity;
 
-import com.fund.stockProject.user.domain.PROVIDER;
+import com.fund.stockProject.auth.domain.PROVIDER;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 

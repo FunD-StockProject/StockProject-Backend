@@ -1,4 +1,4 @@
-package com.fund.stockProject.user.domain;
+package com.fund.stockProject.auth.domain;
 
 public enum PROVIDER {
     LOCAL("local"), // 필요하다면 "local" 문자열도 정의할 수 있습니다.

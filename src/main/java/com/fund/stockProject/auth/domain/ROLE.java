@@ -1,4 +1,4 @@
-package com.fund.stockProject.user.domain;
+package com.fund.stockProject.auth.domain;
 
 public enum ROLE {
     ROLE_USER,
