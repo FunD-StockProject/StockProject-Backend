@@ -26,6 +26,8 @@ import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.Iterator;
 
+import static com.fund.stockProject.global.config.SecurityConfig.DOMAIN_ADDRESS;
+
 @Component
 @RequiredArgsConstructor
 public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
@@ -86,14 +88,14 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             tokenService.issueTempTokenForNewUser(response, email, role);
             // 새로운 사용자일 경우 회원가입 완료 페이지 등으로 리다이렉트
             // TODO: 실제 회원가입 완료 페이지 URL로 변경 필요
-            targetUrl = UriComponentsBuilder.fromUriString("http://localhost:3000/auth/join")
+            targetUrl = UriComponentsBuilder.fromUriString(DOMAIN_ADDRESS + "/auth/join")
                     .queryParam("email", URLEncoder.encode(customPrincipal.getUserEmail(), StandardCharsets.UTF_8))
                     .build().toUriString();
         } else {
             // 기존 사용자일 경우 메인 페이지 또는 로그인 완료 페이지 등으로 리다이렉트
             tokenService.issueTokensOnLogin(response, null, email, role);
-            // TODO: 실제 메인 페이지 URL로 변경 필요q
-            targetUrl = UriComponentsBuilder.fromUriString("http://localhost:3000/home")
+            // TODO: 실제 메인 페이지 URL로 변경 필요
+            targetUrl = UriComponentsBuilder.fromUriString(DOMAIN_ADDRESS + "/mypage")
                     .build().toUriString();
         }
 

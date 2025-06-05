@@ -29,7 +29,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.authentication.logout.LogoutFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 
@@ -52,6 +51,8 @@ public class SecurityConfig {
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
     //private final LogoutSuccessHandler logoutSuccessHandler;
     private final RefreshRepository refreshRepository;
+
+    public final static String DOMAIN_ADDRESS = "https://humanzipyo.com"; // TODO: 실제 도메인으로 변경 필요
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
@@ -82,7 +83,7 @@ public class SecurityConfig {
                     @Override
                     public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
                         CorsConfiguration config = new CorsConfiguration();
-                        config.setAllowedOrigins(Collections.singletonList("http://localhost:3000")); // TODO: 실제 도메인으로 변경 필요
+                        config.setAllowedOrigins(Collections.singletonList(DOMAIN_ADDRESS));
                         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                         config.setAllowCredentials(true);
                         config.setAllowedHeaders(Collections.singletonList("*"));
@@ -99,9 +100,42 @@ public class SecurityConfig {
                 .httpBasic((auth) -> auth.disable());
         http
                 .authorizeHttpRequests((auth) -> auth
-                        .requestMatchers("/error", "/reissue", "/favicon.ico",
-                                "/auth/register","/auth/oauth2/register","/auth/oauth2/naver", "/auth/oauth2/kakao", "/auth/oauth2/google").permitAll()
-                        .anyRequest().authenticated());
+                        .requestMatchers(
+                                "/error",
+                                "/reissue",
+                                "/favicon.ico",
+                                "/auth/register",
+                                "/auth/oauth2/register",
+                                "/auth/oauth2/naver",
+                                "/auth/oauth2/kakao",
+                                "/auth/oauth2/google",
+                                "/keyword/**/stocks",
+                                "/keyword/popular/**",
+                                "/keyword/rankings",
+                                "/**/score/**",
+                                "/wordcloud/**/**",
+                                "/**/keywords",
+                                "/score/index",
+                                "/stock/search/**/**",
+                                "/stock/autocomplete",
+                                "/stock/hot/**",
+                                "/stock/rising/**",
+                                "/stock/descent/**",
+                                "/stock/**/relevant",
+                                "/stock/**/chart/**",
+                                "/stock/**/info/**",
+                                "/stock/category/**/**",
+                                "/stock/rankings/hot",
+                                "/stock/summary/**/**"
+                        ).permitAll() // 이 경로들은 모두 인증 없이 접근 허용
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-resources/**",
+                                "/webjars/**"
+                        ).permitAll() // Swagger 관련 경로는 모두 인증 없이 접근 허용
+                        .anyRequest().authenticated() // 그 외 모든 요청은 인증 필요
+                );
         http
                 .sessionManagement((session) -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -138,17 +172,11 @@ public class SecurityConfig {
                         //.logoutSuccessHandler(logoutSuccessHandler)
                         .permitAll());
 
-        // 이거 다시 보기
         http.exceptionHandling(exception -> exception
                 .authenticationEntryPoint(customAuthenticationEntryPoint)
         );
 
         return http.build();
-    }
-
-    @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
     }
 
     @Bean
