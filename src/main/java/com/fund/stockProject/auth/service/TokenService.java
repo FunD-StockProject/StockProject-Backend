@@ -42,7 +42,7 @@ public class TokenService {
      */
     public void issueTempTokenForNewUser(HttpServletResponse response, String email, String role) {
         // 임시 토큰 생성 (짧은 만료시간, TEMP 카테고리)
-        String tempToken = jwtUtil.createJwt("TEMP", email, role, TEMP_TOKEN_EXPIRATION_MS);
+        String tempToken = jwtUtil.createJwt(JWT_CATEGORY_TEMP, email, role, TEMP_TOKEN_EXPIRATION_MS);
 
         // 임시 토큰을 HttpOnly, Secure, SameSite 쿠키에 설정
         ResponseCookie tempTokenCookie = ResponseCookie.from(TEMP_TOKEN_COOKIE_NAME, tempToken)

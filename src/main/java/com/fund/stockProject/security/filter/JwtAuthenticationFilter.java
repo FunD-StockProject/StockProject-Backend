@@ -37,10 +37,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     // 임시 토큰으로 접근 가능한 경로들
     private static final List<String> TEMP_TOKEN_ALLOWED_PATHS = Arrays.asList(
-            "/auth/social/register",      // 소셜 로그인 후 회원가입 완료 페이지
-            "/auth/oauth2/kakao",         // 카카오 OAuth2 콜백
-            "/auth/oauth2/naver",         // 네이버 OAuth2 콜백
-            "/auth/oauth2/google",        // 구글 OAuth2 콜백
+            "/auth/oauth2/",
             "/oauth2/authorization",       // OAuth2 인가 기본 경로 (이하 모든 경로 허용)
             "/login/oauth2"
     );

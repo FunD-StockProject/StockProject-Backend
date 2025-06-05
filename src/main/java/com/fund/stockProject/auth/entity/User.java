@@ -48,22 +48,36 @@ public class User extends Core {
 
     private LocalDateTime accessTokenExpiresAt;
 
+//    @Builder
+//    public User(String email, String password, String nickname, LocalDate birthDate, ROLE role, PROVIDER provider) {
+//        this.email = email;
+//        this.password = password;
+//        this.nickname = nickname;
+//        this.birthDate = birthDate;
+//        this.role = role;
+//        this.provider = provider;
+//    }
+
     @Builder
-    public User(String email, String password, String nickname, LocalDate birthDate, ROLE role, PROVIDER provider) {
+    public User(String email, String password, String nickname, LocalDate birthDate, ROLE role, PROVIDER provider, String providerId) {
         this.email = email;
         this.password = password;
         this.nickname = nickname;
         this.birthDate = birthDate;
         this.role = role;
         this.provider = provider;
+        this.providerId = providerId;
     }
 
-    public void updateSocialUserInfo(String nickname, LocalDate birthDate) {
+    public void updateSocialUserInfo(String nickname, LocalDate birthDate, ROLE role) {
         if (nickname != null && !nickname.trim().isEmpty()) {
             this.nickname = nickname;
         }
         if (birthDate != null) {
             this.birthDate = birthDate;
+        }
+        if (role != null) {
+            this.role = role;
         }
     }
 

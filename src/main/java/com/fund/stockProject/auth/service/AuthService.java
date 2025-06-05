@@ -58,7 +58,8 @@ public class AuthService {
 
         user.updateSocialUserInfo(
                 oAuth2RegisterRequest.getNickname(),
-                oAuth2RegisterRequest.getBirthDate()
+                oAuth2RegisterRequest.getBirthDate(),
+                ROLE_USER
         );
 
         userRepository.save(user);

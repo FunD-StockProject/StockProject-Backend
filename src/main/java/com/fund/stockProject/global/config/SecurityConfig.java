@@ -4,15 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.auth.repository.HttpCookieOAuth2AuthorizationRequestRepository;
 import com.fund.stockProject.auth.repository.RefreshRepository;
 import com.fund.stockProject.auth.repository.UserRepository;
+import com.fund.stockProject.auth.service.CustomOAuth2UserService;
+import com.fund.stockProject.security.entrypoint.CustomAuthenticationEntryPoint;
 import com.fund.stockProject.security.filter.CustomLogoutFilter;
 import com.fund.stockProject.security.filter.JwtAuthenticationFilter;
 import com.fund.stockProject.security.filter.JwtLoginFilter;
 import com.fund.stockProject.security.handler.JwtLoginSuccessHandler;
 import com.fund.stockProject.security.handler.LoginFailureHandler;
-import com.fund.stockProject.security.handler.LogoutSuccessHandler;
+import com.fund.stockProject.security.handler.OAuth2LoginSuccessHandler;
 import com.fund.stockProject.security.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -41,13 +42,16 @@ import java.util.Collections;
 public class SecurityConfig {
     private final AuthenticationConfiguration authenticationConfiguration;
     private final JwtUtil jwtUtil;
-//    private final CustomOAuth2UserService customOAuth2UserService;
-//    // 커스텀 핸들러들 직접 등록해줘야 함
-//    private final OAuth2LoginSuccessHandler OAuth2LoginSuccessHandler;
+    private final CustomOAuth2UserService customOAuth2UserService;
+    // 커스텀 핸들러들 직접 등록해줘야 함
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
     private final JwtLoginSuccessHandler jwtLoginSuccessHandler;
     private final LoginFailureHandler loginFailureHandler;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
+    //private final LogoutSuccessHandler logoutSuccessHandler;
+    private final RefreshRepository refreshRepository;
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
@@ -55,7 +59,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, RefreshRepository refreshRepository, LogoutSuccessHandler logoutSuccessHandler) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
         // setCsrfRequestAttributeName(null)은 RequestAttributeHandler가 요청 속성에 CSRF 토큰을 노출하도록 합니다.
         // 이는 CsrfTokenRepository가 쿠키로 토큰을 설정하는 데 도움을 줍니다.
@@ -96,7 +100,7 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests((auth) -> auth
                         .requestMatchers("/error", "/reissue", "/favicon.ico",
-                                "/auth/register","/auth/social/register","/auth/oauth2/naver", "/auth/oauth2/kakao", "/auth/oauth2/google").permitAll()
+                                "/auth/register","/auth/oauth2/register","/auth/oauth2/naver", "/auth/oauth2/kakao", "/auth/oauth2/google").permitAll()
                         .anyRequest().authenticated());
         http
                 .sessionManagement((session) -> session
@@ -117,28 +121,26 @@ public class SecurityConfig {
         http
                 .addFilterAt(new CustomLogoutFilter(jwtUtil, refreshRepository, objectMapper), LogoutFilter.class);
 
-//        http
-//                .oauth2Login((oauth2) -> oauth2
-//                        .userInfoEndpoint((userInfoEndpointConfig) -> userInfoEndpointConfig
-//                                .userService(customOAuth2UserService))
-//                        .successHandler(OAuth2LoginSuccessHandler)
-//                        .failureHandler(loginFailureHandler)
-//                        .authorizationEndpoint(authorization -> authorization
-//                                .authorizationRequestRepository(cookieAuthorizationRequestRepository())
-//                        )
-//                );
+        http
+                .oauth2Login((oauth2) -> oauth2
+                        .userInfoEndpoint((userInfoEndpointConfig) -> userInfoEndpointConfig
+                                .userService(customOAuth2UserService))
+                        .successHandler(oAuth2LoginSuccessHandler)
+                        .failureHandler(loginFailureHandler)
+                        .authorizationEndpoint(authorization -> authorization
+                                .authorizationRequestRepository(cookieAuthorizationRequestRepository())
+                        )
+                );
 
         http
                 .logout((logout) -> logout
                         .logoutUrl("/auth/logout")
-                        .logoutSuccessHandler(logoutSuccessHandler)
+                        //.logoutSuccessHandler(logoutSuccessHandler)
                         .permitAll());
 
         // 이거 다시 보기
         http.exceptionHandling(exception -> exception
-                .authenticationEntryPoint((request, response, authException) -> {
-                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "인증이 필요합니다");
-                })
+                .authenticationEntryPoint(customAuthenticationEntryPoint)
         );
 
         return http.build();
