@@ -13,8 +13,10 @@ import com.fund.stockProject.security.handler.JwtLoginSuccessHandler;
 import com.fund.stockProject.security.handler.LoginFailureHandler;
 import com.fund.stockProject.security.handler.OAuth2LoginSuccessHandler;
 import com.fund.stockProject.security.util.JwtUtil;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -34,6 +36,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -51,8 +54,17 @@ public class SecurityConfig {
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
     //private final LogoutSuccessHandler logoutSuccessHandler;
     private final RefreshRepository refreshRepository;
+    private final DomainConfig domainConfig;
 
-    public final static String DOMAIN_ADDRESS = "https://humanzipyo.com"; // TODO: 실제 도메인으로 변경 필요
+    @PostConstruct
+    public void debugValues() {
+        System.out.println("=== Domain Values Debug ===");
+        System.out.println("prodDomainAddress: " + domainConfig.getProd());
+        System.out.println("testDomainAddress: " + domainConfig.getTest());
+        System.out.println("prodDomainAddress is null: " + (domainConfig.getProd() == null));
+        System.out.println("testDomainAddress is null: " + (domainConfig.getTest() == null));
+        System.out.println("========================");
+    }
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
@@ -83,7 +95,7 @@ public class SecurityConfig {
                     @Override
                     public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
                         CorsConfiguration config = new CorsConfiguration();
-                        config.setAllowedOrigins(Collections.singletonList(DOMAIN_ADDRESS));
+                        config.setAllowedOrigins(List.of(domainConfig.getProd(), domainConfig.getTest()));
                         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                         config.setAllowCredentials(true);
                         config.setAllowedHeaders(Collections.singletonList("*"));
@@ -109,24 +121,24 @@ public class SecurityConfig {
                                 "/auth/oauth2/naver",
                                 "/auth/oauth2/kakao",
                                 "/auth/oauth2/google",
-                                "/keyword/**/stocks",
-                                "/keyword/popular/**",
+                                "/keyword/{keywordName}/stocks",
+                                "/keyword/popular/{country}",
                                 "/keyword/rankings",
-                                "/**/score/**",
-                                "/wordcloud/**/**",
-                                "/**/keywords",
+                                "/{id}/score/{country}",
+                                "/wordcloud/{symbol}/{country}",
+                                "/{id}/keywords",
                                 "/score/index",
-                                "/stock/search/**/**",
+                                "/stock/search/{searchKeyword}/{country}",
                                 "/stock/autocomplete",
-                                "/stock/hot/**",
-                                "/stock/rising/**",
-                                "/stock/descent/**",
-                                "/stock/**/relevant",
-                                "/stock/**/chart/**",
-                                "/stock/**/info/**",
-                                "/stock/category/**/**",
+                                "/stock/hot/{country}",
+                                "/stock/rising/{country}",
+                                "/stock/descent/{country}",
+                                "/stock/{id}/relevant",
+                                "/stock/{id}/chart/{country}",
+                                "/stock/{id}/info/{country}",
+                                "/stock/category/{category}/{country}",
                                 "/stock/rankings/hot",
-                                "/stock/summary/**/**"
+                                "/stock/summary/{symbol}/{country}"
                         ).permitAll() // 이 경로들은 모두 인증 없이 접근 허용
                         .requestMatchers(
                                 "/v3/api-docs/**",

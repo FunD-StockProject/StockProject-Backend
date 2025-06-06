@@ -3,6 +3,7 @@ package com.fund.stockProject.security.handler;
 import com.fund.stockProject.auth.entity.User;
 import com.fund.stockProject.auth.repository.UserRepository;
 import com.fund.stockProject.auth.service.TokenService;
+import com.fund.stockProject.global.config.DomainConfig;
 import com.fund.stockProject.security.principle.CustomPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,14 +27,13 @@ import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.Iterator;
 
-import static com.fund.stockProject.global.config.SecurityConfig.DOMAIN_ADDRESS;
-
 @Component
 @RequiredArgsConstructor
 public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final OAuth2AuthorizedClientService authorizedClientService; // OAuth2AuthorizedClientService는 OAuth2 로그인 성공 후 사용자 정보를 가져오는 데 사용됩니다.
     private final TokenService tokenService;
     private final UserRepository userRepository;
+    private final DomainConfig domainConfig;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
@@ -88,14 +88,14 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             tokenService.issueTempTokenForNewUser(response, email, role);
             // 새로운 사용자일 경우 회원가입 완료 페이지 등으로 리다이렉트
             // TODO: 실제 회원가입 완료 페이지 URL로 변경 필요
-            targetUrl = UriComponentsBuilder.fromUriString(DOMAIN_ADDRESS + "/auth/join")
+            targetUrl = UriComponentsBuilder.fromUriString(domainConfig.getProd() + "/auth/join")
                     .queryParam("email", URLEncoder.encode(customPrincipal.getUserEmail(), StandardCharsets.UTF_8))
                     .build().toUriString();
         } else {
             // 기존 사용자일 경우 메인 페이지 또는 로그인 완료 페이지 등으로 리다이렉트
             tokenService.issueTokensOnLogin(response, null, email, role);
             // TODO: 실제 메인 페이지 URL로 변경 필요
-            targetUrl = UriComponentsBuilder.fromUriString(DOMAIN_ADDRESS + "/mypage")
+            targetUrl = UriComponentsBuilder.fromUriString(domainConfig.getProd() + "/mypage")
                     .build().toUriString();
         }
 
