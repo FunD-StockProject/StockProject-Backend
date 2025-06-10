@@ -6,6 +6,7 @@ import com.fund.stockProject.auth.repository.UserRepository;
 import com.fund.stockProject.security.principle.CustomPrincipal;
 import com.fund.stockProject.security.util.CookieUtil;
 import com.fund.stockProject.security.util.JwtUtil;
+import com.fund.stockProject.security.util.ResponseUtil;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureException;
@@ -16,6 +17,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -33,7 +35,7 @@ import static com.fund.stockProject.security.util.JwtUtil.*;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
-    private final ObjectMapper objectMapper;
+    private final ResponseUtil responseUtil;
 
     // 임시 토큰으로 접근 가능한 경로들
     private static final List<String> TEMP_TOKEN_ALLOWED_PATHS = Arrays.asList(
@@ -64,7 +66,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (accessToken != null) {
             tokenToProcess = accessToken;
-            isTempToken = false;
         } else if (tempToken != null) {
             tokenToProcess = tempToken;
             isTempToken = true;
@@ -95,26 +96,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (ExpiredJwtException e) {
             SecurityContextHolder.clearContext();
             if (isTempToken) {
-                sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Temporary token expired");
+                responseUtil.sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "Temporary token expired");
             } else {
-                sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Access token expired");
+                responseUtil.sendErrorResponse(response, HttpStatus.FORBIDDEN, "Access token expired");
             }
 
-        } catch (SignatureException | MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
+        } catch (MalformedJwtException | UnsupportedJwtException | IllegalArgumentException |
+                 UsernameNotFoundException e) {
             SecurityContextHolder.clearContext();
             filterChain.doFilter(request, response);
-            return;
-
-        } catch (UsernameNotFoundException e) {
-            SecurityContextHolder.clearContext();
-            filterChain.doFilter(request, response);
-            return;
 
         } catch (Exception e) {
             logger.error("An unexpected error occurred during JWT authentication", e);
             SecurityContextHolder.clearContext();
-            sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Authentication error");
-            return;
+            responseUtil.sendErrorResponse(response, HttpStatus.INTERNAL_SERVER_ERROR, "Authentication error");
         }
     }
 
@@ -136,7 +131,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String requestURI = request.getRequestURI();
         if (!isAllowedPathForTempToken(requestURI)) {
             SecurityContextHolder.clearContext();
-            sendErrorResponse(response, HttpServletResponse.SC_FORBIDDEN,
+            responseUtil.sendErrorResponse(response, HttpStatus.FORBIDDEN,
                     "Temporary token can only access registration completion endpoints");
             return;
         }
@@ -207,17 +202,5 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 tempPrincipal, null, authorities
         );
         SecurityContextHolder.getContext().setAuthentication(authToken);
-    }
-
-    private void sendErrorResponse(HttpServletResponse response, int status, String message) throws IOException {
-        response.setStatus(status);
-        response.setContentType("application/json;charset=UTF-8");
-
-        Map<String, Object> errorDetails = new HashMap<>();
-        errorDetails.put("status", status);
-        errorDetails.put("message", message);
-
-        response.getWriter().write(objectMapper.writeValueAsString(errorDetails));
-        response.getWriter().flush();
     }
 }

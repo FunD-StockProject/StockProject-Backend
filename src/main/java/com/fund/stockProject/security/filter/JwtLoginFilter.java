@@ -39,7 +39,7 @@ public class JwtLoginFilter extends UsernamePasswordAuthenticationFilter {
                 password = loginRequest.getPassword();
 
             } catch (IOException e) {
-                throw new AuthenticationServiceException("로그인 요청 파싱 실패", e);
+                throw new AuthenticationServiceException("Failed to parse login request", e);
             }
         }
         // 3) 토큰 생성 후 인증 매니저에 위임

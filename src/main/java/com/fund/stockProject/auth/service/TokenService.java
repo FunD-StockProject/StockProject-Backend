@@ -1,8 +1,11 @@
 package com.fund.stockProject.auth.service;
 
 import com.fund.stockProject.auth.entity.RefreshToken;
+import com.fund.stockProject.auth.entity.User;
 import com.fund.stockProject.auth.repository.RefreshRepository;
 import com.fund.stockProject.security.util.JwtUtil;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -30,7 +33,8 @@ public class TokenService {
     private Long refreshTokenExpirationMs;
 
     // 임시 토큰 만료 시간 (10분)
-    private static final Long TEMP_TOKEN_EXPIRATION_MS = 10 * 60 * 1000L; // 10분
+    @Value("${spring.jwt.temp-expiration-ms}")
+    private Long TEMP_TOKEN_EXPIRATION_MS;
 
     /**
      * 새로운 사용자를 위한 임시 토큰 발급
@@ -136,7 +140,7 @@ public class TokenService {
 
         // 4. 새로운 Refresh Token을 DB에 저장
         // RefreshEntity에 @NoArgsConstructor와 @AllArgsConstructor 또는 빌더 패턴을 적용하는 것이 좋습니다.
-        RefreshToken refreshToken = new RefreshToken(newRefreshToken, email, System.currentTimeMillis() + refreshTokenExpirationMs);
+        RefreshToken refreshToken = new RefreshToken(email, newRefreshToken, System.currentTimeMillis() + refreshTokenExpirationMs);
         refreshRepository.save(refreshToken);
 
         // 5. Access Token을 HttpOnly, Secure, SameSite=Lax 쿠키에 설정
@@ -176,29 +180,41 @@ public class TokenService {
     public void reissueTokens(HttpServletRequest request, HttpServletResponse response) {
 
         String oldRefreshToken = null;
+
         Cookie[] cookies = request.getCookies();
         for (Cookie cookie : cookies) {
-            if ("refresh".equals(cookie.getName())) {
+            if (REFRESH_TOKEN_COOKIE_NAME.equals(cookie.getName())) {
                 oldRefreshToken = cookie.getValue();
                 break; // 쿠키를 찾으면 반복 종료
             }
         }
-        // 1. 기존 리프레시 토큰의 유효성 검증 및 정보 추출 (JWTUtil 내부에서 만료/서명 등 검증)
-        // 토큰 유효성 검증 실패 시 JWTUtil에서 예외 발생
-        String email = jwtUtil.getEmail(oldRefreshToken); // 내부적으로 getClaims() 호출
-        String role = jwtUtil.getRole(oldRefreshToken);   // 내부적으로 getClaims() 호출
-        String category = jwtUtil.getCategory(oldRefreshToken);
 
-        // 2. 토큰 카테고리 확인
-        if (!category.equals(REFRESH_TOKEN_COOKIE_NAME)) {
-            // 이 시점에 도달하면 ExpiredJwtException 등은 이미 catch 되었을 것이므로,
-            // category 불일치는 '잘못된 토큰'으로 간주
-            throw new RuntimeException("Invalid refresh token category");
+        if (oldRefreshToken == null) {
+            throw new RuntimeException("Refresh token not found");
         }
 
-        // 3. 해당 리프레시 토큰이 DB에 존재하는지 확인
-        // Refresh Token Rotation을 위해 DB에 저장된 토큰을 가져와서 삭제해야 합니다.
-        // `findByRefresh` 메서드가 `Optional<RefreshEntity>`를 반환한다고 가정
-        issueTokensOnLogin(response, oldRefreshToken, email, role);
+        try {
+            // 2. 토큰 정보 추출
+            String email = jwtUtil.getEmail(oldRefreshToken);
+            String role = jwtUtil.getRole(oldRefreshToken);
+            String category = jwtUtil.getCategory(oldRefreshToken);
+
+            // 3. 카테고리 확인
+            if (!JWT_CATEGORY_REFRESH.equals(category)) {
+                throw new RuntimeException("Invalid refresh token category");
+            }
+
+            // 4. DB에서 해당 refresh token 존재 여부 확인
+            refreshRepository.findByRefreshToken(oldRefreshToken)
+                    .orElseThrow(() -> new RuntimeException("Refresh token not found in database"));
+
+            // 5. 새 토큰 발급
+            issueTokensOnLogin(response, oldRefreshToken, email, role);
+
+        } catch (ExpiredJwtException e) {
+            throw new RuntimeException("Refresh token expired");
+        } catch (JwtException e) {
+            throw new RuntimeException("Invalid refresh token: " + e.getMessage());
+        }
     }
 }

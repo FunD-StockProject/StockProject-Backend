@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.auth.repository.RefreshRepository;
 import com.fund.stockProject.security.util.CookieUtil;
 import com.fund.stockProject.security.util.JwtUtil;
+import com.fund.stockProject.security.util.ResponseUtil;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureException;
@@ -32,7 +33,7 @@ public class CustomLogoutFilter extends OncePerRequestFilter { // ⭐ 상속 변
 
     private final JwtUtil jwtUtil;
     private final RefreshRepository refreshRepository;
-    private final ObjectMapper objectMapper;
+    private final ResponseUtil responseUtil;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -58,7 +59,7 @@ public class CustomLogoutFilter extends OncePerRequestFilter { // ⭐ 상속 변
 
         // 3. Refresh Token 존재 여부 확인
         if (refreshToken == null) {
-            sendErrorResponse(response, HttpStatus.BAD_REQUEST.value(), "Refresh token not found");
+            responseUtil.sendErrorResponse(response, HttpStatus.BAD_REQUEST, "Refresh token not found");
             return;
         }
 
@@ -69,7 +70,7 @@ public class CustomLogoutFilter extends OncePerRequestFilter { // ⭐ 상속 변
 
             // 토큰 카테고리 확인
             if (!category.equals(JWT_CATEGORY_REFRESH)) { // "refresh" 대신 상수 사용
-                sendErrorResponse(response, HttpStatus.BAD_REQUEST.value(), "Invalid refresh token category");
+                responseUtil.sendErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid refresh token category");
                 return;
             }
         } catch (ExpiredJwtException e) {
@@ -77,15 +78,15 @@ public class CustomLogoutFilter extends OncePerRequestFilter { // ⭐ 상속 변
             // 클라이언트에게는 성공을 알리고, DB에서는 삭제 시도
             logger.warn("Expired refresh token received during logout: " + e.getMessage());
             // 하지만 DB 삭제는 시도하고, 쿠키도 삭제해야 함. 응답은 200 OK로 해도 무방.
-        } catch (SignatureException | MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
+        } catch (MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
             // 유효하지 않은 Refresh Token
             logger.error("Invalid refresh token received during logout: " + e.getMessage());
-            sendErrorResponse(response, HttpStatus.BAD_REQUEST.value(), "Invalid refresh token");
+            responseUtil.sendErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid refresh token");
             return;
         } catch (Exception e) {
             // 그 외 예상치 못한 예외
             logger.error("An unexpected error occurred during logout: " + e.getMessage(), e);
-            sendErrorResponse(response, HttpStatus.INTERNAL_SERVER_ERROR.value(), "Logout failed due to an internal error");
+            responseUtil.sendErrorResponse(response, HttpStatus.INTERNAL_SERVER_ERROR, "Logout failed due to an internal error");
             return;
         }
 
@@ -104,28 +105,8 @@ public class CustomLogoutFilter extends OncePerRequestFilter { // ⭐ 상속 변
         // 만약 사용한다면 Spring Security의 CSRF 설정에 따라 처리.
         // deleteCookie(response, "XSRF-TOKEN"); // 필요하다면 유지
 
-        // 7. 로그아웃 성공 응답
-        response.setStatus(HttpStatus.OK.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
-
-        Map<String, Object> responseBody = new HashMap<>();
-        responseBody.put("message", "Logout successful");
-        objectMapper.writeValue(response.getWriter(), responseBody);
+        responseUtil.sendSuccessResponse(response, "Logout successful");
 
         filterChain.doFilter(request, response);
-    }
-
-    // ⭐ sendErrorResponse 헬퍼 메서드를 JWTFilter에서 가져와 재사용
-    private void sendErrorResponse(HttpServletResponse response, int status, String message) throws IOException {
-        response.setStatus(status);
-        response.setContentType("application/json;charset=UTF-8");
-
-        Map<String, Object> errorDetails = new HashMap<>();
-        errorDetails.put("status", status);
-        errorDetails.put("message", message);
-
-        response.getWriter().write(objectMapper.writeValueAsString(errorDetails));
-        response.getWriter().flush();
     }
 }

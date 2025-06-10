@@ -42,6 +42,9 @@ spring:
       enabled: false
   jwt:
     secret: ENC(ZtLQKC+5jIxK8fYB7W6XZ3mkCr3ueVGBVYTa1SfpAsnsSKUw2k5lHD+egat0VF0fyQH9apHpl5o=)
+    access-expiration-ms: ENC(LC2BPxRUYKGUHFikipEopQ==)
+    refresh-expiration-ms: ENC(vIwhX3e0QNiMf9DT3qx6tviWchTH1OL7)
+    temp-expiration-ms: ENC(CRbXo2wXEd3RsluSjqVNYA==)
 security:
   appkey: ENC(FS8DY9wSmCauQ8SGk2CW3avWxPia5c41UDxMHAzzog3AloY5ynPAz1J/vVPvophr)
   appsecret: ENC(cYfISHcPzRSI2OO/N17vf9MD7OOqfp8Zq8+DcsXY+X7PTpbECdwqEDXclOlJfWUwhYZl8yy5bSwvuveEOPpxd5LFg5NtQWIcV63oWdPBzZmaGeJIvu8owdrJd5V07EJWNAHl9z4dZ6nTNTKCgahQ/o6Gy15FHDwFk99hM1TgZzvZ7h1hOsKZt9xbvZvLMtq3UbumkxrCGLbJHSUYK2EhmVXsC6GQmZwSAKJdxAzIvB2PKUDwu3eI5RXcxDyhzRzd)

@@ -13,6 +13,7 @@ import com.fund.stockProject.security.handler.JwtLoginSuccessHandler;
 import com.fund.stockProject.security.handler.LoginFailureHandler;
 import com.fund.stockProject.security.handler.OAuth2LoginSuccessHandler;
 import com.fund.stockProject.security.util.JwtUtil;
+import com.fund.stockProject.security.util.ResponseUtil;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -55,16 +56,7 @@ public class SecurityConfig {
     //private final LogoutSuccessHandler logoutSuccessHandler;
     private final RefreshRepository refreshRepository;
     private final DomainConfig domainConfig;
-
-    @PostConstruct
-    public void debugValues() {
-        System.out.println("=== Domain Values Debug ===");
-        System.out.println("prodDomainAddress: " + domainConfig.getProd());
-        System.out.println("testDomainAddress: " + domainConfig.getTest());
-        System.out.println("prodDomainAddress is null: " + (domainConfig.getProd() == null));
-        System.out.println("testDomainAddress is null: " + (domainConfig.getTest() == null));
-        System.out.println("========================");
-    }
+    private final ResponseUtil responseUtil;
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
@@ -114,9 +106,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests((auth) -> auth
                         .requestMatchers(
                                 "/error",
-                                "/reissue",
                                 "/favicon.ico",
                                 "/auth/register",
+                                "/auth/reissue",
                                 "/auth/oauth2/register",
                                 "/auth/oauth2/naver",
                                 "/auth/oauth2/kakao",
@@ -154,7 +146,7 @@ public class SecurityConfig {
                         .sessionFixation().none()); // 세션 고정 방지 비활성화, JWT 기반 인증이므로
 
         http
-                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, userRepository, objectMapper), LogoutFilter.class);
+                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, userRepository, responseUtil), LogoutFilter.class);
         // 커스텀 필터 등록
         JwtLoginFilter jwtLoginFilter = new JwtLoginFilter(authenticationManager(authenticationConfiguration));
         jwtLoginFilter.setAuthenticationSuccessHandler(jwtLoginSuccessHandler);
@@ -165,7 +157,7 @@ public class SecurityConfig {
                 .addFilterAt(jwtLoginFilter, UsernamePasswordAuthenticationFilter.class);
 
         http
-                .addFilterAt(new CustomLogoutFilter(jwtUtil, refreshRepository, objectMapper), LogoutFilter.class);
+                .addFilterAt(new CustomLogoutFilter(jwtUtil, refreshRepository, responseUtil), LogoutFilter.class);
 
         http
                 .oauth2Login((oauth2) -> oauth2

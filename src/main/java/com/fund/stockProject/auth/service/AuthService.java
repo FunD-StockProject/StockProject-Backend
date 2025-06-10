@@ -6,6 +6,7 @@ import com.fund.stockProject.auth.dto.RegisterRequest;
 import com.fund.stockProject.auth.entity.User;
 import com.fund.stockProject.auth.repository.UserRepository;
 import com.fund.stockProject.security.principle.CustomPrincipal;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,18 +22,20 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Transactional
     public void registerProcess(RegisterRequest registerRequest) {
         String email = registerRequest.getEmail();
         String password = registerRequest.getPassword();
         String nickname = registerRequest.getNickname();
         LocalDate birthDate = registerRequest.getBirthDate();
         PROVIDER provider = PROVIDER.LOCAL;
+        Boolean isActive = true;
+        Boolean marketingAgreement = registerRequest.getMarketingAgreement();
 
         Boolean isExists = userRepository.existsByEmail(email);
 
         if(isExists) {
-            // 이미 존재하는 닉네임인 경우 예외 처리 또는 다른 로직을 추가할 수 있습니다.
-            throw new RuntimeException("이미 존재하는 이메일입니다: " + email);
+            throw new RuntimeException(String.format("Email already exists: %s", email));
         }
 
         User user = User.builder()
@@ -42,24 +45,32 @@ public class AuthService {
                 .birthDate(birthDate)
                 .provider(provider)
                 .role(ROLE_USER)
+                .isActive(isActive)
+                .marketingAgreement(marketingAgreement)
                 .build();
 
         userRepository.save(user);
     }
 
+    @Transactional
     public void socialJoinProcess(OAuth2RegisterRequest oAuth2RegisterRequest, CustomPrincipal customPrincipal) {
 
         if (!Objects.equals(customPrincipal.getUserEmail(), oAuth2RegisterRequest.getEmail())) {
-            throw new RuntimeException("소셜 로그인 이메일과 클라이언트가 입력한 이메일이 일치하지 않습니다.");
+            throw new RuntimeException(
+                    String.format("Social login email mismatch. Principal email: [%s], Request email: [%s]",
+                            customPrincipal.getUserEmail(), oAuth2RegisterRequest.getEmail())
+            );
         }
 
         User user = userRepository.findByEmail(oAuth2RegisterRequest.getEmail())
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다. 이메일: " + oAuth2RegisterRequest.getEmail()));
+                .orElseThrow(() -> new RuntimeException(String.format("User not found with email: %s", oAuth2RegisterRequest.getEmail())));
 
         user.updateSocialUserInfo(
                 oAuth2RegisterRequest.getNickname(),
                 oAuth2RegisterRequest.getBirthDate(),
-                ROLE_USER
+                ROLE_USER,
+                true,
+                oAuth2RegisterRequest.getMarketingAgreement()
         );
 
         userRepository.save(user);

@@ -28,6 +28,7 @@ public class User extends Core {
 
     private String password;
 
+    @Column(unique = true)
     private String nickname;
 
     private LocalDate birthDate;
@@ -48,18 +49,18 @@ public class User extends Core {
 
     private LocalDateTime accessTokenExpiresAt;
 
-//    @Builder
-//    public User(String email, String password, String nickname, LocalDate birthDate, ROLE role, PROVIDER provider) {
-//        this.email = email;
-//        this.password = password;
-//        this.nickname = nickname;
-//        this.birthDate = birthDate;
-//        this.role = role;
-//        this.provider = provider;
-//    }
+    // 유저 관련 설정
+    private String profileImageUrl;
+
+    @Column(nullable = false)
+    private Boolean isActive = false;
+
+    @Column(nullable = false)
+    private Boolean marketingAgreement = false;
 
     @Builder
-    public User(String email, String password, String nickname, LocalDate birthDate, ROLE role, PROVIDER provider, String providerId) {
+    public User(String email, String password, String nickname, LocalDate birthDate, ROLE role, PROVIDER provider, String providerId,
+                Boolean isActive, Boolean marketingAgreement) {
         this.email = email;
         this.password = password;
         this.nickname = nickname;
@@ -67,9 +68,11 @@ public class User extends Core {
         this.role = role;
         this.provider = provider;
         this.providerId = providerId;
+        this.isActive = isActive;
+        this.marketingAgreement = marketingAgreement;
     }
 
-    public void updateSocialUserInfo(String nickname, LocalDate birthDate, ROLE role) {
+    public void updateSocialUserInfo(String nickname, LocalDate birthDate, ROLE role, Boolean isActive, Boolean marketingAgreement) {
         if (nickname != null && !nickname.trim().isEmpty()) {
             this.nickname = nickname;
         }
@@ -78,6 +81,12 @@ public class User extends Core {
         }
         if (role != null) {
             this.role = role;
+        }
+        if (isActive != null) {
+            this.isActive = isActive;
+        }
+        if (marketingAgreement != null) {
+            this.marketingAgreement = marketingAgreement;
         }
     }
 
