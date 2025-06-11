@@ -1,8 +1,7 @@
 package com.fund.stockProject.auth.service;
 
 import com.fund.stockProject.auth.entity.RefreshToken;
-import com.fund.stockProject.auth.entity.User;
-import com.fund.stockProject.auth.repository.RefreshRepository;
+import com.fund.stockProject.auth.repository.RefreshTokenRepository;
 import com.fund.stockProject.security.util.JwtUtil;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -24,7 +23,7 @@ import static com.fund.stockProject.security.util.JwtUtil.*;
 public class TokenService {
 
     private final JwtUtil jwtUtil;
-    private final RefreshRepository refreshRepository; // RefreshRepository 주입
+    private final RefreshTokenRepository refreshTokenRepository; // RefreshRepository 주입
 
     @Value("${spring.jwt.access-expiration-ms}")
     private Long accessTokenExpirationMs;
@@ -135,13 +134,13 @@ public class TokenService {
         // 3. (선택적) 기존 Refresh Token이 DB에 있다면 삭제 (로그인 시 보통 새로운 세션으로 간주)
         // 기존 Refresh Token이 있다면 해당 토큰을 무효화하는 것이 좋습니다.
         if (existingRefreshToken != null && !existingRefreshToken.isEmpty()) {
-            refreshRepository.deleteByRefreshToken(existingRefreshToken);
+            refreshTokenRepository.deleteByRefreshToken(existingRefreshToken);
         }
 
         // 4. 새로운 Refresh Token을 DB에 저장
         // RefreshEntity에 @NoArgsConstructor와 @AllArgsConstructor 또는 빌더 패턴을 적용하는 것이 좋습니다.
         RefreshToken refreshToken = new RefreshToken(email, newRefreshToken, System.currentTimeMillis() + refreshTokenExpirationMs);
-        refreshRepository.save(refreshToken);
+        refreshTokenRepository.save(refreshToken);
 
         // 5. Access Token을 HttpOnly, Secure, SameSite=Lax 쿠키에 설정
         // ResponseCookie를 사용하여 쿠키 설정을 더욱 명확하고 안전하게 관리하는 것을 권장합니다.
@@ -205,7 +204,7 @@ public class TokenService {
             }
 
             // 4. DB에서 해당 refresh token 존재 여부 확인
-            refreshRepository.findByRefreshToken(oldRefreshToken)
+            refreshTokenRepository.findByRefreshToken(oldRefreshToken)
                     .orElseThrow(() -> new RuntimeException("Refresh token not found in database"));
 
             // 5. 새 토큰 발급

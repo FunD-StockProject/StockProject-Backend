@@ -2,7 +2,7 @@ package com.fund.stockProject.global.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.auth.repository.HttpCookieOAuth2AuthorizationRequestRepository;
-import com.fund.stockProject.auth.repository.RefreshRepository;
+import com.fund.stockProject.auth.repository.RefreshTokenRepository;
 import com.fund.stockProject.auth.repository.UserRepository;
 import com.fund.stockProject.auth.service.CustomOAuth2UserService;
 import com.fund.stockProject.security.entrypoint.CustomAuthenticationEntryPoint;
@@ -14,10 +14,8 @@ import com.fund.stockProject.security.handler.LoginFailureHandler;
 import com.fund.stockProject.security.handler.OAuth2LoginSuccessHandler;
 import com.fund.stockProject.security.util.JwtUtil;
 import com.fund.stockProject.security.util.ResponseUtil;
-import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -54,9 +52,48 @@ public class SecurityConfig {
     private final ObjectMapper objectMapper;
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
     //private final LogoutSuccessHandler logoutSuccessHandler;
-    private final RefreshRepository refreshRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final DomainConfig domainConfig;
     private final ResponseUtil responseUtil;
+
+    private static final String[] SWAGGER_API_PATHS = {
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-resources/**",
+            "/webjars/**"
+    };
+
+    private static final String[] PUBLIC_API_PATHS = {
+            "/error",
+            "/favicon.ico",
+            "/auth/register",
+            "/auth/oauth2/register",
+            "/auth/login",
+            "/auth/reissue",
+            "/auth/password-reset",
+            "/auth/password-reset/confirm",
+            "/auth/oauth2/naver",
+            "/auth/oauth2/kakao",
+            "/auth/oauth2/google",
+            "/keyword/{keywordName}/stocks",
+            "/keyword/popular/{country}",
+            "/keyword/rankings",
+            "/{id}/score/{country}",
+            "/wordcloud/{symbol}/{country}",
+            "/{id}/keywords",
+            "/score/index",
+            "/stock/search/{searchKeyword}/{country}",
+            "/stock/autocomplete",
+            "/stock/hot/{country}",
+            "/stock/rising/{country}",
+            "/stock/descent/{country}",
+            "/stock/{id}/relevant",
+            "/stock/{id}/chart/{country}",
+            "/stock/{id}/info/{country}",
+            "/stock/category/{category}/{country}",
+            "/stock/rankings/hot",
+            "/stock/summary/{symbol}/{country}"
+    };
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
@@ -72,13 +109,7 @@ public class SecurityConfig {
 
         http
                 .csrf((csrf) -> csrf
-                        .ignoringRequestMatchers(
-                                request -> "/auth/register".equals(request.getRequestURI()), // 회원가입
-                                request -> "/auth/login".equals(request.getRequestURI()),    // 로그인
-                                request -> "/auth/social/register".equals(request.getRequestURI()) // 소셜 회원가입
-                                // 필요하다면 PathMatcher를 사용하여 더 복잡한 패턴 처리 가능
-                                // request -> new AntPathMatcher().match("/auth/**", request.getRequestURI())
-                        )
+                        .ignoringRequestMatchers(PUBLIC_API_PATHS)
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()) // ⭐ 이 부분이 중요!
                         .csrfTokenRequestHandler(requestHandler)); // ⭐ 이 부분도 중요!
 
@@ -104,40 +135,8 @@ public class SecurityConfig {
                 .httpBasic((auth) -> auth.disable());
         http
                 .authorizeHttpRequests((auth) -> auth
-                        .requestMatchers(
-                                "/error",
-                                "/favicon.ico",
-                                "/auth/register",
-                                "/auth/reissue",
-                                "/auth/oauth2/register",
-                                "/auth/oauth2/naver",
-                                "/auth/oauth2/kakao",
-                                "/auth/oauth2/google",
-                                "/keyword/{keywordName}/stocks",
-                                "/keyword/popular/{country}",
-                                "/keyword/rankings",
-                                "/{id}/score/{country}",
-                                "/wordcloud/{symbol}/{country}",
-                                "/{id}/keywords",
-                                "/score/index",
-                                "/stock/search/{searchKeyword}/{country}",
-                                "/stock/autocomplete",
-                                "/stock/hot/{country}",
-                                "/stock/rising/{country}",
-                                "/stock/descent/{country}",
-                                "/stock/{id}/relevant",
-                                "/stock/{id}/chart/{country}",
-                                "/stock/{id}/info/{country}",
-                                "/stock/category/{category}/{country}",
-                                "/stock/rankings/hot",
-                                "/stock/summary/{symbol}/{country}"
-                        ).permitAll() // 이 경로들은 모두 인증 없이 접근 허용
-                        .requestMatchers(
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-resources/**",
-                                "/webjars/**"
-                        ).permitAll() // Swagger 관련 경로는 모두 인증 없이 접근 허용
+                        .requestMatchers(PUBLIC_API_PATHS).permitAll() // 이 경로들은 모두 인증 없이 접근 허용
+                        .requestMatchers(SWAGGER_API_PATHS).permitAll() // Swagger 관련 경로는 모두 인증 없이 접근 허용
                         .anyRequest().authenticated() // 그 외 모든 요청은 인증 필요
                 );
         http
@@ -157,7 +156,7 @@ public class SecurityConfig {
                 .addFilterAt(jwtLoginFilter, UsernamePasswordAuthenticationFilter.class);
 
         http
-                .addFilterAt(new CustomLogoutFilter(jwtUtil, refreshRepository, responseUtil), LogoutFilter.class);
+                .addFilterAt(new CustomLogoutFilter(jwtUtil, refreshTokenRepository, responseUtil), LogoutFilter.class);
 
         http
                 .oauth2Login((oauth2) -> oauth2

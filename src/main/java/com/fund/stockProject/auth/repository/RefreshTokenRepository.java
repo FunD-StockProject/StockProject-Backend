@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface RefreshRepository extends JpaRepository<RefreshToken, Long> {
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
     @Transactional
     void deleteByRefreshToken(String refreshToken);
     Optional<RefreshToken> findByRefreshToken(String refreshToken);

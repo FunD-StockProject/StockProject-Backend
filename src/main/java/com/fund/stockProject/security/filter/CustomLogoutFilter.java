@@ -1,13 +1,11 @@
 package com.fund.stockProject.security.filter;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fund.stockProject.auth.repository.RefreshRepository;
+import com.fund.stockProject.auth.repository.RefreshTokenRepository;
 import com.fund.stockProject.security.util.CookieUtil;
 import com.fund.stockProject.security.util.JwtUtil;
 import com.fund.stockProject.security.util.ResponseUtil;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.SignatureException;
 import io.jsonwebtoken.UnsupportedJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -16,14 +14,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 
 import static com.fund.stockProject.security.util.JwtUtil.*;
 
@@ -32,7 +27,7 @@ import static com.fund.stockProject.security.util.JwtUtil.*;
 public class CustomLogoutFilter extends OncePerRequestFilter { // ⭐ 상속 변경
 
     private final JwtUtil jwtUtil;
-    private final RefreshRepository refreshRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final ResponseUtil responseUtil;
 
     @Override
@@ -92,7 +87,7 @@ public class CustomLogoutFilter extends OncePerRequestFilter { // ⭐ 상속 변
 
         // 5. Refresh Token DB 삭제 (무효화)
         // (선택 사항) 만료된 토큰이 DB에 남아있을 수 있으므로 deleteByRefresh는 성공 여부와 상관없이 호출
-        refreshRepository.deleteByRefreshToken(refreshToken);
+        refreshTokenRepository.deleteByRefreshToken(refreshToken);
 
         // 6. 쿠키 삭제
         // 액세스 토큰은 보통 헤더에 저장되므로, 쿠키에서 'access' 삭제 로직은 불필요.

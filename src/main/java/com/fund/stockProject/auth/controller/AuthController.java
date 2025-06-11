@@ -1,7 +1,9 @@
 package com.fund.stockProject.auth.controller;
 
 import com.fund.stockProject.auth.dto.OAuth2RegisterRequest;
+import com.fund.stockProject.auth.dto.PasswordResetConfirmRequest;
 import com.fund.stockProject.auth.dto.RegisterRequest;
+import com.fund.stockProject.auth.dto.PasswordResetEmailRequest;
 import com.fund.stockProject.auth.entity.User;
 import com.fund.stockProject.auth.service.AuthService;
 import com.fund.stockProject.security.principle.CustomPrincipal;
@@ -15,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -54,6 +55,30 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "Failed to complete social registration: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/password-reset")
+    public ResponseEntity<Map<String, String>> resetRequest(@RequestBody PasswordResetEmailRequest passwordResetEmailRequest) {
+        try {
+            authService.sendResetLink(passwordResetEmailRequest);
+            return ResponseEntity.ok(Map.of(
+                    "message", "PASSWORD_RESET_EMAIL_SENT"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "PASSWORD_RESET_EMAIL_FAILED"));
+        }
+    }
+
+    @PostMapping("/password-reset/confirm")
+    public ResponseEntity<Map<String, String>> resetPassword(@RequestBody PasswordResetConfirmRequest passwordResetConfirmRequest) {
+        try {
+            authService.resetPassword(passwordResetConfirmRequest);
+            return ResponseEntity.ok(Map.of("message", "PASSWORD_RESET_SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "PASSWORD_RESET_FAILED: " + e.getMessage()));
         }
     }
 }

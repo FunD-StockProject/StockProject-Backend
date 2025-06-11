@@ -101,4 +101,10 @@ public class User extends Core {
             this.accessTokenExpiresAt = accessTokenExpiresAt;
         }
     }
+
+    public void updatePassword(String newPassword) {
+        if (newPassword != null && !newPassword.trim().isEmpty()) {
+            this.password = newPassword;
+        }
+    }
 }

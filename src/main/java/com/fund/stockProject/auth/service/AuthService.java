@@ -2,9 +2,14 @@ package com.fund.stockProject.auth.service;
 
 import com.fund.stockProject.auth.domain.PROVIDER;
 import com.fund.stockProject.auth.dto.OAuth2RegisterRequest;
+import com.fund.stockProject.auth.dto.PasswordResetConfirmRequest;
+import com.fund.stockProject.auth.dto.PasswordResetEmailRequest;
 import com.fund.stockProject.auth.dto.RegisterRequest;
+import com.fund.stockProject.auth.entity.PasswordResetToken;
 import com.fund.stockProject.auth.entity.User;
+import com.fund.stockProject.auth.repository.PasswordResetTokenRepository;
 import com.fund.stockProject.auth.repository.UserRepository;
+import com.fund.stockProject.email.EmailService;
 import com.fund.stockProject.security.principle.CustomPrincipal;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +17,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.UUID;
 
 import static com.fund.stockProject.auth.domain.ROLE.ROLE_USER;
 
@@ -21,6 +28,10 @@ import static com.fund.stockProject.auth.domain.ROLE.ROLE_USER;
 public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final EmailService emailService;
+
+    private Long tokenExpiryMinutes = 10L;
 
     @Transactional
     public void registerProcess(RegisterRequest registerRequest) {
@@ -74,5 +85,56 @@ public class AuthService {
         );
 
         userRepository.save(user);
+    }
+
+    public void sendResetLink(PasswordResetEmailRequest passwordResetEmailRequest) {
+
+        String email = passwordResetEmailRequest.getEmail();
+
+        if (!userRepository.existsByEmail(email)) {
+            throw new RuntimeException(String.format("User not found with email: %s", email));
+        }
+
+        String token = UUID.randomUUID().toString();
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(tokenExpiryMinutes);
+
+        PasswordResetToken entity = PasswordResetToken.builder()
+                .email(email)
+                .token(token)
+                .expiresAt(expiresAt)
+                .isUsed(false)
+                .build();
+
+        passwordResetTokenRepository.save(entity);
+
+        String resetLink = "https://yourservice.com/reset-password?token=" + token;
+        String subject = "[인간지표] 비밀번호 재설정 안내";
+        String content = "비밀번호 재설정 링크: \n" + resetLink + "\n\n유효 시간: 1시간";
+
+        // 이메일 발송
+        emailService.sendEmail(email, subject, content);
+    }
+
+    public void resetPassword(PasswordResetConfirmRequest passwordResetConfirmRequest) {
+        String email = passwordResetConfirmRequest.getEmail();
+        String newPassword = passwordResetConfirmRequest.getNewPassword();
+        String token = passwordResetConfirmRequest.getToken();
+
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByTokenAndIsUsedFalseAndExpiresAtAfter(token, LocalDateTime.now())
+                .orElseThrow(() -> new RuntimeException("Invalid or expired password reset token"));
+
+        if (resetToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Password reset token has expired");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException(String.format("User not found with email: %s", email)));
+
+        user.updatePassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // 토큰 사용 처리
+        resetToken.setIsUsed();
+        passwordResetTokenRepository.save(resetToken);
     }
 }
