@@ -1,10 +1,7 @@
 package com.fund.stockProject.auth.service;
 
 import com.fund.stockProject.auth.domain.PROVIDER;
-import com.fund.stockProject.auth.dto.OAuth2RegisterRequest;
-import com.fund.stockProject.auth.dto.PasswordResetConfirmRequest;
-import com.fund.stockProject.auth.dto.PasswordResetEmailRequest;
-import com.fund.stockProject.auth.dto.RegisterRequest;
+import com.fund.stockProject.auth.dto.*;
 import com.fund.stockProject.auth.entity.PasswordResetToken;
 import com.fund.stockProject.auth.entity.User;
 import com.fund.stockProject.auth.repository.PasswordResetTokenRepository;
@@ -87,6 +84,19 @@ public class AuthService {
         userRepository.save(user);
     }
 
+    public EmailFindResponse findEmail(EmailFindRequest emailFindRequest) {
+        String nickname = emailFindRequest.getNickname();
+        LocalDate birthDate = emailFindRequest.getBirthDate();
+
+        User user = userRepository.findByNicknameAndBirthDate(nickname, birthDate)
+                .orElseThrow(() -> new RuntimeException("User not found with provided nickname and birth date"));
+
+        return EmailFindResponse.builder()
+                .email(user.getEmail())
+                .nickname(user.getNickname())
+                .build();
+    }
+
     public void sendResetLink(PasswordResetEmailRequest passwordResetEmailRequest) {
 
         String email = passwordResetEmailRequest.getEmail();
@@ -109,12 +119,13 @@ public class AuthService {
 
         String resetLink = "https://yourservice.com/reset-password?token=" + token;
         String subject = "[인간지표] 비밀번호 재설정 안내";
-        String content = "비밀번호 재설정 링크: \n" + resetLink + "\n\n유효 시간: 1시간";
+        String content = "비밀번호 재설정 링크: \n" + resetLink + "\n\n유효 시간: 10분";
 
         // 이메일 발송
         emailService.sendEmail(email, subject, content);
     }
 
+    @Transactional
     public void resetPassword(PasswordResetConfirmRequest passwordResetConfirmRequest) {
         String email = passwordResetConfirmRequest.getEmail();
         String newPassword = passwordResetConfirmRequest.getNewPassword();
@@ -136,5 +147,15 @@ public class AuthService {
         // 토큰 사용 처리
         resetToken.setIsUsed();
         passwordResetTokenRepository.save(resetToken);
+    }
+
+    @Transactional
+    public void withdrawUser(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException(String.format("User not found with email: %s", email)));
+
+        user.withdraw();
+
+        userRepository.save(user);
     }
 }

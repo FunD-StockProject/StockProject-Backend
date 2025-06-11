@@ -107,4 +107,8 @@ public class User extends Core {
             this.password = newPassword;
         }
     }
+
+    public void withdraw() {
+        this.isActive = false;
+    }
 }
