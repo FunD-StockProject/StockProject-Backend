@@ -48,7 +48,7 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ENC(FvPN/896Ketue6NdaKgX9DbCCzIH3IsTAhfx0lpZhmA=) // 인간지표 이메일로 변경해야 함
+    username: ENC(FvPN/896Ketue6NdaKgX9DbCCzIH3IsTAhfx0lpZhmA=)
     password: ENC(mR71mGyGHmIzJUdW1mDhNP168kGiKinWJV2OPcOZXaU=)
     properties:
       mail:
