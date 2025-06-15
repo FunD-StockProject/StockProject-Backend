@@ -10,6 +10,9 @@ import com.fund.stockProject.email.EmailService;
 import com.fund.stockProject.security.principle.CustomPrincipal;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +32,13 @@ public class AuthService {
     private final EmailService emailService;
 
     private Long tokenExpiryMinutes = 10L;
+
+    public static boolean isAuthenticated() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null
+                && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken);
+    }
 
     @Transactional
     public void registerProcess(RegisterRequest registerRequest) {
