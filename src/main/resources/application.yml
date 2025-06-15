@@ -1,7 +1,3 @@
-app:
-  domain:
-    prod: ENC(5P9Iq3ZTswvqef+LtMIwKsnvQ0guIfVYyIMmNmYcjDA=)
-    test: ENC(uA65wJJ2xUxoDiTPw+99JfevldmMMFdHcK2oJelBhOG1/h0A+HsR96VdRpeaRzl/)
 server:
   port: 443
   ssl:
@@ -16,9 +12,6 @@ jasypt:
     password: ${JASYPT_ENCRYPTOR_PASSWORD}
 
 spring:
-  output:
-    ansi:
-      enabled: always
   jackson:
     time-zone: Asia/Seoul
   application:
@@ -43,64 +36,11 @@ spring:
     jdbc:
       initialize-schema: ALWAYS
       enabled: false
-  jwt:
-    secret: ENC(ZtLQKC+5jIxK8fYB7W6XZ3mkCr3ueVGBVYTa1SfpAsnsSKUw2k5lHD+egat0VF0fyQH9apHpl5o=)
-    access-expiration-ms: ENC(LC2BPxRUYKGUHFikipEopQ==)
-    refresh-expiration-ms: ENC(vIwhX3e0QNiMf9DT3qx6tviWchTH1OL7)
-    temp-expiration-ms: ENC(CRbXo2wXEd3RsluSjqVNYA==)
-  mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ENC(FvPN/896Ketue6NdaKgX9DbCCzIH3IsTAhfx0lpZhmA=)
-    password: ENC(mR71mGyGHmIzJUdW1mDhNP168kGiKinWJV2OPcOZXaU=)
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
+
 security:
-  appkey: ENC(td/Q4lAom4RYPlev4yviauaD6age2drID0XyCJvXY64vpFj71w+kCcGaBzmUVRNL)
-  appsecret: ENC(vwGwTBTGOpMXwXvKCXh1RWHgGZ1PgqumEJnpLH7DoRFMIo8OyPWJd9OF4fsoxJwRpmzIz+pPTv8JEqWMOCOm5CBEpIzg+oMtpamGJy+r2PDBsuQqu4Vaw5+nH9Lp8dOpHn8Yl3qxt7Y4iN7vrGyAIrwguQE5SXR4Wj8FWS+MhQvMxw5Go5vcsZrumIfqxgpb1AEfToKYZBchkF1phq+rHEntP3VNmTSKvT/+6kTkpuhKLVlyrUaZaJFZQnjNGgju)
-  oauth2:
-    client:
-      registration:
-        naver:
-          client-name: naver
-          client-id: ENC(HY1OyhLVVF6XhXcyA5qv2V6YnDnjEwRiRDSwfxbSF90=)
-          client-secret: ENC(M6Rv2pyRlnE4CEzUtR5zG1T+8oU/QgL7)
-          redirect-uri: ENC(ENKzIy0M0ZmX+xSYduyLKNjV6zcevb68xuJpnzd8FW2nup0EHiOwDGi3TKvVVXI+H73v+ubkY+m5v1V6iPfx4g==)
-          authorization-grant-type: authorization_code
-          scope:
-            - email
-        kakao:
-          client-name: kakao
-          client-id: ENC(Z/azUck8uPg4sccZR9YrtHd2rhbnlhqb3oItGrWwV8hA1ccWVRlQipEDVzK6i9y5)
-          client-secret: ENC(61bQlbYM8ifrJHOUKFkAvmbhq2O5MzMB/wGPZBW9GwL4psRNxGSXB9vGCUefASah)
-          redirect-uri: ENC(qKNpIr7n0QCtmhiNPjKC+jI8oP5w5LWvGnO8xcHrYdeESoUtes77OsdiCYcmNutUcNP3heNE5dSeZtvHPQ34pg==)
-          client-authentication-method: client_secret_post
-          authorization-grant-type: authorization_code
-          scope:
-            - account_email
-        google:
-          client-name: google
-          client-id: ENC(7umyS0XfZFCY4EBA9S0jsf95iyn2hN11TVDm9mQKRwfGCOpCd6GMRAAmPH+QTs0hI1t4Z562K4nHnTDwhkyWeALGEXRWgaXkIAo43mD44OFkOOKQMtSOkw==)
-          client-secret: ENC(Dxg7FyFQHCHZijZyU98AokMA8bWiDBxP7vwABBtPs8VGAOvxI2E4sVVyW9tiVhUo)
-          redirect-uri: ENC(5FGmPL3woEys/pHeIt9C2W4DNC3K6YZaTHHiC11Nllkva6k01yfDby4sV2YRCcTzahdHFpPwKHihogxT7K+uLQ==)
-          authorization-grant-type: authorization_code
-          scope:
-            - email
-      provider:
-        naver:
-          authorization-uri: https://nid.naver.com/oauth2.0/authorize
-          token-uri: https://nid.naver.com/oauth2.0/token
-          user-info-uri: https://openapi.naver.com/v1/nid/me
-          user-name-attribute: response
-        kakao:
-          authorization-uri: https://kauth.kakao.com/oauth/authorize
-          token-uri: https://kauth.kakao.com/oauth/token
-          user-info-uri: https://kapi.kakao.com/v2/user/me
-          user-name-attribute: id
+  appkey: ENC(FS8DY9wSmCauQ8SGk2CW3avWxPia5c41UDxMHAzzog3AloY5ynPAz1J/vVPvophr)
+  appsecret: ENC(cYfISHcPzRSI2OO/N17vf9MD7OOqfp8Zq8+DcsXY+X7PTpbECdwqEDXclOlJfWUwhYZl8yy5bSwvuveEOPpxd5LFg5NtQWIcV63oWdPBzZmaGeJIvu8owdrJd5V07EJWNAHl9z4dZ6nTNTKCgahQ/o6Gy15FHDwFk99hM1TgZzvZ7h1hOsKZt9xbvZvLMtq3UbumkxrCGLbJHSUYK2EhmVXsC6GQmZwSAKJdxAzIvB2PKUDwu3eI5RXcxDyhzRzd)
+
 management:
   endpoints:
     enabled-by-default: false
