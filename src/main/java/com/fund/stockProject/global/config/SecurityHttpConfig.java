@@ -17,10 +17,10 @@ import com.fund.stockProject.global.dto.response.AccessTokenResponse;
 @Configuration
 public class SecurityHttpConfig {
 
-    @Value("${security.appkey}")
+    @Value("${spring.security.appkey}")
     private String appkey;
 
-    @Value("${security.appsecret}")
+    @Value("${spring.security.appsecret}")
     private String appSecret;
 
     private volatile String accessToken;
