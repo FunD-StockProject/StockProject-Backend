@@ -5,7 +5,6 @@ import com.fund.stockProject.auth.entity.User;
 import com.fund.stockProject.auth.service.AuthService;
 import com.fund.stockProject.security.principle.CustomPrincipal;
 import io.swagger.v3.oas.annotations.Hidden;
-import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,7 +34,6 @@ public class AuthController {
     }
 
     @PostMapping("/oauth2/register")
-    @Operation(summary = "OAuth2 회원가입 API", description = "OAuth2 회원가입 API")
     public ResponseEntity<Map<String, String>> completeSocialRegistration(
             @RequestBody OAuth2RegisterRequest oAuth2RegisterRequest,
             @AuthenticationPrincipal CustomPrincipal customPrincipal) {
@@ -55,7 +53,6 @@ public class AuthController {
     }
 
     @PostMapping("/find-email")
-    @Operation(summary = "아이디 찾기 API", description = "아이디 찾기 API")
     public ResponseEntity<EmailFindResponse> findEmail(@RequestBody EmailFindRequest emailFindRequest) {
         try {
             EmailFindResponse emailFindResponse = authService.findEmail(emailFindRequest);
@@ -66,7 +63,6 @@ public class AuthController {
     }
 
     @PostMapping("/reset-password")
-    @Operation(summary = "비밀번호 재설정 이메일 요청 API", description = "비밀번호 재설정 이메일 요청 API")
     public ResponseEntity<Map<String, String>> resetRequest(@RequestBody PasswordResetEmailRequest passwordResetEmailRequest) {
         try {
             authService.sendResetLink(passwordResetEmailRequest);
@@ -80,7 +76,6 @@ public class AuthController {
     }
 
     @PostMapping("/reset-password/confirm")
-    @Operation(summary = "비밀번호 재설정 API", description = "비밀번호 재설정 API")
     public ResponseEntity<Map<String, String>> resetPassword(@RequestBody PasswordResetConfirmRequest passwordResetConfirmRequest) {
         try {
             authService.resetPassword(passwordResetConfirmRequest);
@@ -92,7 +87,6 @@ public class AuthController {
     }
 
     @DeleteMapping("/withdraw")
-    @Operation(summary = "회원 탈퇴 API", description = "회원 탈퇴 API")
     public ResponseEntity<Map<String, String>> withdrawUser(@AuthenticationPrincipal CustomPrincipal customPrincipal) {
         if (customPrincipal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED) // HTTP 401 Unauthorized

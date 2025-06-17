@@ -2,7 +2,6 @@ package com.fund.stockProject.auth.controller;
 
 import com.fund.stockProject.auth.service.TokenService;
 import io.jsonwebtoken.ExpiredJwtException;
-import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +20,6 @@ public class TokenController {
     private final TokenService tokenService;
 
     @PostMapping("/reissue")
-    @Operation(summary = "ACCESS 토큰 재발급 API", description = "유효한 리프레시 토큰을 사용하여 액세스 토큰을 재발급")
     public ResponseEntity<Map<String, String>> reissue(HttpServletRequest request, HttpServletResponse response) {
         try {
             tokenService.reissueTokens(request, response);
