@@ -57,8 +57,8 @@ spring:
           starttls:
             enable: true
   security:
-    appkey: ENC(td/Q4lAom4RYPlev4yviauaD6age2drID0XyCJvXY64vpFj71w+kCcGaBzmUVRNL)
-    appsecret: ENC(vwGwTBTGOpMXwXvKCXh1RWHgGZ1PgqumEJnpLH7DoRFMIo8OyPWJd9OF4fsoxJwRpmzIz+pPTv8JEqWMOCOm5CBEpIzg+oMtpamGJy+r2PDBsuQqu4Vaw5+nH9Lp8dOpHn8Yl3qxt7Y4iN7vrGyAIrwguQE5SXR4Wj8FWS+MhQvMxw5Go5vcsZrumIfqxgpb1AEfToKYZBchkF1phq+rHEntP3VNmTSKvT/+6kTkpuhKLVlyrUaZaJFZQnjNGgju)
+    appkey: ENC(x03pW1tjWZPkly9PCQWLKQd94SpUnXcUGJ2y7NcdcAM5/knSG6/mnt1eEiHqIgIx)
+    appsecret: ENC(lY5EPC0PWewfMk5owO0kTYSWAL5HSIW5pHXjWNl3fZggYrDWTjOHEy2zfkaO7lfIMg6OCzYkvKS9abf1ERQtcatpX/4dc1LEsCmgImvmIghj6m5r7SlBcBsSraMr70vs39wFo/9AVwiyHY0idIbrfNJwW9ZWSJM2NKDhuSo0K3hI1kDWjcVkRTRkdtjlMk4YxMqGgJ5lcx3EVmHqp7+RSYTx+j64lLUrSjt56wXQqgBI95wwzAmTq6UVJRhPyNwJ)
     oauth2:
       client:
         registration:
