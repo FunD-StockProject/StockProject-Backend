@@ -5,8 +5,10 @@ import com.fund.stockProject.global.entity.Core;
 import com.fund.stockProject.preference.domain.PreferenceType;
 import com.fund.stockProject.stock.entity.Stock;
 import jakarta.persistence.*;
+import lombok.Getter;
 
 @Entity
+@Getter
 @IdClass(PreferenceId.class)
 public class Preference extends Core {
     @Id
@@ -28,6 +30,10 @@ public class Preference extends Core {
     public Preference(User user, Stock stock, PreferenceType preferenceType) {
         this.user = user;
         this.stock = stock;
+        this.preferenceType = preferenceType;
+    }
+
+    public void setPreferenceType(PreferenceType preferenceType) {
         this.preferenceType = preferenceType;
     }
 }

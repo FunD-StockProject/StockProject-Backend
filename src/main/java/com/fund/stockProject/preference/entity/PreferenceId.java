@@ -1,7 +1,5 @@
 package com.fund.stockProject.preference.entity;
 
-import jakarta.persistence.Embeddable;
-
 import java.io.Serializable;
 import java.util.Objects;
 
