@@ -18,6 +18,7 @@ public class CustomPrincipal implements UserDetails, OAuth2User {
     private Map<String, Object> attributes; // OAuth2User 속성 (OAuth2 로그인 시에만 값 가짐)
     private String socialAccessToken; // OAuth2 로그인 시 사용되는 액세스 토큰 (선택적)
     private Boolean isNewUser = false; // 새 사용자 여부 (선택적, 필요시 사용)
+
     // 일반 로그인 사용자를 위한 생성자
     public CustomPrincipal(User user) {
         this.user = user;
@@ -49,9 +50,8 @@ public class CustomPrincipal implements UserDetails, OAuth2User {
     }
 
     @Override
-    public String getUsername() {
-        // ✅ UserDetails의 'username'을 이메일로 매핑하여 Spring Security 내부에서 사용
-        return user.getEmail();
+    public String getUsername() { // 일반적으로 사용 X
+        return user.getEmail(); // 사용자 이메일을 반환
     }
 
     // 계정 상태 관련 메서드 (true로 반환하여 기본적으로 활성화 상태)
@@ -67,20 +67,19 @@ public class CustomPrincipal implements UserDetails, OAuth2User {
     }
 
     @Override
-    public String getName() {
-        // ✅ OAuth2User의 'name'을 애플리케이션의 주 식별자인 이메일로 통일
-        return user.getEmail();
+    public String getName() { // 일반적으로 사용 X
+        return user.getEmail(); // 사용자 이메일을 반환
     }
 
-    // --- ✨ 애플리케이션 로직에서 사용할 공통 Getter (핵심) ✨ ---
+    public Integer getUserId() {
+        return user.getId();
+    }
+
     public String getUserEmail() {
-        // ✨ 개발자는 이메일을 가져올 때 항상 이 메서드를 사용하도록 권장합니다.
-        //    getUsername(), getName()과의 혼란을 방지하고 일관성을 제공합니다.
         return user.getEmail();
     }
 
     public String getUserNickname() {
-        // 사용자 닉네임을 가져올 때 사용합니다.
         return user.getNickname();
     }
 }

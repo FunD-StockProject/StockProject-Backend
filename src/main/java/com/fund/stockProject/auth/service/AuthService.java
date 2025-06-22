@@ -33,11 +33,29 @@ public class AuthService {
 
     private Long tokenExpiryMinutes = 10L;
 
+    /**
+     * 현재 사용자가 인증된 상태인지 확인합니다.
+     * @return 인증된 경우 true, 그렇지 않은 경우 false
+     */
     public static boolean isAuthenticated() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication != null
                 && authentication.isAuthenticated()
                 && !(authentication instanceof AnonymousAuthenticationToken);
+    }
+
+    /**
+     * 현재 인증된 사용자의 ID를 반환합니다.
+     * 인증되지 않은 경우 null을 반환합니다.
+     */
+    public static Integer getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated() && !(authentication instanceof AnonymousAuthenticationToken)) {
+            CustomPrincipal principal = (CustomPrincipal) authentication.getPrincipal();
+            return principal.getUserId();
+        }
+
+        return null;
     }
 
     @Transactional
