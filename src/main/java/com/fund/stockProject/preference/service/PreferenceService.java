@@ -19,8 +19,10 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -58,45 +60,32 @@ public class PreferenceService {
             return List.of();
         }
 
-        return Flux.fromIterable(stockList)
-                .parallel()
-                .runOn(Schedulers.boundedElastic())
-                .flatMap(stock -> {
-                    // 1. stock 변수의 스코프가 flatMap 내부에서 유지됩니다.
-                    COUNTRY country = getCountryFromExchangeNum(stock.getExchangeNum());
+        List<BookmarkInfoResponse> result = new ArrayList<>();
 
-                    // 2. 비동기 API를 호출하고, 그 결과와 기존 stock 객체를 함께 사용합니다.
-                    return securityService.getSecurityStockInfoKorea(
-                                    stock.getId(), stock.getSymbolName(), stock.getSecurityName(),
-                                    stock.getSymbol(), stock.getExchangeNum(), country
-                            )
-                            .map(stockInfoResponse -> {
-                                // 3. Score 안정성을 확보하여 최종 응답 객체(Optional)를 만듭니다.
-                                return stock.getScores().stream()
-                                        .findFirst()
-                                        .map(firstScore -> {
-                                            Integer score = (country == COUNTRY.KOREA)
-                                                    ? firstScore.getScoreKorea()
-                                                    : firstScore.getScoreOversea();
+        for (Stock stock : stockList) {
+            COUNTRY country = getCountryFromExchangeNum(stock.getExchangeNum());
 
-                                            return new BookmarkInfoResponse(
-                                                    stock.getSymbolName(),
-                                                    stockInfoResponse.getPrice(),
-                                                    stockInfoResponse.getPriceDiffPerCent(),
-                                                    score,
-                                                    firstScore.getDiff()
-                                            );
-                                        });
-                            });
-                })
-                // flatMap의 결과는 Optional<BookmarkInfoResponse> 이므로, 비어있는 Optional을 걸러냅니다.
-                .filter(Optional::isPresent)
-                // Optional을 벗겨내어 실제 BookmarkInfoResponse 객체만 남깁니다.
-                .map(Optional::get)
-                .sequential()
-                .collectList()
-                .block();
+            StockInfoResponse stockInfoResponse = securityService.getSecurityStockInfoKorea(
+                    stock.getId(), stock.getSymbolName(), stock.getSecurityName(),
+                    stock.getSymbol(), stock.getExchangeNum(), country
+            ).block();
+
+            if (stockInfoResponse != null) {
+                BookmarkInfoResponse bookmarkInfoResponse = new BookmarkInfoResponse(
+                        stock.getSymbolName(),
+                        stockInfoResponse.getPrice(),
+                        stockInfoResponse.getPriceDiffPerCent(),
+                        country == COUNTRY.KOREA ? stock.getScores().get(0).getScoreKorea() : stock.getScores().get(0).getScoreOversea(),
+                        stock.getScores().get(0).getDiff()
+                );
+
+                result.add(bookmarkInfoResponse);
+            }
+        }
+
+        return result;
     }
+
 
     public Integer getBookmarkCount() {
         Integer currentUserId = AuthService.getCurrentUserId();
@@ -121,6 +110,7 @@ public class PreferenceService {
         if (existingPreference.isPresent()) {
             // 기존 선호도가 있다면 타입만 변경
             existingPreference.get().setPreferenceType(newPreferenceType);
+            preferenceRepository.save(existingPreference.get());
         } else {
             // 기존 선호도가 없다면 User와 Stock을 조회하여 새로 생성
             User user = getUserOrThrow(currentUserId);

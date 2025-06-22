@@ -12,12 +12,12 @@ import lombok.Getter;
 @IdClass(PreferenceId.class)
 public class Preference extends Core {
     @Id
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @Id
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "stock_id", nullable = false)
     private Stock stock;
 
