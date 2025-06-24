@@ -12,15 +12,8 @@ import com.fund.stockProject.score.service.ScoreService;
 import com.fund.stockProject.stock.domain.CATEGORY;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
-import com.fund.stockProject.stock.dto.response.StockCategoryResponse;
-import com.fund.stockProject.stock.dto.response.StockChartResponse;
+import com.fund.stockProject.stock.dto.response.*;
 import com.fund.stockProject.stock.dto.response.StockChartResponse.PriceInfo;
-import com.fund.stockProject.stock.dto.response.StockDiffResponse;
-import com.fund.stockProject.stock.dto.response.StockHotSearchResponse;
-import com.fund.stockProject.stock.dto.response.StockInfoResponse;
-import com.fund.stockProject.stock.dto.response.StockRelevantResponse;
-import com.fund.stockProject.stock.dto.response.StockSearchResponse;
-import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockQueryRepository;
 import com.fund.stockProject.stock.repository.StockRepository;
@@ -693,6 +686,38 @@ public class StockService {
         return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
             stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
             getCountryFromExchangeNum(stock.getExchangeNum()));
+    }
+
+    public StockDetailResponse getStockDetailInfo(Integer id, COUNTRY country) {
+        // TODO: 비 블로킹 컨텍스트 관련 처리
+        Stock stock = stockRepository.findStockById(id)
+                .orElseThrow(() -> new RuntimeException("no stock found"));
+
+        List<String> keywords = keywordRepository.findKeywordsByStockId(id, PageRequest.of(0, 2))
+                .stream()
+                .map(Keyword::getName)
+                .filter(this::isValidKeyword)
+                .distinct()
+                .toList();
+
+        StockInfoResponse stockInfoKorea = securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
+                stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
+                getCountryFromExchangeNum(stock.getExchangeNum())).block();
+
+        return StockDetailResponse.builder()
+                .stockId(stockInfoKorea.getStockId())
+                .symbolName(stockInfoKorea.getSymbolName())
+                .securityName(stockInfoKorea.getSecurityName())
+                .symbol(stockInfoKorea.getSymbol())
+                .exchangeNum(stockInfoKorea.getExchangeNum())
+                .country(stockInfoKorea.getCountry())
+                .price(stockInfoKorea.getPrice())
+                .priceDiff(stockInfoKorea.getPriceDiff())
+                .priceDiffPerCent(stockInfoKorea.getPriceDiffPerCent())
+                .score(country == COUNTRY.KOREA ? stock.getScores().get(0).getScoreKorea() : stock.getScores().get(0).getScoreOversea())
+                .scoreDiff(stock.getScores().get(0).getDiff())
+                .keywords(keywords)
+                .build();
     }
 
     private COUNTRY getCountryFromExchangeNum(EXCHANGENUM exchangenum) {

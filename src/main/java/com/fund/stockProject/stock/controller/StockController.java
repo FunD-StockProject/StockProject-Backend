@@ -2,14 +2,7 @@ package com.fund.stockProject.stock.controller;
 
 import com.fund.stockProject.stock.domain.CATEGORY;
 import com.fund.stockProject.stock.domain.COUNTRY;
-import com.fund.stockProject.stock.dto.response.StockCategoryResponse;
-import com.fund.stockProject.stock.dto.response.StockChartResponse;
-import com.fund.stockProject.stock.dto.response.StockDiffResponse;
-import com.fund.stockProject.stock.dto.response.StockHotSearchResponse;
-import com.fund.stockProject.stock.dto.response.StockInfoResponse;
-import com.fund.stockProject.stock.dto.response.StockRelevantResponse;
-import com.fund.stockProject.stock.dto.response.StockSearchResponse;
-import com.fund.stockProject.stock.dto.response.StockSimpleResponse;
+import com.fund.stockProject.stock.dto.response.*;
 import com.fund.stockProject.stock.service.StockService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -85,9 +78,9 @@ public class StockController {
 
     @GetMapping("/{id}/info/{country}")
     @Operation(summary = "주식 정보 api", description = "주식 정보 api")
-    ResponseEntity<Mono<StockInfoResponse>> getStockInfo(final @PathVariable("id") Integer id,
-        final @PathVariable("country") COUNTRY country) {
-        return ResponseEntity.ok().body(stockService.getStockInfo(id, country));
+    ResponseEntity<StockDetailResponse> getStockInfo(final @PathVariable("id") Integer id,
+                                                     final @PathVariable("country") COUNTRY country) {
+        return ResponseEntity.ok().body(stockService.getStockDetailInfo(id, country));
     }
 
     @GetMapping("/category/{category}/{country}")
