@@ -58,6 +58,7 @@ public class SecurityConfig {
     private final RefreshTokenRepository refreshTokenRepository;
     private final DomainConfig domainConfig;
     private final ResponseUtil responseUtil;
+    private final CorsConfig corsConfig;
 
     private static final String[] SWAGGER_API_PATHS = {
             "/v3/api-docs/**",
@@ -117,22 +118,24 @@ public class SecurityConfig {
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()) // ⭐ 이 부분이 중요!
                         .csrfTokenRequestHandler(requestHandler)); // ⭐ 이 부분도 중요!
 
+//        http
+//                .cors((cors) -> cors.configurationSource(new CorsConfigurationSource() {
+//                    @Override
+//                    public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
+//                        CorsConfiguration config = new CorsConfiguration();
+//                        config.setAllowedOrigins(List.of(domainConfig.getProd(), domainConfig.getTest()));
+//                        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+//                        config.setAllowCredentials(true);
+//                        config.setAllowedHeaders(Collections.singletonList("*"));
+//                        config.setMaxAge(3600L);
+//                        config.setExposedHeaders(Arrays.asList("access", "Set-Cookie"));
+//
+//
+//                        return config;
+//                    }
+//                }));
         http
-                .cors((cors) -> cors.configurationSource(new CorsConfigurationSource() {
-                    @Override
-                    public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
-                        CorsConfiguration config = new CorsConfiguration();
-                        config.setAllowedOrigins(List.of(domainConfig.getProd(), domainConfig.getTest()));
-                        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-                        config.setAllowCredentials(true);
-                        config.setAllowedHeaders(Collections.singletonList("*"));
-                        config.setMaxAge(3600L);
-                        config.setExposedHeaders(Arrays.asList("access", "Set-Cookie"));
-
-
-                        return config;
-                    }
-                }));
+                .cors(cors -> cors.configurationSource(corsConfig.corsConfigurationSource()));
         http
                 .formLogin((auth) -> auth.disable());
         http
