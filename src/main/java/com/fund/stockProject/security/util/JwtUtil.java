@@ -1,5 +1,6 @@
 package com.fund.stockProject.security.util;
 
+import com.fund.stockProject.auth.domain.ROLE;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -18,11 +19,6 @@ public class JwtUtil {
 
     public static final String JWT_CATEGORY_ACCESS = "access";
     public static final String JWT_CATEGORY_REFRESH = "refresh";
-    public static final String JWT_CATEGORY_TEMP = "temp";
-    public static final String ACCESS_TOKEN_COOKIE_NAME = "ACCESS-TOKEN";
-    public static final String REFRESH_TOKEN_COOKIE_NAME = "REFRESH-TOKEN";
-    public static final String TEMP_TOKEN_COOKIE_NAME = "TEMP-TOKEN";
-    public static final String CSRF_TOKEN_COOKIE_NAME = "XSRF-TOKEN";
 
     public JwtUtil(@Value("${spring.jwt.secret}") String secret) {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
@@ -49,7 +45,7 @@ public class JwtUtil {
         return getClaims(token).get("role", String.class);
     }
 
-    public String createJwt(String category, String email, String role, Long expiredMs) {
+    public String createJwt(String category, String email, ROLE role, Long expiredMs) {
         Instant issuedAt = Instant.now();
         Instant expiration = issuedAt.plusMillis(expiredMs);
 

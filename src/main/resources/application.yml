@@ -44,7 +44,6 @@ spring:
     secret: ENC(ZtLQKC+5jIxK8fYB7W6XZ3mkCr3ueVGBVYTa1SfpAsnsSKUw2k5lHD+egat0VF0fyQH9apHpl5o=)
     access-expiration-ms: ENC(LC2BPxRUYKGUHFikipEopQ==)
     refresh-expiration-ms: ENC(vIwhX3e0QNiMf9DT3qx6tviWchTH1OL7)
-    temp-expiration-ms: ENC(CRbXo2wXEd3RsluSjqVNYA==)
   mail:
     host: smtp.gmail.com
     port: 587
@@ -98,6 +97,10 @@ spring:
             token-uri: https://kauth.kakao.com/oauth/token
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
 management:
   endpoints:
     enabled-by-default: false
