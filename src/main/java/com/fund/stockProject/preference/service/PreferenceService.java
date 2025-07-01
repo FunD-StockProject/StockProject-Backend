@@ -49,7 +49,7 @@ public class PreferenceService {
     }
 
     public List<BookmarkInfoResponse> getBookmarks() {
-        Integer currentUserId = AuthService.getCurrentUserId();
+        Integer currentUserId = getCurrentUserId();
 
         List<Stock> stockList = preferenceRepository.findByUserIdAndPreferenceType(currentUserId, PreferenceType.BOOKMARK)
                 .stream()
@@ -88,7 +88,7 @@ public class PreferenceService {
 
 
     public Integer getBookmarkCount() {
-        Integer currentUserId = AuthService.getCurrentUserId();
+        Integer currentUserId = getCurrentUserId();
         return (int) preferenceRepository.countByUserIdAndPreferenceType(currentUserId, PreferenceType.BOOKMARK);
     }
 
@@ -103,7 +103,7 @@ public class PreferenceService {
     }
 
     private void setPreference(Integer stockId, PreferenceType newPreferenceType) {
-        Integer currentUserId = AuthService.getCurrentUserId();
+        Integer currentUserId = getCurrentUserId();
         Optional<Preference> existingPreference =
                 preferenceRepository.findByUserIdAndStockId(currentUserId, stockId);
 
@@ -121,7 +121,7 @@ public class PreferenceService {
     }
 
     private void removePreference(Integer stockId, PreferenceType expectedPreferenceType) {
-        Integer currentUserId = AuthService.getCurrentUserId();
+        Integer currentUserId = getCurrentUserId();
         Optional<Preference> existingPreference =
                 preferenceRepository.findByUserIdAndStockId(currentUserId, stockId);
 
@@ -137,5 +137,15 @@ public class PreferenceService {
     private COUNTRY getCountryFromExchangeNum(EXCHANGENUM exchangenum) {
         return List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF)
                 .contains(exchangenum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
+    }
+
+    private Integer getCurrentUserId() {
+        String userEmail = AuthService.getCurrentUserEmail();
+
+        User user = userRepository.findByEmail(userEmail).orElseThrow(
+                () -> new EntityNotFoundException("User not found with email: " + userEmail)
+        );
+
+        return user.getId();
     }
 }

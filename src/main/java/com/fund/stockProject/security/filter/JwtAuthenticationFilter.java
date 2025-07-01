@@ -1,206 +1,122 @@
 package com.fund.stockProject.security.filter;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fund.stockProject.auth.entity.User;
-import com.fund.stockProject.auth.repository.UserRepository;
-import com.fund.stockProject.security.principle.CustomPrincipal;
-import com.fund.stockProject.security.util.CookieUtil;
 import com.fund.stockProject.security.util.JwtUtil;
-import com.fund.stockProject.security.util.ResponseUtil;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.SignatureException;
 import io.jsonwebtoken.UnsupportedJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.fund.stockProject.security.util.JwtUtil.*;
 
+@Slf4j
+@Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-    private final JwtUtil jwtUtil;
-    private final UserRepository userRepository;
-    private final ResponseUtil responseUtil;
 
-    // 임시 토큰으로 접근 가능한 경로들
-    private static final List<String> TEMP_TOKEN_ALLOWED_PATHS = Arrays.asList(
-            "/auth/oauth2/",
-            "/oauth2/authorization",       // OAuth2 인가 기본 경로 (이하 모든 경로 허용)
-            "/login/oauth2"
-    );
+    private final JwtUtil jwtUtil; // JwtUtil -> JwtTokenProvider로 이름 변경 가정
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        String accessToken = null;
-        String tempToken = null;
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
 
-        // 1. 요청에서 토큰 쿠키들 추출
-        if (request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
-                if (ACCESS_TOKEN_COOKIE_NAME.equals(cookie.getName())) {
-                    accessToken = cookie.getValue();
-                } else if (TEMP_TOKEN_COOKIE_NAME.equals(cookie.getName())) {
-                    tempToken = cookie.getValue();
-                }
-            }
-        }
+        // 1. [수정] Authorization 헤더에서 Bearer 토큰 추출
+        String accessToken = resolveToken(request);
 
-        // 2. 토큰 우선순위: Access Token > Temp Token
-        String tokenToProcess = null;
-        boolean isTempToken = false;
-
-        if (accessToken != null) {
-            tokenToProcess = accessToken;
-        } else if (tempToken != null) {
-            tokenToProcess = tempToken;
-            isTempToken = true;
-        }
-
-        // 토큰이 아예 없는 경우: 인증 컨텍스트를 비우고 다음 필터로 진행
-        if (tokenToProcess == null) {
-            SecurityContextHolder.clearContext();
+        // 2. 토큰이 없는 경우: 다음 필터로 바로 통과 (인증이 필요 없는 API 접근 허용)
+        if (accessToken == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
         // 3. 토큰 유효성 검증 및 처리
         try {
-            // JWT 토큰 유효성 검증 및 클레임 추출
-            String category = jwtUtil.getCategory(tokenToProcess);
-            String email = jwtUtil.getEmail(tokenToProcess);
-            String role = jwtUtil.getRole(tokenToProcess);
+            if (JWT_CATEGORY_ACCESS.equals(jwtUtil.getCategory(accessToken))) {
+                // 토큰이 유효하면, 인증 객체(Authentication)를 가져와서 SecurityContext에 저장
+                String email = jwtUtil.getEmail(accessToken);
+                String role = jwtUtil.getRole(accessToken);
 
-            if (isTempToken) {
-                // 임시 토큰 처리
-                handleTempToken(request, response, filterChain, category, email, role);
+                List<SimpleGrantedAuthority> authorities = Stream.of(role.split(","))
+                        .map(r -> new SimpleGrantedAuthority("ROLE_" + r.trim()))
+                        .collect(Collectors.toList());
+
+                // TODO: 필요에 따라서는 다시 CustomDetails 만들어야 할 듯
+                UserDetails userDetails = new User(email, "", authorities);
+
+                Authentication authentication = new UsernamePasswordAuthenticationToken(
+                        userDetails,         // Principal (인증된 사용자 정보)
+                        null,                // Credentials (비밀번호는 사용 안함)
+                        userDetails.getAuthorities() // Authorities (권한 목록)
+                );
+
+                SecurityContextHolder.getContext().setAuthentication(authentication);
             } else {
-                // 액세스 토큰 처리
-                handleAccessToken(request, response, filterChain, category, email, role);
+                // Access Token이 아닌 다른 종류의 토큰(예: Refresh Token)이 헤더에 담겨 온 경우
+                log.warn("Authorization 헤더에 Access Token이 아닌 토큰이 전달되었습니다. Category: {}", jwtUtil.getCategory(accessToken));
             }
+
+
+        } catch (MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
+            log.warn("Invalid JWT token: {}", e.getMessage());
+            // SecurityContext를 비우는 것이 안전합니다.
+            SecurityContextHolder.clearContext();
+            // 잘못된 토큰의 경우, 401 Unauthorized 에러를 응답할 수 있습니다.
+            // response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid Token");
+            // 혹은 그냥 통과시켜서 Spring Security의 ExceptionTranslationFilter가 처리하게 둘 수도 있습니다.
 
         } catch (ExpiredJwtException e) {
+            log.warn("Expired JWT token: {}", e.getMessage());
             SecurityContextHolder.clearContext();
-            if (isTempToken) {
-                responseUtil.sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "Temporary token expired");
-            } else {
-                responseUtil.sendErrorResponse(response, HttpStatus.FORBIDDEN, "Access token expired");
-            }
-
-        } catch (MalformedJwtException | UnsupportedJwtException | IllegalArgumentException |
-                 UsernameNotFoundException e) {
-            SecurityContextHolder.clearContext();
-            filterChain.doFilter(request, response);
+            // 만료된 토큰의 경우, 401 Unauthorized 에러를 응답하여 클라이언트가 토큰을 갱신하도록 유도합니다.
+            // TODO: 리턴 값에 따라 reissue
+            // response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Expired Token");
 
         } catch (Exception e) {
-            logger.error("An unexpected error occurred during JWT authentication", e);
+            log.error("An unexpected error occurred during JWT authentication", e);
             SecurityContextHolder.clearContext();
-            responseUtil.sendErrorResponse(response, HttpStatus.INTERNAL_SERVER_ERROR, "Authentication error");
-        }
-    }
-
-    /**
-     * 임시 토큰 처리
-     */
-    private void handleTempToken(HttpServletRequest request, HttpServletResponse response,
-                                 FilterChain filterChain, String category, String email, String role)
-            throws IOException, ServletException {
-
-        // 카테고리 검증
-        if (!JWT_CATEGORY_TEMP.equals(category)) {
-            SecurityContextHolder.clearContext();
-            filterChain.doFilter(request, response);
-            return;
+            // response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Authentication Error");
         }
 
-        // 임시 토큰으로 접근 가능한 경로인지 확인
-        String requestURI = request.getRequestURI();
-        if (!isAllowedPathForTempToken(requestURI)) {
-            SecurityContextHolder.clearContext();
-            responseUtil.sendErrorResponse(response, HttpStatus.FORBIDDEN,
-                    "Temporary token can only access registration completion endpoints");
-            return;
-        }
-
-        // 임시 사용자 인증 객체 생성
-        createTempAuthentication(email, role);
+        // 4. 다음 필터로 제어 전달
         filterChain.doFilter(request, response);
     }
 
     /**
-     * 액세스 토큰 처리 (기존 로직)
+     * [새로운 메소드]
+     * HttpServletRequest의 Authorization 헤더에서 Bearer 토큰을 추출하는 헬퍼 메소드
+     * @param request The request
+     * @return 추출된 토큰 문자열, 없거나 형식이 틀리면 null
      */
-    private void handleAccessToken(HttpServletRequest request, HttpServletResponse response,
-                                   FilterChain filterChain, String category, String email, String role)
-            throws IOException, ServletException {
+    private String resolveToken(HttpServletRequest request) {
+        // "Authorization" 헤더 값을 가져옵니다.
+        String bearerToken = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-        // 혹시 있을 임시 토큰 제거
-        CookieUtil.deleteCookie(request, response, TEMP_TOKEN_COOKIE_NAME);
-
-        // 토큰 카테고리 검증
-        if (!category.equals(JWT_CATEGORY_ACCESS)) {
-            SecurityContextHolder.clearContext();
-            filterChain.doFilter(request, response);
-            return;
+        // 헤더가 존재하고, "Bearer "로 시작하는지 확인합니다.
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+            // "Bearer " 접두사를 제거하고 순수한 토큰 값만 반환합니다.
+            return bearerToken.substring(7);
         }
 
-        // 데이터베이스에서 실제 사용자 정보 조회
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
-
-        // Spring Security 컨텍스트에 인증 정보 설정
-        CustomPrincipal customPrincipal = new CustomPrincipal(user);
-        Authentication authentication = new UsernamePasswordAuthenticationToken(
-                customPrincipal,
-                null,
-                customPrincipal.getAuthorities()
-        );
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        filterChain.doFilter(request, response);
-    }
-
-    /**
-     * 임시 토큰으로 접근 가능한 경로인지 확인
-     */
-    private boolean isAllowedPathForTempToken(String requestURI) {
-        return TEMP_TOKEN_ALLOWED_PATHS.stream()
-                .anyMatch(requestURI::startsWith);
-    }
-
-    /**
-     * 임시 사용자 인증 객체 생성
-     */
-    private void createTempAuthentication(String email, String role) {
-        // 임시 사용자를 위한 CustomPrincipal 생성 (isNewUser = true)
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email)); // 이것 다시 보기
-
-        // TODO: 여기 다시 구현
-        CustomPrincipal tempPrincipal = new CustomPrincipal(user, true);
-
-        // 임시 사용자 권한 설정
-        Collection<GrantedAuthority> authorities = Collections.singletonList(
-                new SimpleGrantedAuthority("ROLE_TEMP")
-        );
-
-        Authentication authToken = new UsernamePasswordAuthenticationToken(
-                tempPrincipal, null, authorities
-        );
-        SecurityContextHolder.getContext().setAuthentication(authToken);
+        // 그 외의 경우 null을 반환합니다.
+        return null;
     }
 }

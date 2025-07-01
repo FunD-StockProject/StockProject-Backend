@@ -34,4 +34,3 @@ public class ResponseUtil {
         sendJsonResponse(response, status, message);
     }
 }
-

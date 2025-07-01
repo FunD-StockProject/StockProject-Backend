@@ -1,32 +1,33 @@
 package com.fund.stockProject.auth.controller;
 
-import io.swagger.v3.oas.annotations.Operation;
-import jakarta.servlet.http.HttpServletResponse;
+import com.fund.stockProject.auth.dto.TokensResponse;
+import com.fund.stockProject.auth.service.OAuth2Service;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.IOException;
+import java.util.NoSuchElementException;
 
 @RestController
-@RequestMapping("/auth/oauth2")
+@RequestMapping("/auth")
+@RequiredArgsConstructor
 public class OAuth2Controller {
+    private final OAuth2Service oAuth2Service;
 
-    @GetMapping("/naver")
-    @Operation(summary = "네이버 로그인 리다이렉트", description = "네이버 로그인 페이지로 리다이렉트")
-    public void redirectToNaver(HttpServletResponse response) throws IOException {
-        response.sendRedirect("/oauth2/authorization/naver");
+    @GetMapping("/login/kakao")
+    public ResponseEntity<TokensResponse> kakaoLogin(@RequestParam String code, @RequestParam String state) {
+        try {
+            TokensResponse tokens = oAuth2Service.kakaoLogin(code, state);
+            return ResponseEntity.ok(tokens); // 200 OK
+        } catch (NoSuchElementException e) { // 예를 들어 사용자가 없거나 특정 리소스를 못 찾았을 때
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); // 404 Not Found
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(); // 500 Internal Server Error
+        }
     }
 
-    @GetMapping("/kakao")
-    @Operation(summary = "카카오 로그인 리다이렉트", description = "카카오 로그인 페이지로 리다이렉트")
-    public void redirectToKakao(HttpServletResponse response) throws IOException {
-        response.sendRedirect("/oauth2/authorization/kakao");
-    }
-
-    @GetMapping("/google")
-    @Operation(summary = "구글 로그인 리다이렉트", description = "구글 로그인 페이지로 리다이렉트")
-    public void redirectToGoogle(HttpServletResponse response) throws IOException {
-        response.sendRedirect("/oauth2/authorization/google");
-    }
 }

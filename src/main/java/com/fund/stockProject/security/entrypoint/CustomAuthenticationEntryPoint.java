@@ -1,6 +1,5 @@
 package com.fund.stockProject.security.entrypoint;
 
-import com.fund.stockProject.security.util.ResponseUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -14,11 +13,14 @@ import java.io.IOException;
 @Component
 @RequiredArgsConstructor
 public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint {
-    private final ResponseUtil responseUtil;
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
                          AuthenticationException authException) throws IOException {
-        responseUtil.sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "Unauthorized access.");
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        response.setContentType("application/json");
+        response.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"Authentication is required to access this resource.\"}");
+        response.getWriter().flush();
+        response.getWriter().close();
     }
 }
