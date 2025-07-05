@@ -14,6 +14,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.Collections;
 import java.util.Map;
 
 @Component
@@ -32,34 +33,48 @@ public class NaverService {
     private String userInfoUri;
 
     public NaverTokenResponse getAccessToken(String code, String redirectUri) throws UnsupportedEncodingException {
-        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
 
-        params.add("grant_type", "authorization_code");
-        params.add("client_id", clientId);
-        params.add("client_secret", clientSecret);
-        params.add("code", code);
         String state = URLEncoder.encode(redirectUri, "UTF-8");
-        params.add("state", state);
 
-        NaverTokenResponse response = webClient.post()
-                .uri(tokenUri)
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .body(BodyInserters.fromFormData(params))
+        String fullUrl = tokenUri
+                + "?grant_type=authorization_code"
+                + "&client_id=" + clientId
+                + "&client_secret=" + clientSecret
+                + "&code=" + code
+                + "&state=" + state;
+
+        NaverTokenResponse response = webClient.get()
+                .uri(fullUrl)
                 .retrieve()
                 .bodyToMono(NaverTokenResponse.class)
                 .block();
 
         if (response == null || response.getAccessToken() == null) {
-            throw new RuntimeException("Failed to retrieve access token from Kakao");
+            throw new RuntimeException("Failed to retrieve access token from Naver");
         }
 
         return response;
     }
 
     public Map<String, Object> getUserInfo(String accessToken) {
+        String result = webClient.get()
+                .uri(userInfoUri)
+                .headers(headers -> {
+                    headers.setBearerAuth(accessToken);
+                    headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+                })
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+        System.out.println("Naver userInfo API result: " + result);
+
         return webClient.get()
                 .uri(userInfoUri)
-                .headers(headers -> headers.setBearerAuth(accessToken))
+                .headers(headers -> {
+                    headers.setBearerAuth(accessToken);
+                    headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+                })
                 .retrieve()
                 .bodyToMono(Map.class)
                 .block();

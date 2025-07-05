@@ -63,8 +63,8 @@ spring:
         registration:
           naver:
             client-name: naver
-            client-id: ENC(HY1OyhLVVF6XhXcyA5qv2V6YnDnjEwRiRDSwfxbSF90=)
-            client-secret: ENC(M6Rv2pyRlnE4CEzUtR5zG1T+8oU/QgL7)
+            client-id: ENC(iujxejF3nI3d/FDLv35lDVvqkRJjyhJ360wQIz58XVI=)
+            client-secret: ENC(UTJocZk/Qdn55DvJDhT6EqoUvrBHn8a7)
             redirect-uri: ENC(ENKzIy0M0ZmX+xSYduyLKNjV6zcevb68xuJpnzd8FW2nup0EHiOwDGi3TKvVVXI+H73v+ubkY+m5v1V6iPfx4g==)
             authorization-grant-type: authorization_code
             scope:
