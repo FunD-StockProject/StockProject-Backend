@@ -1,51 +1,54 @@
 package com.fund.stockProject.auth.service;
 
 import com.fund.stockProject.auth.dto.KakaoTokenResponse;
+import com.fund.stockProject.auth.dto.NaverTokenResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class KakaoService {
+public class NaverService {
     private final WebClient webClient;
 
-    @Value("${spring.security.oauth2.client.registration.kakao.client-id}")
+    @Value("${spring.security.oauth2.client.registration.naver.client-id}")
     private String clientId;
-    @Value("${spring.security.oauth2.client.registration.kakao.client-secret}")
+    @Value("${spring.security.oauth2.client.registration.naver.client-secret}")
     private String clientSecret;
-    @Value("${spring.security.oauth2.client.provider.kakao.token-uri}")
+    @Value("${spring.security.oauth2.client.provider.naver.token-uri}")
     private String tokenUri;
-    @Value("${spring.security.oauth2.client.provider.kakao.user-info-uri}")
+    @Value("${spring.security.oauth2.client.provider.naver.user-info-uri}")
     private String userInfoUri;
 
-    public KakaoTokenResponse getAccessToken(String code, String redirectUri) {
+    public NaverTokenResponse getAccessToken(String code, String redirectUri) throws UnsupportedEncodingException {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
 
         params.add("grant_type", "authorization_code");
         params.add("client_id", clientId);
-        params.add("redirect_uri", redirectUri);
-        params.add("code", code);
         params.add("client_secret", clientSecret);
+        params.add("code", code);
+        String state = URLEncoder.encode(redirectUri, "UTF-8");
+        params.add("state", state);
 
-        KakaoTokenResponse response = webClient.post()
+        NaverTokenResponse response = webClient.post()
                 .uri(tokenUri)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(BodyInserters.fromFormData(params))
                 .retrieve()
-                .bodyToMono(KakaoTokenResponse.class)
+                .bodyToMono(NaverTokenResponse.class)
                 .block();
-        // TODO: KakaoTokenResponse를 반환
+
         if (response == null || response.getAccessToken() == null) {
             throw new RuntimeException("Failed to retrieve access token from Kakao");
         }
