@@ -29,7 +29,7 @@ public class KakaoService {
     @Value("${spring.security.oauth2.client.provider.kakao.user-info-uri}")
     private String userInfoUri;
 
-    public String getAccessToken(String code, String redirectUri) {
+    public KakaoTokenResponse getAccessToken(String code, String redirectUri) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
 
         params.add("grant_type", "authorization_code");
@@ -45,11 +45,12 @@ public class KakaoService {
                 .retrieve()
                 .bodyToMono(KakaoTokenResponse.class)
                 .block();
+        // TODO: KakaoTokenResponse를 반환
         if (response == null || response.getAccessToken() == null) {
             throw new RuntimeException("Failed to retrieve access token from Kakao");
         }
 
-        return response.getAccessToken();
+        return response;
     }
 
     public Map<String, Object> getUserInfo(String accessToken) {

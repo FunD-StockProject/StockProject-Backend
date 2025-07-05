@@ -35,6 +35,7 @@ public class SecurityConfig {
             "/favicon.ico",
             "/auth/register",
             "/auth/login/kakao",
+            "/auth/login/naver",
             "/auth/oauth2/register",
             "/auth/login",
             "/auth/logout",
