@@ -1,3 +1,6 @@
+logging:
+  level:
+    root: DEBUG
 app:
   domain:
     prod: ENC(5P9Iq3ZTswvqef+LtMIwKsnvQ0guIfVYyIMmNmYcjDA=)
