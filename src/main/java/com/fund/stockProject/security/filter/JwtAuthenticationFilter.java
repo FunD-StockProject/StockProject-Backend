@@ -1,5 +1,6 @@
 package com.fund.stockProject.security.filter;
 
+import com.fund.stockProject.security.principle.CustomUserDetails;
 import com.fund.stockProject.security.util.JwtUtil;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
@@ -22,6 +23,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -60,13 +62,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         .collect(Collectors.toList());
 
                 // TODO: 필요에 따라서는 다시 CustomDetails 만들어야 할 듯
-                UserDetails userDetails = new User(email, "", authorities);
+                CustomUserDetails userPrincipal = new CustomUserDetails(email, "", authorities);
 
-                Authentication authentication = new UsernamePasswordAuthenticationToken(
-                        userDetails,         // Principal (인증된 사용자 정보)
-                        null,                // Credentials (비밀번호는 사용 안함)
-                        userDetails.getAuthorities() // Authorities (권한 목록)
-                );
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userPrincipal,
+                                null,
+                                userPrincipal.getAuthorities()
+                        );
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } else {
