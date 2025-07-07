@@ -3,6 +3,7 @@ package com.fund.stockProject.auth.controller;
 import com.fund.stockProject.auth.dto.*;
 import com.fund.stockProject.auth.service.AuthService;
 import com.fund.stockProject.auth.service.TokenService;
+import com.fund.stockProject.security.principle.CustomUserDetails;
 import com.sun.security.auth.UserPrincipal;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,14 +37,14 @@ public class AuthController {
 
     @DeleteMapping("/withdraw")
     @Operation(summary = "회원 탈퇴 API", description = "회원 탈퇴 API")
-    public ResponseEntity<Map<String, String>> withdrawUser(@AuthenticationPrincipal UserPrincipal userPrincipal) {
-        if (userPrincipal == null) {
+    public ResponseEntity<Map<String, String>> withdrawUser(@AuthenticationPrincipal CustomUserDetails customUserDetails) {
+        if (customUserDetails == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED) // HTTP 401 Unauthorized
                     .body(Map.of("message", "Authentication required"));
         }
 
         try {
-            authService.withdrawUser(userPrincipal.getName()); // getName()이지만 실제로는 email을 반환
+            authService.withdrawUser(customUserDetails.getEmail());
             return ResponseEntity.ok(Map.of("message", "User withdrawn successfully")); // HTTP 200 OK
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
