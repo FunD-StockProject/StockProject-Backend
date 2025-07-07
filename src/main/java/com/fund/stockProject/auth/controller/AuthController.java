@@ -7,6 +7,7 @@ import com.fund.stockProject.security.principle.CustomUserDetails;
 import com.sun.security.auth.UserPrincipal;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +38,7 @@ public class AuthController {
 
     @DeleteMapping("/withdraw")
     @Operation(summary = "회원 탈퇴 API", description = "회원 탈퇴 API")
+    @SecurityRequirement(name = "bearerAuth") // 인증이 필요한 API로 설정
     public ResponseEntity<Map<String, String>> withdrawUser(@AuthenticationPrincipal CustomUserDetails customUserDetails) {
         if (customUserDetails == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED) // HTTP 401 Unauthorized
@@ -71,6 +73,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
+    @SecurityRequirement(name = "bearerAuth") // 인증이 필요한 API로 설정
     public ResponseEntity<?> logout(@RequestBody RefreshTokenRequest requestDto) {
         try {
             tokenService.logout(requestDto.getRefreshToken());
