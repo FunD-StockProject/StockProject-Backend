@@ -1,10 +1,12 @@
 package com.fund.stockProject.auth.service;
 
 import com.fund.stockProject.auth.domain.PROVIDER;
+import com.fund.stockProject.auth.dto.GoogleTokenResponse;
 import com.fund.stockProject.auth.dto.KakaoTokenResponse;
 import com.fund.stockProject.auth.dto.NaverTokenResponse;
 import com.fund.stockProject.auth.dto.TokensResponse;
 import com.fund.stockProject.auth.entity.User;
+import com.fund.stockProject.auth.oauth2.GoogleOAuth2UserInfo;
 import com.fund.stockProject.auth.oauth2.KakaoOAuth2UserInfo;
 import com.fund.stockProject.auth.oauth2.NaverOAuth2UserInfo;
 import com.fund.stockProject.auth.repository.UserRepository;
@@ -24,6 +26,7 @@ public class OAuth2Service {
     private final UserRepository userRepository;
     private final TokenService tokenService;
     private final NaverService naverService;
+    private final GoogleService googleService;
 
     public TokensResponse kakaoLogin(String code, String state) {
         String redirectUri = decodeState(state);
@@ -53,6 +56,23 @@ public class OAuth2Service {
         );
 
         user.updateSocialUserInfo(PROVIDER.NAVER, naverUserInfo.getProviderId(), response.getAccessToken(), response.getRefreshToken());
+        userRepository.save(user); // 사용자 정보 업데이트
+        // TODO: 소셜 사용자 정보 업데이트 로직 추가
+
+        return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
+    }
+
+    public TokensResponse googleLogin(String code, String state) {
+        String redirectUri = decodeState(state);
+        GoogleTokenResponse response = googleService.getAccessToken(code, redirectUri);
+        Map<String, Object> attributes = googleService.getUserInfo(response.getAccessToken());
+        GoogleOAuth2UserInfo googleUserInfo = new GoogleOAuth2UserInfo(attributes);
+
+        User user = userRepository.findByEmail(googleUserInfo.getEmail()).orElseThrow(
+                () -> new NoSuchElementException("해당 이메일로 가입된 사용자가 없습니다.")
+        );
+
+        user.updateSocialUserInfo(PROVIDER.GOOGLE, googleUserInfo.getProviderId(), response.getAccessToken(), response.getRefreshToken());
         userRepository.save(user); // 사용자 정보 업데이트
         // TODO: 소셜 사용자 정보 업데이트 로직 추가
 
