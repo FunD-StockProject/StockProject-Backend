@@ -42,17 +42,17 @@ public class OAuth2Controller {
         }
     }
 
-//    @GetMapping("/login/google")
-//    public ResponseEntity<TokensResponse> googleLogin(@RequestParam String code, @RequestParam String state) {
-//        try {
-//            TokensResponse tokens = oAuth2Service.googleLogin(code, state);
-//            return ResponseEntity.ok(tokens); // 200 OK
-//        } catch (NoSuchElementException e) { // 예를 들어 사용자가 없거나 특정 리소스를 못 찾았을 때
-//            return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); // 404 Not Found
-//        } catch (Exception e) {
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(); // 500 Internal Server Error
-//        }
-//    }
+    @GetMapping("/login/google")
+    public ResponseEntity<TokensResponse> googleLogin(@RequestParam String code, @RequestParam String state) {
+        try {
+            TokensResponse tokens = oAuth2Service.googleLogin(code, state);
+            return ResponseEntity.ok(tokens); // 200 OK
+        } catch (NoSuchElementException e) { // 예를 들어 사용자가 없거나 특정 리소스를 못 찾았을 때
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); // 404 Not Found
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(); // 500 Internal Server Error
+        }
+    }
 //
 //    @GetMapping("/login/apple")
 //    public ResponseEntity<TokensResponse> appleLogin(@RequestParam String code, @RequestParam String state) {
