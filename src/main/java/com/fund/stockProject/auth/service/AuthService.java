@@ -62,11 +62,6 @@ public class AuthService {
 
     @Transactional
     public void withdrawUser(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException(String.format("User not found with email: %s", email)));
-
-        user.withdraw();
-
-        userRepository.save(user);
+        userRepository.deleteUserByEmail(email);
     }
 }
