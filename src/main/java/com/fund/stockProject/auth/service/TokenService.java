@@ -50,7 +50,7 @@ public class TokenService {
 
         String nickname = getNickname(email); // 사용자 닉네임 조회
 
-        return new LoginResponse(email, nickname, accessToken, newRefreshToken);
+        return new LoginResponse("SUCCESS", email, nickname, accessToken, newRefreshToken);
     }
 
     /**
@@ -105,7 +105,7 @@ public class TokenService {
             String nickname = getNickname(email); // 사용자 닉네임 조회
 
             // 6. 새 토큰들을 DTO에 담아 반환
-            return new LoginResponse(email, nickname, newAccessToken, newRefreshToken);
+            return new LoginResponse("SUCCESS", email, nickname, newAccessToken, newRefreshToken);
 
         } catch (ExpiredJwtException e) {
             // 만료된 경우, DB에 토큰이 남아있다면 삭제해주는 것이 보안상 좋습니다.
