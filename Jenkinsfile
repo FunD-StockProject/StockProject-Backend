@@ -45,6 +45,16 @@ pipeline {
             }
         }
 
+        stage('Copy Apple AuthKey (.p8)') {
+                    steps {
+                        withCredentials([file(credentialsId: 'apple-signin-p8', variable: 'APPLE_P8')]) {
+                            sh '''
+                                cp $APPLE_P8 $WORKSPACE/AuthKey_DKATK95R7J_humanzipyo.p8
+                            '''
+                        }
+                    }
+                }
+
         stage('Build Docker Image') {
             steps {
                 script {
