@@ -4,7 +4,7 @@ import com.fund.stockProject.auth.domain.PROVIDER;
 import com.fund.stockProject.auth.dto.GoogleTokenResponse;
 import com.fund.stockProject.auth.dto.KakaoTokenResponse;
 import com.fund.stockProject.auth.dto.NaverTokenResponse;
-import com.fund.stockProject.auth.dto.TokensResponse;
+import com.fund.stockProject.auth.dto.LoginResponse;
 import com.fund.stockProject.auth.entity.User;
 import com.fund.stockProject.auth.oauth2.GoogleOAuth2UserInfo;
 import com.fund.stockProject.auth.oauth2.KakaoOAuth2UserInfo;
@@ -28,7 +28,7 @@ public class OAuth2Service {
     private final NaverService naverService;
     private final GoogleService googleService;
 
-    public TokensResponse kakaoLogin(String code, String state) {
+    public LoginResponse kakaoLogin(String code, String state) {
         String redirectUri = decodeState(state);
         KakaoTokenResponse response = kakaoService.getAccessToken(code, redirectUri);
         Map<String, Object> attributes = kakaoService.getUserInfo(response.getAccessToken());
@@ -45,7 +45,7 @@ public class OAuth2Service {
         return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
     }
 
-    public TokensResponse naverLogin(String code, String state) throws UnsupportedEncodingException {
+    public LoginResponse naverLogin(String code, String state) throws UnsupportedEncodingException {
         String redirectUri = decodeState(state);
         NaverTokenResponse response = naverService.getAccessToken(code, redirectUri);
         Map<String, Object> attributes = naverService.getUserInfo(response.getAccessToken());
@@ -62,7 +62,7 @@ public class OAuth2Service {
         return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
     }
 
-    public TokensResponse googleLogin(String code, String state) {
+    public LoginResponse googleLogin(String code, String state) {
         String redirectUri = decodeState(state);
         GoogleTokenResponse response = googleService.getAccessToken(code, redirectUri);
         Map<String, Object> attributes = googleService.getUserInfo(response.getAccessToken());

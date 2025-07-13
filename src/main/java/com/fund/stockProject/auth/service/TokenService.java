@@ -1,10 +1,11 @@
 package com.fund.stockProject.auth.service;
 
 import com.fund.stockProject.auth.domain.ROLE;
-import com.fund.stockProject.auth.dto.TokensResponse;
+import com.fund.stockProject.auth.dto.LoginResponse;
 import com.fund.stockProject.auth.dto.RefreshTokenRequest;
 import com.fund.stockProject.auth.entity.RefreshToken;
 import com.fund.stockProject.auth.repository.RefreshTokenRepository;
+import com.fund.stockProject.auth.repository.UserRepository;
 import com.fund.stockProject.security.util.JwtUtil;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -21,6 +22,7 @@ public class TokenService {
 
     private final JwtUtil jwtUtil;
     private final RefreshTokenRepository refreshTokenRepository; // RefreshRepository 주입
+    private final UserRepository userRepository;
 
     @Value("${spring.jwt.access-expiration-ms}")
     private Long accessTokenExpirationMs;
@@ -30,7 +32,7 @@ public class TokenService {
 
 
     @Transactional
-    public TokensResponse issueTokensOnLogin(String email, ROLE role, String existingRefreshToken) {
+    public LoginResponse issueTokensOnLogin(String email, ROLE role, String existingRefreshToken) {
         // access token 생성
         String accessToken = jwtUtil.createJwt(JWT_CATEGORY_ACCESS, email, role, accessTokenExpirationMs);
 
@@ -46,7 +48,9 @@ public class TokenService {
         RefreshToken refreshToken = new RefreshToken(email, newRefreshToken, System.currentTimeMillis() + refreshTokenExpirationMs);
         refreshTokenRepository.save(refreshToken);
 
-        return new TokensResponse(accessToken, newRefreshToken);
+        String nickname = getNickname(email); // 사용자 닉네임 조회
+
+        return new LoginResponse(email, nickname, accessToken, newRefreshToken);
     }
 
     /**
@@ -59,7 +63,7 @@ public class TokenService {
      * @throws RuntimeException 토큰 검증 실패 시 (만료, 유효하지 않음 등)
      */
     @Transactional
-    public TokensResponse reissueTokens(RefreshTokenRequest request) { // String 토큰을 직접 받음
+    public LoginResponse reissueTokens(RefreshTokenRequest request) { // String 토큰을 직접 받음
         String oldRefreshToken = request.getRefreshToken();
 
         if (oldRefreshToken == null || oldRefreshToken.isBlank()) {
@@ -98,9 +102,10 @@ public class TokenService {
                     .build();
 
             refreshTokenRepository.save(refreshToken);
+            String nickname = getNickname(email); // 사용자 닉네임 조회
 
             // 6. 새 토큰들을 DTO에 담아 반환
-            return new TokensResponse(newAccessToken, newRefreshToken);
+            return new LoginResponse(email, nickname, newAccessToken, newRefreshToken);
 
         } catch (ExpiredJwtException e) {
             // 만료된 경우, DB에 토큰이 남아있다면 삭제해주는 것이 보안상 좋습니다.
@@ -138,6 +143,12 @@ public class TokenService {
         // 3. DB에서 Refresh Token 삭제
         // deleteBy... 메소드는 대상이 없어도 오류를 발생시키지 않으므로, find.. 없이 바로 사용 가능
         refreshTokenRepository.deleteByRefreshToken(refreshToken);
+    }
+
+    private String getNickname(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new JwtException("User not found with email: " + email))
+                .getNickname(); // 사용자 닉네임 조회
     }
 
 }

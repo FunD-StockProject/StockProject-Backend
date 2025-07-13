@@ -1,6 +1,6 @@
 package com.fund.stockProject.auth.controller;
 
-import com.fund.stockProject.auth.dto.TokensResponse;
+import com.fund.stockProject.auth.dto.LoginResponse;
 import com.fund.stockProject.auth.service.OAuth2Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,10 +19,10 @@ public class OAuth2Controller {
     private final OAuth2Service oAuth2Service;
 
     @GetMapping("/login/kakao")
-    public ResponseEntity<TokensResponse> kakaoLogin(@RequestParam String code, @RequestParam String state) {
+    public ResponseEntity<LoginResponse> kakaoLogin(@RequestParam String code, @RequestParam String state) {
         try {
-            TokensResponse tokens = oAuth2Service.kakaoLogin(code, state);
-            return ResponseEntity.ok(tokens); // 200 OK
+            LoginResponse response = oAuth2Service.kakaoLogin(code, state);
+            return ResponseEntity.ok(response); // 200 OK
         } catch (NoSuchElementException e) { // 예를 들어 사용자가 없거나 특정 리소스를 못 찾았을 때
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); // 404 Not Found
         } catch (Exception e) {
@@ -31,10 +31,10 @@ public class OAuth2Controller {
     }
 
     @GetMapping("/login/naver")
-    public ResponseEntity<TokensResponse> naverLogin(@RequestParam String code, @RequestParam String state) {
+    public ResponseEntity<LoginResponse> naverLogin(@RequestParam String code, @RequestParam String state) {
         try {
-            TokensResponse tokens = oAuth2Service.naverLogin(code, state);
-            return ResponseEntity.ok(tokens); // 200 OK
+            LoginResponse response = oAuth2Service.naverLogin(code, state);
+            return ResponseEntity.ok(response); // 200 OK
         } catch (NoSuchElementException e) { // 예를 들어 사용자가 없거나 특정 리소스를 못 찾았을 때
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); // 404 Not Found
         } catch (Exception e) {
@@ -43,10 +43,10 @@ public class OAuth2Controller {
     }
 
     @GetMapping("/login/google")
-    public ResponseEntity<TokensResponse> googleLogin(@RequestParam String code, @RequestParam String state) {
+    public ResponseEntity<LoginResponse> googleLogin(@RequestParam String code, @RequestParam String state) {
         try {
-            TokensResponse tokens = oAuth2Service.googleLogin(code, state);
-            return ResponseEntity.ok(tokens); // 200 OK
+            LoginResponse response = oAuth2Service.googleLogin(code, state);
+            return ResponseEntity.ok(response); // 200 OK
         } catch (NoSuchElementException e) { // 예를 들어 사용자가 없거나 특정 리소스를 못 찾았을 때
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); // 404 Not Found
         } catch (Exception e) {
