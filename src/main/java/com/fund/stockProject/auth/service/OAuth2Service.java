@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -34,13 +35,14 @@ public class OAuth2Service {
         Map<String, Object> attributes = kakaoService.getUserInfo(response.getAccessToken());
         KakaoOAuth2UserInfo kakaoUserInfo = new KakaoOAuth2UserInfo(attributes);
 
-        User user = userRepository.findByEmail(kakaoUserInfo.getEmail()).orElseThrow(
-                () -> new NoSuchElementException("해당 이메일로 가입된 사용자가 없습니다.")
-        );
+        Optional<User> userOptional = userRepository.findByEmail(kakaoUserInfo.getEmail());
+        if(userOptional.isEmpty()) {
+            return new LoginResponse("NEED_REGISTER", kakaoUserInfo.getEmail(), null, null, null);
+        }
 
+        User user = userOptional.get();
         user.updateSocialUserInfo(PROVIDER.KAKAO, kakaoUserInfo.getProviderId(), response.getAccessToken(), response.getRefreshToken());
         userRepository.save(user); // 사용자 정보 업데이트
-        // TODO: 소셜 사용자 정보 업데이트 로직 추가
 
         return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
     }
@@ -51,13 +53,14 @@ public class OAuth2Service {
         Map<String, Object> attributes = naverService.getUserInfo(response.getAccessToken());
         NaverOAuth2UserInfo naverUserInfo = new NaverOAuth2UserInfo(attributes);
 
-        User user = userRepository.findByEmail(naverUserInfo.getEmail()).orElseThrow(
-                () -> new NoSuchElementException("해당 이메일로 가입된 사용자가 없습니다.")
-        );
+        Optional<User> userOptional = userRepository.findByEmail(naverUserInfo.getEmail());
+        if(userOptional.isEmpty()) {
+            return new LoginResponse("NEED_REGISTER", naverUserInfo.getEmail(), null, null, null);
+        }
 
+        User user = userOptional.get();
         user.updateSocialUserInfo(PROVIDER.NAVER, naverUserInfo.getProviderId(), response.getAccessToken(), response.getRefreshToken());
         userRepository.save(user); // 사용자 정보 업데이트
-        // TODO: 소셜 사용자 정보 업데이트 로직 추가
 
         return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
     }
@@ -68,13 +71,14 @@ public class OAuth2Service {
         Map<String, Object> attributes = googleService.getUserInfo(response.getAccessToken());
         GoogleOAuth2UserInfo googleUserInfo = new GoogleOAuth2UserInfo(attributes);
 
-        User user = userRepository.findByEmail(googleUserInfo.getEmail()).orElseThrow(
-                () -> new NoSuchElementException("해당 이메일로 가입된 사용자가 없습니다.")
-        );
+        Optional<User> userOptional = userRepository.findByEmail(googleUserInfo.getEmail());
+        if(userOptional.isEmpty()) {
+            return new LoginResponse("NEED_REGISTER", googleUserInfo.getEmail(), null, null, null);
+        }
 
+        User user = userOptional.get();
         user.updateSocialUserInfo(PROVIDER.GOOGLE, googleUserInfo.getProviderId(), response.getAccessToken(), response.getRefreshToken());
         userRepository.save(user); // 사용자 정보 업데이트
-        // TODO: 소셜 사용자 정보 업데이트 로직 추가
 
         return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
     }
