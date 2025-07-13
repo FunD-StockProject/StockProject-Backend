@@ -53,5 +53,8 @@ COPY --from=build /app/build/libs/stockProject-0.0.1-SNAPSHOT.jar /app/app.jar
 # 7. keystore.p12 파일 복사
 COPY keystore.p12 /app/config/keystore.p12
 
-# 8. 실행 파일 최소화
+# 8. Apple .p8 파일 복사
+COPY AuthKey_DKATK95R7J_humanzipyo.p8 /app/config/AuthKey_DKATK95R7J_humanzipyo.p8
+
+# 9. 실행 파일 최소화
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
