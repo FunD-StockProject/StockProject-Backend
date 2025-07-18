@@ -62,6 +62,9 @@ spring:
             client-name: google
             client-id: ENC(WFb1HLBH6ZJZdarB9dBSrdY2s7pi9ngOH1tbeBeAMYDd9NQb3vXPfBqL/Bjlu6qWD7NM9RpRiXy/w0Skhq4QU7zRw3wqxUi76OoOuAO+I2JwWpzAHOhN5g==)
             client-secret: ENC(E1oLkj1En5qF/g+3AS78j0pQLwgyfiY2Wxdgx1y8O1LC8l/bFlZzV9XkTLM3FGAg)
+          apple:
+            client-name: apple
+            client-id: ENC(NcgbXaGAkFQQQKMatTfBKPslwGNAFPyupnb5CggsLTY=)
         provider:
           naver:
             token-uri: https://nid.naver.com/oauth2.0/token
@@ -72,6 +75,13 @@ spring:
           google:
             token-uri: https://oauth2.googleapis.com/token
             user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+          apple:
+            token-uri: https://appleid.apple.com/auth/token
+            user-info-uri: https://appleid.apple.com/auth/userinfo
+      apple:
+        team-id: ENC(84yDRtpeK/fwcu9uB2fOh1EhHiYxW9zK)
+        key-id: ENC(dwju4g/zLsvwxtTbLTP2VuTri+uoUX3t)
+        private-key-path: ENC(Wh2lCpfugr9NofUwUMVqcee4LtdKRrRq+rKTbUiWJY7Ob+yO6rZicJqoEV9Lqa9XQcvTLG4tmD0=)
 management:
   endpoints:
     enabled-by-default: false

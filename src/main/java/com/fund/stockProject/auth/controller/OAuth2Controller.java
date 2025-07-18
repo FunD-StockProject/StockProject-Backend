@@ -62,17 +62,20 @@ public class OAuth2Controller {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(); // 500 Internal Server Error
         }
     }
-//
-//    @GetMapping("/login/apple")
-//    public ResponseEntity<TokensResponse> appleLogin(@RequestParam String code, @RequestParam String state) {
-//        try {
-//            TokensResponse tokens = oAuth2Service.appleLogin(code, state);
-//            return ResponseEntity.ok(tokens); // 200 OK
-//        } catch (NoSuchElementException e) { // 예를 들어 사용자가 없거나 특정 리소스를 못 찾았을 때
-//            return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); // 404 Not Found
-//        } catch (Exception e) {
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(); // 500 Internal Server Error
-//        }
-//    }
+
+    @GetMapping("/login/apple")
+    public ResponseEntity<LoginResponse> appleLogin(@RequestParam String code, @RequestParam String state) {
+        try {
+            LoginResponse response = oAuth2Service.appleLogin(code, state);
+
+            if ("NEED_REGISTER".equals(response.getState())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response); // 404
+            }
+
+            return ResponseEntity.ok(response); // 200 OK
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(); // 500 Internal Server Error
+        }
+    }
 
 }

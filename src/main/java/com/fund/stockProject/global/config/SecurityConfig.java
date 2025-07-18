@@ -37,6 +37,7 @@ public class SecurityConfig {
             "/auth/login/kakao",
             "/auth/login/naver",
             "/auth/login/google",
+            "/auth/login/apple",
             "/auth/oauth2/register",
             "/auth/login",
             "/auth/logout",

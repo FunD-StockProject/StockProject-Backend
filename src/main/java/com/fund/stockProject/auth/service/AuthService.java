@@ -39,6 +39,7 @@ public class AuthService {
         if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) {
             return null;
         }
+        // TODO: UserPrincipal이 아닌 CustomUserDetails를 사용하도록 변경
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
 
         return principal.getName();
