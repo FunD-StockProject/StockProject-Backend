@@ -4,7 +4,8 @@ public enum PROVIDER {
     LOCAL("local"), // 필요하다면 "local" 문자열도 정의할 수 있습니다.
     KAKAO("kakao"),
     NAVER("naver"),
-    GOOGLE("google");
+    GOOGLE("google"),
+    APPLE("apple");
 
     private final String provider;
 

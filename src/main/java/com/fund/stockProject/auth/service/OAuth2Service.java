@@ -1,11 +1,9 @@
 package com.fund.stockProject.auth.service;
 
 import com.fund.stockProject.auth.domain.PROVIDER;
-import com.fund.stockProject.auth.dto.GoogleTokenResponse;
-import com.fund.stockProject.auth.dto.KakaoTokenResponse;
-import com.fund.stockProject.auth.dto.NaverTokenResponse;
-import com.fund.stockProject.auth.dto.LoginResponse;
+import com.fund.stockProject.auth.dto.*;
 import com.fund.stockProject.auth.entity.User;
+import com.fund.stockProject.auth.oauth2.AppleOAuth2UserInfo;
 import com.fund.stockProject.auth.oauth2.GoogleOAuth2UserInfo;
 import com.fund.stockProject.auth.oauth2.KakaoOAuth2UserInfo;
 import com.fund.stockProject.auth.oauth2.NaverOAuth2UserInfo;
@@ -28,6 +26,7 @@ public class OAuth2Service {
     private final TokenService tokenService;
     private final NaverService naverService;
     private final GoogleService googleService;
+    private final AppleService appleService;
 
     public LoginResponse kakaoLogin(String code, String state) {
         String redirectUri = decodeState(state);
@@ -82,6 +81,28 @@ public class OAuth2Service {
 
         return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
     }
+
+    public LoginResponse appleLogin(String code, String state) {
+        String redirectUri = decodeState(state);
+        // 1. 애플로 code + client_secret을 보내서 토큰(및 id_token) 받기
+        AppleTokenResponse response = appleService.getAccessToken(code, redirectUri);
+        // 2. id_token(JWT)에서 사용자 정보 추출 (이메일, sub=providerId 등)
+        AppleOAuth2UserInfo appleUserInfo = appleService.getUserInfoFromIdToken(response.getIdToken());
+
+        Optional<User> userOptional = userRepository.findByEmail(appleUserInfo.getEmail());
+        if (userOptional.isEmpty()) {
+            return new LoginResponse("NEED_REGISTER", appleUserInfo.getEmail(), null, null, null);
+        }
+
+        User user = userOptional.get();
+        user.updateSocialUserInfo(PROVIDER.APPLE, appleUserInfo.getProviderId(), response.getAccessToken(), response.getRefreshToken());
+        userRepository.save(user);
+
+        return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
+    }
+
+
+
 
     private String decodeState(String encodedState) {
         try {
