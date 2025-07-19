@@ -4,7 +4,6 @@ import com.fund.stockProject.auth.dto.*;
 import com.fund.stockProject.auth.service.AuthService;
 import com.fund.stockProject.auth.service.TokenService;
 import com.fund.stockProject.security.principle.CustomUserDetails;
-import com.sun.security.auth.UserPrincipal;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -82,5 +81,19 @@ public class AuthController {
             // 예를 들어 유효하지 않은 토큰 포맷 등의 이유로 실패했을 때
             return ResponseEntity.badRequest().body(Map.of("message", "Logout failed: " + e.getMessage()));
         }
+    }
+
+    @GetMapping("/nickname")
+    @Operation(summary = "닉네임 중복 확인 API", description = "닉네임이 이미 사용 중인지 확인")
+    public ResponseEntity<Map<String, Boolean>> checkNicknameDuplicate(@RequestParam String nickname) {
+        boolean isDuplicate = authService.isNicknameDuplicate(nickname);
+        return ResponseEntity.ok(Map.of("duplicate", isDuplicate));
+    }
+
+    @GetMapping("/email")
+    @Operation(summary = "이메일 중복 확인 API", description = "이메일이 이미 사용 중인지 확인")
+    public ResponseEntity<Map<String, Boolean>> checkEmailDuplicate(@RequestParam String email) {
+        boolean isDuplicate = authService.isEmailDuplicate(email);
+        return ResponseEntity.ok(Map.of("duplicate", isDuplicate));
     }
 }

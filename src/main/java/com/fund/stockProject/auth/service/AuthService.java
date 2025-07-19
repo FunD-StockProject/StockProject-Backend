@@ -3,6 +3,7 @@ package com.fund.stockProject.auth.service;
 import com.fund.stockProject.auth.dto.*;
 import com.fund.stockProject.auth.entity.User;
 import com.fund.stockProject.auth.repository.UserRepository;
+import com.fund.stockProject.security.principle.CustomUserDetails;
 import com.sun.security.auth.UserPrincipal;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,8 @@ public class AuthService {
                 && !(authentication instanceof AnonymousAuthenticationToken);
     }
 
+    // getCurrentUser 만들려고 했으나 static 이슈로 안 만듦
+
     /**
      * 현재 인증된 사용자의 ID를 반환합니다.
      * 인증되지 않은 경우 null을 반환합니다.
@@ -36,13 +39,13 @@ public class AuthService {
     public static String getCurrentUserEmail() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) {
+        if (isAuthenticated()) {
             return null;
         }
         // TODO: UserPrincipal이 아닌 CustomUserDetails를 사용하도록 변경
-        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+        CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
 
-        return principal.getName();
+        return principal.getEmail();
     }
 
     @Transactional
@@ -64,5 +67,13 @@ public class AuthService {
     @Transactional
     public void withdrawUser(String email) {
         userRepository.deleteUserByEmail(email);
+    }
+
+    public boolean isNicknameDuplicate(String nickname) {
+        return userRepository.existsByNickname(nickname);
+    }
+
+    public boolean isEmailDuplicate(String email) {
+        return userRepository.existsByEmail(email);
     }
 }
