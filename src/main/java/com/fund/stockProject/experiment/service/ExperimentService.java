@@ -212,8 +212,9 @@ public class ExperimentService {
                 stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum()));
 
             if (securityStockInfoKorea.blockOptional().isPresent()) {
-                final Double price = securityStockInfoKorea.block().getPrice();
-                experimentItem.updateAutoSellResult(price, "COMPLETE", LocalDateTime.now());
+                final Double price = securityStockInfoKorea.block().getTodayPrice();
+                Double roi = ((experimentItem.getBuyPrice() - price) % experimentItem.getBuyPrice()) * 100;
+                experimentItem.updateAutoSellResult(price, "COMPLETE", LocalDateTime.now(), roi);
             }
 
         }catch (Exception e){
