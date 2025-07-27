@@ -3,6 +3,7 @@ package com.fund.stockProject.experiment.controller;
 import com.fund.stockProject.experiment.dto.ExperimentSimpleResponse;
 import com.fund.stockProject.experiment.dto.ExperimentStatusResponse;
 import com.fund.stockProject.experiment.service.ExperimentService;
+import com.fund.stockProject.security.principle.CustomUserDetails;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
@@ -24,13 +25,13 @@ public class ExperimentController {
 
     @GetMapping("/status")
     @Operation(summary = "실험(모의 매수) 현황 API", description = "실험(모의 매수) 현황 조회")
-    public ResponseEntity<Mono<ExperimentStatusResponse>> getExperimentStatus(final @PathVariable Integer userId) {
-        return ResponseEntity.ok().body(experimentService.getExperimentStatus(userId));
+    public ResponseEntity<Mono<ExperimentStatusResponse>> getExperimentStatus(@AuthenticationPrincipal CustomUserDetails customUserDetails) {
+        return ResponseEntity.ok().body(experimentService.getExperimentStatus(customUserDetails));
     }
 
     @PostMapping("/{id}/buy/{country}")
     @Operation(summary = "실험(모의 매수) 종목 매수 API", description = "실험(모의 매수) 종목 매수")
-    public ResponseEntity<Mono<ExperimentSimpleResponse>> buyExperimentItem(final @PathVariable Integer userId, final @PathVariable("id") Integer stockId, final @PathVariable("country") String country) {
-        return ResponseEntity.ok().body(experimentService.buyExperimentItem(userId, stockId, country));
+    public ResponseEntity<Mono<ExperimentSimpleResponse>> buyExperimentItem(@AuthenticationPrincipal CustomUserDetails customUserDetails, final @PathVariable("id") Integer stockId, final @PathVariable("country") String country) {
+        return ResponseEntity.ok().body(experimentService.buyExperimentItem(customUserDetails, stockId, country));
     }
 }
