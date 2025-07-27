@@ -55,9 +55,10 @@ public class ExperimentItem {
     @Column(nullable = false)
     private String tradeStatus;
 
-    public void updateAutoSellResult(Double sellPrice, String tradeStatus, LocalDateTime sellAt) {
+    public void updateAutoSellResult(Double sellPrice, String tradeStatus, LocalDateTime sellAt, Double roi) {
         this.sellPrice = sellPrice;
         this.tradeStatus = tradeStatus;
         this.sellAt = sellAt;
+        this.roi = roi;
     }
 }
