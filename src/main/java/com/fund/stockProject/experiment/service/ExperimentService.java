@@ -12,7 +12,9 @@ import com.fund.stockProject.security.principle.CustomUserDetails;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockInfoResponse;
+import com.fund.stockProject.stock.dto.response.StockSearchResponse;
 import com.fund.stockProject.stock.entity.Stock;
+import com.fund.stockProject.stock.repository.StockQueryRepository;
 import com.fund.stockProject.stock.repository.StockRepository;
 import com.fund.stockProject.stock.service.SecurityService;
 import java.time.LocalDate;
@@ -22,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +39,7 @@ public class ExperimentService {
     private final UserRepository userRepository;
     private final ScoreRepository scoreRepository;
     private final SecurityService securityService;
+    private final StockQueryRepository stockQueryRepository;
 
     public Mono<ExperimentStatusResponse> getExperimentStatus(
         final CustomUserDetails customUserDetails) {
@@ -241,5 +245,42 @@ public class ExperimentService {
         } catch (Exception e) {
             System.err.println("Failed to autoSell");
         }
+    }
+
+    public Mono<StockInfoResponse> searchStockBySymbolName(final String searchKeyword, final String country) {
+        List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF);
+        List<EXCHANGENUM> overseaExchanges = List.of(EXCHANGENUM.NAS, EXCHANGENUM.NYS, EXCHANGENUM.AMS);
+
+        final Optional<Stock> bySymbolNameAndCountryWithEnums = stockRepository.findBySearchKeywordAndCountryWithEnums(
+            searchKeyword, country, koreaExchanges, overseaExchanges);
+
+        if (bySymbolNameAndCountryWithEnums.isPresent()) {
+            final Stock stock = bySymbolNameAndCountryWithEnums.get();
+
+            return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
+                stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
+                getCountryFromExchangeNum(stock.getExchangeNum()));
+        }
+
+        return Mono.empty();
+    }
+
+    public List<StockSearchResponse> autoCompleteKeyword(String keyword) {
+        final List<Stock> stocks = stockQueryRepository.autocompleteKeyword(keyword);
+
+        if (stocks.isEmpty()) {
+            return null;
+        }
+
+        return stocks.stream()
+            .map(stock -> StockSearchResponse.builder()
+                .stockId(stock.getId())
+                .symbol(stock.getSymbol())
+                .symbolName(stock.getSymbolName())
+                .securityName(stock.getSecurityName())
+                .exchangeNum(stock.getExchangeNum())
+                .country(getCountryFromExchangeNum(stock.getExchangeNum()))
+                .build())
+            .collect(Collectors.toList());
     }
 }
