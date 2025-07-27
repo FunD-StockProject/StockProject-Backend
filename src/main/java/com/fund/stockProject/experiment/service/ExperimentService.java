@@ -4,7 +4,7 @@ import com.fund.stockProject.auth.entity.User;
 import com.fund.stockProject.auth.repository.UserRepository;
 import com.fund.stockProject.experiment.dto.ExperimentSimpleResponse;
 import com.fund.stockProject.experiment.dto.ExperimentStatusResponse;
-import com.fund.stockProject.experiment.dto.ProgressExperimentItemResponse;
+import com.fund.stockProject.experiment.dto.ExperimentItemInfoResponse;
 import com.fund.stockProject.experiment.entity.ExperimentItem;
 import com.fund.stockProject.experiment.repository.ExperimentRepository;
 import com.fund.stockProject.score.repository.ScoreRepository;
@@ -39,6 +39,7 @@ public class ExperimentService {
 
     public Mono<ExperimentStatusResponse> getExperimentStatus(
         final CustomUserDetails customUserDetails) {
+        // 로그인한 유저 관련 모의 투자 정보 조회
         final List<ExperimentItem> experimentItemsByUserId = experimentRepository.findExperimentItemsByEmail(
             customUserDetails.getEmail());
 
@@ -46,7 +47,10 @@ public class ExperimentService {
             return Mono.empty();
         }
 
-        final List<ProgressExperimentItemResponse> progressExperimentItems = new ArrayList<>();
+        // 진행중인 모의 투자 종목
+        final List<ExperimentItemInfoResponse> progressExperimentItemsInfo = new ArrayList<>();
+        // 완료된 모의 투자 종목
+        final List<ExperimentItemInfoResponse> completeExperimentItemsInfo = new ArrayList<>();
 
         for (final ExperimentItem experimentItem : experimentItemsByUserId) {
             final Optional<Stock> bySymbol = stockRepository.findBySymbol(
@@ -67,7 +71,22 @@ public class ExperimentService {
                 getCountryFromExchangeNum(stock.getExchangeNum())
             ).block();
 
-            progressExperimentItems.add(ProgressExperimentItemResponse
+            if (experimentItem.getTradeStatus().equals("PROGRESS")) {
+                progressExperimentItemsInfo.add(ExperimentItemInfoResponse
+                    .builder()
+                    .id(experimentItem.getId())
+                    .roi(experimentItem.getRoi())
+                    .buyAt(experimentItem.getBuyAt())
+                    .symbolName(stock.getSymbolName())
+                    .currentPrice(stockInfoKorea.getPrice())
+                    .diffPrice((stockInfoKorea.getPrice()) - experimentItem.getBuyPrice())
+                    .tradeStatus(experimentItem.getTradeStatus())
+                    .build());
+
+                continue;
+            }
+
+            completeExperimentItemsInfo.add(ExperimentItemInfoResponse
                 .builder()
                 .id(experimentItem.getId())
                 .roi(experimentItem.getRoi())
@@ -79,7 +98,7 @@ public class ExperimentService {
                 .build());
         }
 
-        final int countByTradeStatusCompleted = experimentRepository.countByTradeStatusProgress(); // 진행중인 실험
+        final int countByTradeStatusCompleted = experimentRepository.countByTradeStatusProgress(); // 진행중인 실험 수
 
         final double averageRoi = experimentItemsByUserId
             .stream()
@@ -91,16 +110,17 @@ public class ExperimentService {
             .filter(p -> p.getSellPrice() - p.getBuyPrice() > 0).count(); // 모의투자에 성공한 종목 개수
         double successRate = ((double) count / experimentItemsByUserId.size()) * 100;
 
-        final ExperimentStatusResponse portfolioStatusResponse = ExperimentStatusResponse.
+        final ExperimentStatusResponse experimentStatusResponse = ExperimentStatusResponse.
             builder()
-            .progressExperimentItems(progressExperimentItems) // 진행중인 실험 정보
+            .progressExperimentItems(progressExperimentItemsInfo) // 진행중인 실험 정보
+            .completeExperimentItems(completeExperimentItemsInfo) // 완료된 실험 정보
             .avgRoi(averageRoi) // 평균 수익률
             .totalPaperTradeCount(experimentItemsByUserId.size()) // 총 실험 수 (전체 모의투자 개수)
             .progressPaperTradeCount(countByTradeStatusCompleted) // 진행중인 실험 수 (진행중인 모의투자 개수)
             .successRate(successRate) // 성공률
             .build();
 
-        return Mono.just(portfolioStatusResponse);
+        return Mono.just(experimentStatusResponse);
     }
 
     private COUNTRY getCountryFromExchangeNum(EXCHANGENUM exchangenum) {
@@ -213,11 +233,12 @@ public class ExperimentService {
 
             if (securityStockInfoKorea.blockOptional().isPresent()) {
                 final Double price = securityStockInfoKorea.block().getTodayPrice();
-                Double roi = ((experimentItem.getBuyPrice() - price) % experimentItem.getBuyPrice()) * 100;
+                Double roi =
+                    ((experimentItem.getBuyPrice() - price) % experimentItem.getBuyPrice()) * 100;
                 experimentItem.updateAutoSellResult(price, "COMPLETE", LocalDateTime.now(), roi);
             }
 
-        }catch (Exception e){
+        } catch (Exception e) {
             System.err.println("Failed to autoSell");
         }
     }

@@ -6,7 +6,7 @@ import lombok.Getter;
 
 @Getter
 @Builder
-public class ProgressExperimentItemResponse {
+public class ExperimentItemInfoResponse {
 
     private Integer id;
 
