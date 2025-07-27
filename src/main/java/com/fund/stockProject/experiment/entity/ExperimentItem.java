@@ -47,11 +47,17 @@ public class ExperimentItem {
     private Double buyPrice;
 
     @Column(nullable = false)
-    private Integer sellPrice;
+    private Double sellPrice;
 
     @Column(nullable = false)
     private Double roi;
 
     @Column(nullable = false)
     private String tradeStatus;
+
+    public void updateAutoSellResult(Double sellPrice, String tradeStatus, LocalDateTime sellAt) {
+        this.sellPrice = sellPrice;
+        this.tradeStatus = tradeStatus;
+        this.sellAt = sellAt;
+    }
 }

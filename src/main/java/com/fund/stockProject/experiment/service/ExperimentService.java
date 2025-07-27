@@ -24,6 +24,7 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
 @Service
@@ -36,8 +37,10 @@ public class ExperimentService {
     private final ScoreRepository scoreRepository;
     private final SecurityService securityService;
 
-    public Mono<ExperimentStatusResponse> getExperimentStatus(final CustomUserDetails customUserDetails) {
-        final List<ExperimentItem> experimentItemsByUserId = experimentRepository.findExperimentItemsByEmail(customUserDetails.getEmail());
+    public Mono<ExperimentStatusResponse> getExperimentStatus(
+        final CustomUserDetails customUserDetails) {
+        final List<ExperimentItem> experimentItemsByUserId = experimentRepository.findExperimentItemsByEmail(
+            customUserDetails.getEmail());
 
         if (experimentItemsByUserId.isEmpty()) {
             return Mono.empty();
@@ -46,7 +49,8 @@ public class ExperimentService {
         final List<ProgressExperimentItemResponse> progressExperimentItems = new ArrayList<>();
 
         for (final ExperimentItem experimentItem : experimentItemsByUserId) {
-            final Optional<Stock> bySymbol = stockRepository.findBySymbol(experimentItem.getStock().getSymbol());
+            final Optional<Stock> bySymbol = stockRepository.findBySymbol(
+                experimentItem.getStock().getSymbol());
 
             if (bySymbol.isEmpty()) {
                 throw new NoSuchElementException("No Stock Found");
@@ -104,7 +108,8 @@ public class ExperimentService {
             .contains(exchangenum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
     }
 
-    public Mono<ExperimentSimpleResponse> buyExperimentItem(final CustomUserDetails customUserDetails, final Integer stockId, String country) {
+    public Mono<ExperimentSimpleResponse> buyExperimentItem(
+        final CustomUserDetails customUserDetails, final Integer stockId, String country) {
         final Optional<Stock> stockById = stockRepository.findStockById(stockId);
         final Optional<User> userById = userRepository.findByEmail(customUserDetails.getEmail());
 
@@ -119,9 +124,10 @@ public class ExperimentService {
         LocalDate today = now.toLocalDate();
         LocalTime current = now.toLocalTime();
 
-        final Optional<ExperimentItem> experimentItemByStockIdAndBuyAt = experimentRepository.findExperimentItemByStockIdAndBuyAt(stockId, today);
+        final Optional<ExperimentItem> experimentItemByStockIdAndBuyAt = experimentRepository.findExperimentItemByStockIdAndBuyAt(
+            stockId, today);
 
-        if(experimentItemByStockIdAndBuyAt.isPresent()){
+        if (experimentItemByStockIdAndBuyAt.isPresent()) {
             return Mono.just(
                 ExperimentSimpleResponse.builder()
                     .message("같은 종목 중복 구매")
@@ -137,10 +143,11 @@ public class ExperimentService {
         Double price = 0.0d;
 
         final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea(
-            stock.getId(), stock.getSymbolName(), stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum())
+            stock.getId(), stock.getSymbolName(), stock.getSecurityName(), stock.getSymbol(),
+            stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum())
         );
 
-        if(securityStockInfoKorea.blockOptional().isEmpty()){
+        if (securityStockInfoKorea.blockOptional().isEmpty()) {
             return Mono.empty();
         }
 
@@ -182,5 +189,35 @@ public class ExperimentService {
                 .price(price)
                 .build()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<ExperimentItem> findExperimentItemAfter5BusinessDays() {
+        final List<ExperimentItem> experimentItemsAfter5BusinessDays = experimentRepository.findExperimentItemsAfter5BusinessDays();
+
+        if (experimentItemsAfter5BusinessDays.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return experimentItemsAfter5BusinessDays;
+    }
+
+    @Transactional
+    public void updateAutoSellStockStatus(ExperimentItem experimentItem) {
+        try {
+            final Stock stock = experimentItem.getStock();
+
+            final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea(
+                stock.getId(), stock.getSymbolName(), stock.getSecurityName(), stock.getSymbol(),
+                stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum()));
+
+            if (securityStockInfoKorea.blockOptional().isPresent()) {
+                final Double price = securityStockInfoKorea.block().getPrice();
+                experimentItem.updateAutoSellResult(price, "COMPLETE", LocalDateTime.now());
+            }
+
+        }catch (Exception e){
+            System.err.println("Failed to autoSell");
+        }
     }
 }
