@@ -1,0 +1,36 @@
+package com.fund.stockProject.experiment.controller;
+
+import com.fund.stockProject.experiment.dto.ExperimentSimpleResponse;
+import com.fund.stockProject.experiment.dto.ExperimentStatusResponse;
+import com.fund.stockProject.experiment.service.ExperimentService;
+import com.fund.stockProject.stock.domain.COUNTRY;
+import io.swagger.v3.oas.annotations.Operation;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/experiment")
+public class ExperimentController {
+
+    private ExperimentService experimentService;
+
+    @GetMapping("/status")
+    @Operation(summary = "실험(모의 매수) 현황 API", description = "실험(모의 매수) 현황 조회")
+    public ResponseEntity<Mono<ExperimentStatusResponse>> getExperimentStatus(final @PathVariable Integer userId) {
+        return ResponseEntity.ok().body(experimentService.getExperimentStatus(userId));
+    }
+
+    @PostMapping("/{id}/buy/{country}")
+    @Operation(summary = "실험(모의 매수) 종목 매수 API", description = "실험(모의 매수) 종목 매수")
+    public ResponseEntity<Mono<ExperimentSimpleResponse>> buyExperimentItem(final @PathVariable Integer userId, final @PathVariable("id") Integer stockId, final @PathVariable("country") String country) {
+        return ResponseEntity.ok().body(experimentService.buyExperimentItem(userId, stockId, country));
+    }
+}
