@@ -87,8 +87,8 @@ public class SecurityService {
                 stockInfoResponse.setCountry(country);
                 stockInfoResponse.setPrice(outputNode.get("stck_prpr").asDouble());
                 stockInfoResponse.setPriceDiff(outputNode.get("prdy_vrss").asDouble());
-                stockInfoResponse.setYesterdayPrice(outputNode.get("bfdy_clpr").asDouble());
-                stockInfoResponse.setTodayPrice(outputNode.get("thdt_clpr").asDouble());
+                stockInfoResponse.setYesterdayPrice(outputNode.get("bfdy_clpr").asDouble()); // 전일종가
+                stockInfoResponse.setTodayPrice(outputNode.get("thdt_clpr").asDouble()); // 당일종가
             }
 
             return Mono.just(stockInfoResponse);
@@ -111,8 +111,8 @@ public class SecurityService {
                 stockInfoResponse.setSymbol(symbol);
                 stockInfoResponse.setExchangeNum(exchangenum);
                 stockInfoResponse.setPrice(outputNode.get("last").asDouble());
-                stockInfoResponse.setYesterdayPrice(outputNode.get("last").asDouble());
-                stockInfoResponse.setTodayPrice(outputNode.get("base").asDouble());
+                stockInfoResponse.setYesterdayPrice(outputNode.get("last").asDouble()); // 전일종가
+                stockInfoResponse.setTodayPrice(outputNode.get("base").asDouble()); // 당일종가
                 // 해외는 diff가 절대값이므로 절대값에 따라 음수로 변경
                 if(outputNode.get("rate").asDouble() < 0) {
                     stockInfoResponse.setPriceDiff(outputNode.get("diff").asDouble() * -1);
