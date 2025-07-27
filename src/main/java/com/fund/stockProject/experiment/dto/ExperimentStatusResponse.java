@@ -8,7 +8,9 @@ import lombok.Getter;
 @Builder
 public class ExperimentStatusResponse {
 
-    private List<ProgressExperimentItemResponse> progressExperimentItems;
+    private List<ExperimentItemInfoResponse> progressExperimentItems;
+
+    private List<ExperimentItemInfoResponse> completeExperimentItems;
 
     private double avgRoi; // 평균수익률
 
