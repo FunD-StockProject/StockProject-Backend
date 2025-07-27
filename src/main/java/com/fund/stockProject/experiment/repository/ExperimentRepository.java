@@ -19,4 +19,7 @@ public interface ExperimentRepository extends JpaRepository<ExperimentItem, Inte
 
     @Query("SELECT e FROM ExperimentItem e WHERE e.stock.id = :stockId AND e.buyAy = :today")
     Optional<ExperimentItem> findExperimentItemByStockIdAndBuyAt(@Param("stockId") Integer stockId, @Param("today") LocalDate today);
+
+    @Query("SELECT e FROM experiment_item E WHERE DATE(e.buy_at) = CURDATE() - INTERVAL 5 DAY;")
+    List<ExperimentItem> findExperimentItemsAfter5BusinessDays();
 }
