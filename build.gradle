@@ -74,6 +74,9 @@ dependencies {
 	implementation 'io.jsonwebtoken:jjwt-impl:0.12.5'
 	implementation 'io.jsonwebtoken:jjwt-jackson:0.12.5'
 
+	// nimbus-jose-jwt
+	implementation 'com.nimbusds:nimbus-jose-jwt:10.0.2'
+
 	// spring security oauth2 client
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 

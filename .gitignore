@@ -1,5 +1,6 @@
 ### 로컬 개발 환경에서 무시할 파일들 ###
 **/application_*.*
+*.p8
 
 HELP.md
 .gradle

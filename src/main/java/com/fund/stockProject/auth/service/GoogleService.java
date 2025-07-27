@@ -1,11 +1,11 @@
 package com.fund.stockProject.auth.service;
 
+import com.fund.stockProject.auth.dto.GoogleTokenResponse;
 import com.fund.stockProject.auth.dto.KakaoTokenResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -17,33 +17,33 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class KakaoService {
+public class GoogleService {
     private final WebClient webClient;
 
-    @Value("${spring.security.oauth2.client.registration.kakao.client-id}")
+    @Value("${spring.security.oauth2.client.registration.google.client-id}")
     private String clientId;
-    @Value("${spring.security.oauth2.client.registration.kakao.client-secret}")
+    @Value("${spring.security.oauth2.client.registration.google.client-secret}")
     private String clientSecret;
-    @Value("${spring.security.oauth2.client.provider.kakao.token-uri}")
+    @Value("${spring.security.oauth2.client.provider.google.token-uri}")
     private String tokenUri;
-    @Value("${spring.security.oauth2.client.provider.kakao.user-info-uri}")
+    @Value("${spring.security.oauth2.client.provider.google.user-info-uri}")
     private String userInfoUri;
 
-    public KakaoTokenResponse getAccessToken(String code, String redirectUri) {
+    public GoogleTokenResponse getAccessToken(String code, String redirectUri) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
 
-        params.add("grant_type", "authorization_code");
         params.add("client_id", clientId);
-        params.add("redirect_uri", redirectUri);
-        params.add("code", code);
         params.add("client_secret", clientSecret);
+        params.add("code", code);
+        params.add("grant_type", "authorization_code");
+        params.add("redirect_uri", redirectUri);
 
-        KakaoTokenResponse response = webClient.post()
+        GoogleTokenResponse response = webClient.post()
                 .uri(tokenUri)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(BodyInserters.fromFormData(params))
                 .retrieve()
-                .bodyToMono(KakaoTokenResponse.class)
+                .bodyToMono(GoogleTokenResponse.class)
                 .block();
         // TODO: KakaoTokenResponse를 반환
         if (response == null || response.getAccessToken() == null) {

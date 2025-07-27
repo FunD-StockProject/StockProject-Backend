@@ -47,8 +47,6 @@ public class User extends Core {
 
     private String socialRefreshToken;
 
-    private LocalDateTime accessTokenExpiresAt;
-
     // 유저 관련 설정
     private String profileImageUrl;
 
@@ -72,40 +70,11 @@ public class User extends Core {
         this.marketingAgreement = marketingAgreement;
     }
 
-    public void updateSocialUserInfo(String nickname, LocalDate birthDate, ROLE role, Boolean isActive, Boolean marketingAgreement) {
-        if (nickname != null && !nickname.trim().isEmpty()) {
-            this.nickname = nickname;
-        }
-        if (birthDate != null) {
-            this.birthDate = birthDate;
-        }
-        if (role != null) {
-            this.role = role;
-        }
-        if (isActive != null) {
-            this.isActive = isActive;
-        }
-        if (marketingAgreement != null) {
-            this.marketingAgreement = marketingAgreement;
-        }
-    }
-
-    public void updateSocialUserInfo(String socialAccessToken, String socialRefreshToken, LocalDateTime accessTokenExpiresAt) {
-        if (socialAccessToken != null && !socialAccessToken.trim().isEmpty()) {
-            this.socialAccessToken = socialAccessToken;
-        }
-        if (socialRefreshToken != null && !socialRefreshToken.trim().isEmpty()) {
-            this.socialRefreshToken = socialRefreshToken;
-        }
-        if (accessTokenExpiresAt != null) {
-            this.accessTokenExpiresAt = accessTokenExpiresAt;
-        }
-    }
-
-    public void updatePassword(String newPassword) {
-        if (newPassword != null && !newPassword.trim().isEmpty()) {
-            this.password = newPassword;
-        }
+    public void updateSocialUserInfo(PROVIDER provider, String providerId, String socialAccessToken, String socialRefreshToken) {
+        this.provider = provider;
+        this.providerId = providerId;
+        this.socialAccessToken = socialAccessToken;
+        this.socialRefreshToken = socialRefreshToken;
     }
 
     public void withdraw() {
