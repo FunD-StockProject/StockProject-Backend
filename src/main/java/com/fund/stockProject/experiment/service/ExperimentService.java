@@ -8,6 +8,7 @@ import com.fund.stockProject.experiment.dto.ProgressExperimentItemResponse;
 import com.fund.stockProject.experiment.entity.ExperimentItem;
 import com.fund.stockProject.experiment.repository.ExperimentRepository;
 import com.fund.stockProject.score.repository.ScoreRepository;
+import com.fund.stockProject.security.principle.CustomUserDetails;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockInfoResponse;
@@ -35,8 +36,8 @@ public class ExperimentService {
     private final ScoreRepository scoreRepository;
     private final SecurityService securityService;
 
-    public Mono<ExperimentStatusResponse> getExperimentStatus(final Integer userId) {
-        final List<ExperimentItem> experimentItemsByUserId = experimentRepository.findExperimentItemsByUserId(userId);
+    public Mono<ExperimentStatusResponse> getExperimentStatus(final CustomUserDetails customUserDetails) {
+        final List<ExperimentItem> experimentItemsByUserId = experimentRepository.findExperimentItemsByEmail(customUserDetails.getEmail());
 
         if (experimentItemsByUserId.isEmpty()) {
             return Mono.empty();
@@ -103,9 +104,9 @@ public class ExperimentService {
             .contains(exchangenum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
     }
 
-    public Mono<ExperimentSimpleResponse> buyExperimentItem(final Integer userId, final Integer stockId, String country) {
+    public Mono<ExperimentSimpleResponse> buyExperimentItem(final CustomUserDetails customUserDetails, final Integer stockId, String country) {
         final Optional<Stock> stockById = stockRepository.findStockById(stockId);
-        final Optional<User> userById = userRepository.findById(userId);
+        final Optional<User> userById = userRepository.findByEmail(customUserDetails.getEmail());
 
         if (stockById.isEmpty() || userById.isEmpty()) {
             return Mono.empty();

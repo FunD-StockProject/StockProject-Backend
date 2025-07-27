@@ -11,8 +11,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ExperimentRepository extends JpaRepository<ExperimentItem, Integer> {
-    @Query("SELECT e FROM ExperimentItem e WHERE e.userId = :userId")
-    List<ExperimentItem> findExperimentItemsByUserId(@Param("userId") Integer userId);
+    @Query("SELECT e FROM ExperimentItem e WHERE e.email = :email")
+    List<ExperimentItem> findExperimentItemsByEmail(@Param("email") String email);
 
     @Query("SELECT COUNT(e) FROM ExperimentItem e WHERE e.tradeStatus = 'PROGRESS'")
     int countByTradeStatusProgress();
