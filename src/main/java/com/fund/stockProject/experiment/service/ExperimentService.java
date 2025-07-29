@@ -132,8 +132,7 @@ public class ExperimentService {
             .contains(exchangenum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
     }
 
-    public Mono<ExperimentSimpleResponse> buyExperimentItem(
-        final CustomUserDetails customUserDetails, final Integer stockId, String country) {
+    public Mono<ExperimentSimpleResponse> buyExperimentItem(final CustomUserDetails customUserDetails, final Integer stockId, String country) {
         final Optional<Stock> stockById = stockRepository.findStockById(stockId);
         final Optional<User> userById = userRepository.findByEmail(customUserDetails.getEmail());
 
@@ -145,31 +144,14 @@ public class ExperimentService {
         final User user = userById.get();
 
         LocalDateTime now = LocalDateTime.now();
-        LocalDate today = now.toLocalDate();
         LocalTime current = now.toLocalTime();
-
-        final Optional<ExperimentItem> experimentItemByStockIdAndBuyAt = experimentRepository.findExperimentItemByStockIdAndBuyAt(
-            stockId, today);
-
-        if (experimentItemByStockIdAndBuyAt.isPresent()) {
-            return Mono.just(
-                ExperimentSimpleResponse.builder()
-                    .message("같은 종목 중복 구매")
-                    .success(false)
-                    .price(0.0d)
-                    .build()
-            );
-        }
-
-        LocalTime domesticUpdateTime = LocalTime.of(17, 00);
+        LocalDate today = now.toLocalDate();
+        LocalTime koreaUpdateTime = LocalTime.of(17, 0);
         LocalTime overseasUpdateTime = LocalTime.of(6, 0);
-
         Double price = 0.0d;
 
-        final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea(
-            stock.getId(), stock.getSymbolName(), stock.getSecurityName(), stock.getSymbol(),
-            stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum())
-        );
+        final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
+            stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(), getCountryFromExchangeNum(stock.getExchangeNum()));
 
         if (securityStockInfoKorea.blockOptional().isEmpty()) {
             return Mono.empty();
@@ -178,36 +160,53 @@ public class ExperimentService {
         final StockInfoResponse stockInfoResponse = securityStockInfoKorea.block();
 
         if (stockInfoResponse.getCountry().equals(COUNTRY.KOREA)) {
-            if (current.isBefore(domesticUpdateTime)) {
-                // 17:00 이전 → 전일 종가
-                price = stockInfoResponse.getYesterdayPrice();
-            } else {
-                // 17:00 이후 → 당일 종가
-                price = stockInfoResponse.getPrice();
+            final Optional<ExperimentItem> experimentItemByStockIdAndBuyAt = experimentRepository.findExperimentItemByStockIdAndBuyAt(stockId, today);
+
+            // 하루에 같은 종목 중복 구매 불가 처리
+            if (experimentItemByStockIdAndBuyAt.isPresent()) {
+                return Mono.just(
+                    ExperimentSimpleResponse.builder()
+                        .message("같은 종목 중복 구매")
+                        .success(false)
+                        .price(0.0d)
+                        .build()
+                );
             }
+
+            // 종가 결정
+            price = current.isBefore(koreaUpdateTime) ? stockInfoResponse.getYesterdayPrice() : stockInfoResponse.getTodayPrice();
         } else {
-            if (current.isBefore(overseasUpdateTime)) {
-                // 06:00 이전 → 전일(미국시장 종가) → KST 기준 ‘전날’
-                price = stockInfoResponse.getYesterdayPrice();
-            } else {
-                // 06:00 이후 → 당일(미국시장 전날 종가) → KST 기준 ‘오늘’
-                price = stockInfoResponse.getTodayPrice();
+            // 해외 주식 로직
+            LocalDateTime overseasStartTime = now.withHour(6).withMinute(0).withSecond(0).withNano(0); // 오늘 06:00
+            LocalDateTime overseasPreviousDayTime = overseasStartTime.minusDays(1).plusMinutes(1); // 전날 06:01
+
+            // 해당 구간에 이미 매수한 경우 중복 매수 방지
+            Optional<ExperimentItem> existingItem = experimentRepository.findExperimentItemByStockIdAndBuyAtBetween(stockId, overseasPreviousDayTime, overseasStartTime);
+
+            if (existingItem.isPresent()) {
+                return Mono.just(ExperimentSimpleResponse.builder()
+                    .message("같은 종목 중복 구매")
+                    .success(false)
+                    .price(0.0d)
+                    .build()
+                );
             }
+
+            // 종가 결정
+            price = current.isBefore(overseasUpdateTime) ? stockInfoResponse.getYesterdayPrice() : stockInfoResponse.getTodayPrice();
         }
 
-        final ExperimentItem experimentItem = ExperimentItem
-            .builder()
+        final ExperimentItem experimentItem = ExperimentItem.builder()
             .user(user)
             .stock(stock)
             .tradeStatus("PROGRESS")
-            .buyAt(LocalDateTime.now())
+            .buyAt(now)
             .buyPrice(price)
             .build();
 
         experimentRepository.save(experimentItem);
 
-        return Mono.just(
-            ExperimentSimpleResponse.builder()
+        return Mono.just(ExperimentSimpleResponse.builder()
                 .message("모의 매수 성공")
                 .success(true)
                 .price(price)
