@@ -1,5 +1,6 @@
 package com.fund.stockProject.security.principle;
 
+import com.fund.stockProject.auth.entity.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -9,11 +10,17 @@ public class CustomUserDetails implements UserDetails {
     private final String email;
     private final String password;
     private final Collection<? extends GrantedAuthority> authorities;
+    private final User user;
 
-    public CustomUserDetails(String email, String password, Collection<? extends GrantedAuthority> authorities) {
+    public CustomUserDetails(String email, String password, Collection<? extends GrantedAuthority> authorities, User user) {
         this.email = email;
         this.password = password;
         this.authorities = authorities;
+        this.user = user;
+    }
+
+    public User getUser() {
+        return user;
     }
 
     @Override

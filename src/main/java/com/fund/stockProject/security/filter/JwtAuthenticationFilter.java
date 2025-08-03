@@ -1,5 +1,7 @@
 package com.fund.stockProject.security.filter;
 
+import com.fund.stockProject.auth.entity.User;
+import com.fund.stockProject.auth.repository.UserRepository;
 import com.fund.stockProject.security.principle.CustomUserDetails;
 import com.fund.stockProject.security.util.JwtUtil;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -16,7 +18,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -36,6 +37,7 @@ import static com.fund.stockProject.security.util.JwtUtil.*;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil; // JwtUtil -> JwtTokenProvider로 이름 변경 가정
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -61,8 +63,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         .map(r -> new SimpleGrantedAuthority("ROLE_" + r.trim()))
                         .collect(Collectors.toList());
 
-                // TODO: 필요에 따라서는 다시 CustomDetails 만들어야 할 듯
-                CustomUserDetails userPrincipal = new CustomUserDetails(email, "", authorities);
+                User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+                CustomUserDetails userPrincipal = new CustomUserDetails(email, "", authorities, user);
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
