@@ -8,6 +8,7 @@ import com.fund.stockProject.keyword.entity.StockKeyword;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 
+import com.fund.stockProject.stock.domain.SECTOR;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -53,6 +54,11 @@ public class Stock extends Core {
     @Column(nullable = false)
     @Convert(converter = ExchangeNumConverter.class)
     private EXCHANGENUM exchangeNum;
+
+    @Enumerated(EnumType.STRING)
+    private SECTOR sector = SECTOR.UNKNOWN; // 기본값은 미정/기타
+
+    private String imageUrl; // 주식 로고 이미지 URL
 
     public void updateSymbolNameIfNull(String symbolName) {
         if (this.symbolName == null) {
