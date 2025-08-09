@@ -833,4 +833,25 @@ public class SecurityService {
         }
     }
 
+    public Mono<StockInfoResponse> getRealTimeStockPrice(Stock stock) {
+        return getSecurityStockInfoKorea(
+                stock.getId(),
+                stock.getSymbolName(),
+                stock.getSecurityName(),
+                stock.getSymbol(),
+                stock.getExchangeNum(),
+                getCountryFromExchangeNum(stock.getExchangeNum())
+        );
+    }
+
+    /**
+     * 거래소를 기반으로 국가를 판단하는 메서드
+     */
+    private COUNTRY getCountryFromExchangeNum(EXCHANGENUM exchangeNum) {
+        return switch (exchangeNum) {
+            case KOSPI, KOSDAQ, KOREAN_ETF -> COUNTRY.KOREA;
+            default -> COUNTRY.OVERSEA;
+        };
+    }
+
 }

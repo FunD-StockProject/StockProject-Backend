@@ -51,4 +51,6 @@ public interface ScoreRepository extends JpaRepository<Score, Integer> {
 
     @Query("SELECT s FROM Score s WHERE s.date IN (:today) AND s.scoreOversea = 9999")
     List<Score> findScoresByTodayOversea(@Param("today") LocalDate today);
+
+    List<Score> findFirst30ByStockIdOrderByDateDesc(Integer stockId);
 }
