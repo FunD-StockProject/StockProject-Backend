@@ -56,9 +56,11 @@ public class Stock extends Core {
     private EXCHANGENUM exchangeNum;
 
     @Enumerated(EnumType.STRING)
-    private SECTOR sector = SECTOR.UNKNOWN; // 기본값은 미정/기타
+    private SECTOR sector = SECTOR.UNKNOWN;
 
-    private String imageUrl; // 주식 로고 이미지 URL
+    private String imageUrl;
+
+    private Boolean valid;
 
     public void updateSymbolNameIfNull(String symbolName) {
         if (this.symbolName == null) {
