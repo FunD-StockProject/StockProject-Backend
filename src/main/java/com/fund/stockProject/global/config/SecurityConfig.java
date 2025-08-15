@@ -1,5 +1,6 @@
 package com.fund.stockProject.global.config;
 
+import com.fund.stockProject.auth.repository.UserRepository;
 import com.fund.stockProject.security.entrypoint.CustomAuthenticationEntryPoint;
 import com.fund.stockProject.security.filter.JwtAuthenticationFilter;
 import com.fund.stockProject.security.util.JwtUtil;
@@ -22,6 +23,7 @@ public class SecurityConfig {
     private final JwtUtil jwtUtil;
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
     private final CorsConfig corsConfig;
+    private final UserRepository userRepository;
 
     private static final String[] SWAGGER_API_PATHS = {
             "/v3/api-docs/**",
@@ -102,7 +104,7 @@ public class SecurityConfig {
 
         // JWT 검증 필터 등록
         http
-                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil), LogoutFilter.class);
+                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, userRepository), LogoutFilter.class);
 
         // 로그인 예외 시 실행
         http.exceptionHandling(exception -> exception
