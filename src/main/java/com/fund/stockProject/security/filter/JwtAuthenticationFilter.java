@@ -1,7 +1,7 @@
 package com.fund.stockProject.security.filter;
 
-import com.fund.stockProject.auth.entity.User;
-import com.fund.stockProject.auth.repository.UserRepository;
+import com.fund.stockProject.user.entity.User;
+import com.fund.stockProject.user.repository.UserRepository;
 import com.fund.stockProject.security.principle.CustomUserDetails;
 import com.fund.stockProject.security.util.JwtUtil;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -14,17 +14,15 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.nio.file.attribute.UserPrincipal;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -40,7 +38,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final UserRepository userRepository;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
         // 1. [수정] Authorization 헤더에서 Bearer 토큰 추출

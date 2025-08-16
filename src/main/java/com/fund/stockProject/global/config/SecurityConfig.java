@@ -1,6 +1,6 @@
 package com.fund.stockProject.global.config;
 
-import com.fund.stockProject.auth.repository.UserRepository;
+import com.fund.stockProject.user.repository.UserRepository;
 import com.fund.stockProject.security.entrypoint.CustomAuthenticationEntryPoint;
 import com.fund.stockProject.security.filter.JwtAuthenticationFilter;
 import com.fund.stockProject.security.util.JwtUtil;

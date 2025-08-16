@@ -2,12 +2,12 @@ package com.fund.stockProject.auth.service;
 
 import com.fund.stockProject.auth.domain.PROVIDER;
 import com.fund.stockProject.auth.dto.*;
-import com.fund.stockProject.auth.entity.User;
+import com.fund.stockProject.user.entity.User;
 import com.fund.stockProject.auth.oauth2.AppleOAuth2UserInfo;
 import com.fund.stockProject.auth.oauth2.GoogleOAuth2UserInfo;
 import com.fund.stockProject.auth.oauth2.KakaoOAuth2UserInfo;
 import com.fund.stockProject.auth.oauth2.NaverOAuth2UserInfo;
-import com.fund.stockProject.auth.repository.UserRepository;
+import com.fund.stockProject.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

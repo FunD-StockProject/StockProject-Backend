@@ -1,6 +1,6 @@
 package com.fund.stockProject.preference.entity;
 
-import com.fund.stockProject.auth.entity.User;
+import com.fund.stockProject.user.entity.User;
 import com.fund.stockProject.global.entity.Core;
 import com.fund.stockProject.preference.domain.PreferenceType;
 import com.fund.stockProject.stock.entity.Stock;
@@ -37,4 +37,3 @@ public class Preference extends Core {
         this.preferenceType = preferenceType;
     }
 }
-

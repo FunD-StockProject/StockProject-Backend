@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -22,13 +23,15 @@ public class AuthController {
     private final AuthService authService;
     private final TokenService tokenService;
 
-    @PostMapping("/register")
+    @PostMapping(value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "회원가입 API", description = "회원가입 API")
-    public ResponseEntity<Map<String, String>> register(
-            @RequestBody OAuth2RegisterRequest oAuth2RegisterRequest) {
+    public ResponseEntity<Map<String, String>> register(@ModelAttribute OAuth2RegisterRequest request) {
         try {
-            authService.register(oAuth2RegisterRequest);
-            return ResponseEntity.ok(Map.of("message", "User registered successfully via social login")); // HTTP 200 OK
+            String imageUrl = authService.register(request);
+            return ResponseEntity.ok(Map.of(
+                    "message", "User registered successfully",
+                    "profileImageUrl", imageUrl != null ? imageUrl : ""
+            ));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "Failed to complete social registration: " + e.getMessage()));
@@ -54,20 +57,18 @@ public class AuthController {
     }
 
     @PostMapping("/reissue")
-    @Operation(summary = "ACCESS 토큰 재발급 API", description = "유효한 리프레시 토큰을 사용하여 액세스 토큰을 재발급")
-    public ResponseEntity<Map<String, String>> reissue(@RequestBody RefreshTokenRequest request) {
+    @Operation(summary = "ACCESS 토큰 재발급 API", description = "ACCESS 토큰 재발급 API")
+    public ResponseEntity<LoginResponse> reissue(@RequestBody RefreshTokenRequest request) {
         try {
-            tokenService.reissueTokens(request);
-            return ResponseEntity.ok(Map.of("message", "Token reissued successfully"));
-
+            LoginResponse response = tokenService.reissueTokens(request);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             if (e instanceof ExpiredJwtException || e.getMessage().contains("expired")) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("message", "Refresh token expired"));
+                        .body(new LoginResponse("FAILED", null, null, null, null));
             }
-
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST) //
-                    .body(Map.of("message", "Failed to reissue token: " + e.getMessage()));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new LoginResponse("FAILED", null, null, null, null));
         }
     }
 
