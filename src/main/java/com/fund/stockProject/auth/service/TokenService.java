@@ -5,7 +5,7 @@ import com.fund.stockProject.auth.dto.LoginResponse;
 import com.fund.stockProject.auth.dto.RefreshTokenRequest;
 import com.fund.stockProject.auth.entity.RefreshToken;
 import com.fund.stockProject.auth.repository.RefreshTokenRepository;
-import com.fund.stockProject.auth.repository.UserRepository;
+import com.fund.stockProject.user.repository.UserRepository;
 import com.fund.stockProject.security.util.JwtUtil;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -57,9 +57,8 @@ public class TokenService {
      * 리프레시 토큰을 사용하여 새로운 액세스 토큰과 새로운 리프레시 토큰을 발급합니다.
      * 이 과정에서 사용된 기존 리프레시 토큰은 DB에서 삭제됩니다 (Refresh Token Rotation).
      *
-     * @param oldRefreshToken 클라이언트로부터 받은 기존 리프레시 토큰 문자열
-     * @param response HttpServletResponse 객체 (새로운 리프레시 토큰 쿠키 설정을 위함)
-     * @return 새로 발급된 액세스 토큰 문자열
+     * @param request 리프레시 토큰이 담긴 요청 DTO
+     * @return 새로 발급된 액세스/리프레시 토큰 정보를 담은 LoginResponse
      * @throws RuntimeException 토큰 검증 실패 시 (만료, 유효하지 않음 등)
      */
     @Transactional

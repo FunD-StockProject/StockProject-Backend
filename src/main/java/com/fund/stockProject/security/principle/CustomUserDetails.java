@@ -1,6 +1,6 @@
 package com.fund.stockProject.security.principle;
 
-import com.fund.stockProject.auth.entity.User;
+import com.fund.stockProject.user.entity.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 

@@ -1,7 +1,7 @@
 package com.fund.stockProject.preference.service;
 
-import com.fund.stockProject.auth.entity.User;
-import com.fund.stockProject.auth.repository.UserRepository;
+import com.fund.stockProject.user.entity.User;
+import com.fund.stockProject.user.repository.UserRepository;
 import com.fund.stockProject.auth.service.AuthService;
 import com.fund.stockProject.preference.domain.PreferenceType;
 import com.fund.stockProject.preference.dto.BookmarkInfoResponse;
@@ -16,13 +16,10 @@ import com.fund.stockProject.stock.service.SecurityService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor

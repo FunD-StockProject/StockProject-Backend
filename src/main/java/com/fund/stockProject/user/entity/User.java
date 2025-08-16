@@ -1,4 +1,4 @@
-package com.fund.stockProject.auth.entity;
+package com.fund.stockProject.user.entity;
 
 import com.fund.stockProject.global.entity.Core;
 import com.fund.stockProject.auth.domain.PROVIDER;
@@ -8,10 +8,8 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.cglib.core.Local;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 @Entity
 @Getter
@@ -25,8 +23,6 @@ public class User extends Core {
 
     @Column(unique = true, nullable = false)
     private String email;
-
-    private String password;
 
     @Column(unique = true)
     private String nickname;
@@ -57,15 +53,15 @@ public class User extends Core {
     private Boolean marketingAgreement = false;
 
     @Builder
-    public User(String email, String password, String nickname, LocalDate birthDate, ROLE role, PROVIDER provider, String providerId,
-                Boolean isActive, Boolean marketingAgreement) {
+    public User(String email, String nickname, LocalDate birthDate, ROLE role, PROVIDER provider, String providerId,
+                String profileImageUrl, Boolean isActive, Boolean marketingAgreement) {
         this.email = email;
-        this.password = password;
         this.nickname = nickname;
         this.birthDate = birthDate;
         this.role = role;
         this.provider = provider;
         this.providerId = providerId;
+        this.profileImageUrl = profileImageUrl;
         this.isActive = isActive;
         this.marketingAgreement = marketingAgreement;
     }
@@ -77,7 +73,13 @@ public class User extends Core {
         this.socialRefreshToken = socialRefreshToken;
     }
 
-    public void withdraw() {
-        this.isActive = false;
+    public void updateProfile(String nickname, LocalDate birthDate, Boolean marketingAgreement) {
+        if (nickname != null && !nickname.isBlank()) this.nickname = nickname;
+        if (birthDate != null) this.birthDate = birthDate;
+        if (marketingAgreement != null) this.marketingAgreement = marketingAgreement;
+    }
+
+    public void updateProfileImage(String imageUrl) {
+        this.profileImageUrl = imageUrl;
     }
 }
