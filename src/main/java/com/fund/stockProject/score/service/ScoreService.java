@@ -6,10 +6,12 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import com.fund.stockProject.notification.service.StockScoreAlertService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,9 @@ public class ScoreService {
     private final StockRepository stockRepository;
     private final KeywordRepository keywordRepository;
     private final StockKeywordRepository stockKeywordRepository;
+    private final StockScoreAlertService stockScoreAlertService;
+
+    private static final Set<Integer> INDEX_STOCK_IDS = Set.of(16492, 16493, 16494, 16495, 16496, 16497);
 
     @Transactional(readOnly = true)
     public List<Score> findScoresByDate(LocalDate yesterday, LocalDate today) {
@@ -252,6 +257,11 @@ public class ScoreService {
     // 점수 & 키워드 업데이트
     @Transactional
     public void updateScoreAndKeyword(Integer id, COUNTRY country, int yesterdayScore) {
+        // 인덱스(ScoreIndex) 종목은 배치 업데이트 제외
+        if (INDEX_STOCK_IDS.contains(id)) {
+            return;
+        }
+
         Stock stock = stockRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Could not find stock"));
         try {
@@ -273,6 +283,7 @@ public class ScoreService {
             // `stock` 연관 설정
             newScore.setStock(stock);
             scoreRepository.save(newScore);
+            stockScoreAlertService.onScoreChanged(id, yesterdayScore, finalScore);
 
             // 기존 StockKeyword 삭제
             stockKeywordRepository.deleteByStock(stock);

@@ -15,6 +15,7 @@ import java.util.Map;
 @RequestMapping("/preference")
 @RequiredArgsConstructor
 public class PreferenceController {
+
     private final PreferenceService preferenceService;
 
     @PostMapping("/bookmark/{stockId}")
@@ -85,4 +86,32 @@ public class PreferenceController {
         return ResponseEntity.ok().body(preferenceService.getBookmarkCount());
     }
 
+    // 새로 추가된 알림 관리 API들
+    @PatchMapping("/bookmark/{stockId}/disable-notification")
+    @Operation(summary = "알림만 해제 API", description = "북마크는 유지하되 알림만 해제하는 API")
+    public ResponseEntity<Map<String, String>> disableNotification(@PathVariable Integer stockId) {
+        try {
+            preferenceService.disableNotification(stockId);
+            
+            return ResponseEntity.status(HttpStatus.OK)
+                    .body(Map.of("message", "Notification disabled successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to disable notification: " + e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/bookmark/{stockId}/enable-notification")
+    @Operation(summary = "알림 다시 활성화 API", description = "알림을 다시 활성화하는 API")
+    public ResponseEntity<Map<String, String>> enableNotification(@PathVariable Integer stockId) {
+        try {
+            preferenceService.enableNotification(stockId);
+            
+            return ResponseEntity.status(HttpStatus.OK)
+                    .body(Map.of("message", "Notification enabled successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to enable notification: " + e.getMessage()));
+        }
+    }
 }
