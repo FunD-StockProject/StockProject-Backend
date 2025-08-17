@@ -27,7 +27,6 @@ import com.fund.stockProject.score.dto.response.ScoreResponse;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
 import com.fund.stockProject.stock.domain.COUNTRY;
-import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockWordResponse;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockRepository;
@@ -349,58 +348,6 @@ public class ScoreService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to update index scores", e);
         }
-    }
-
-    // ================= 강제 재계산 API =================
-    @Transactional
-    public void forceUpdateAllByCountry(final COUNTRY country) {
-        LocalDate today = LocalDate.now();
-        LocalDate yesterday = today.minusDays(1);
-
-        // 모든 종목 중 해당 국가만 대상
-        List<Stock> stocks = stockRepository.findAll();
-        for (Stock stock : stocks) {
-            COUNTRY stockCountry = getCountryFromExchangeNum(stock.getExchangeNum());
-            if (stockCountry != country) continue;
-
-            // 오늘 데이터가 있으면 삭제(덮어쓰기 방지)
-            if (scoreRepository.existsByStockIdAndDate(stock.getId(), today)) {
-                scoreRepository.deleteByStockIdAndDate(stock.getId(), today);
-            }
-
-            // diff 계산용 어제 점수(없으면 0)
-            int yesterdayScore = scoreRepository.findByStockIdAndDate(stock.getId(), yesterday)
-                .map(s -> country == COUNTRY.KOREA ? s.getScoreKorea() : s.getScoreOversea())
-                .orElse(0);
-
-            updateScoreAndKeyword(stock.getId(), country, yesterdayScore);
-        }
-    }
-
-    @Transactional
-    public void forceUpdateOne(final Integer stockId, final COUNTRY country) {
-        LocalDate today = LocalDate.now();
-        LocalDate yesterday = today.minusDays(1);
-
-        Stock stock = stockRepository.findById(stockId)
-            .orElseThrow(() -> new RuntimeException("Could not find stock"));
-
-        // 오늘 데이터가 있으면 삭제(덮어쓰기 방지)
-        if (scoreRepository.existsByStockIdAndDate(stock.getId(), today)) {
-            scoreRepository.deleteByStockIdAndDate(stock.getId(), today);
-        }
-
-        // diff 계산용 어제 점수(없으면 0)
-        int yesterdayScore = scoreRepository.findByStockIdAndDate(stock.getId(), yesterday)
-            .map(s -> country == COUNTRY.KOREA ? s.getScoreKorea() : s.getScoreOversea())
-            .orElse(0);
-
-        updateScoreAndKeyword(stock.getId(), country, yesterdayScore);
-    }
-
-    private COUNTRY getCountryFromExchangeNum(EXCHANGENUM exchangenum) {
-        return List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF)
-            .contains(exchangenum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
     }
 
     private boolean isFirst(Integer id) {
