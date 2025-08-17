@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -41,6 +42,8 @@ public class ScoreService {
     private final StockRepository stockRepository;
     private final KeywordRepository keywordRepository;
     private final StockKeywordRepository stockKeywordRepository;
+
+    private static final Set<Integer> INDEX_STOCK_IDS = Set.of(16492, 16493, 16494, 16495, 16496, 16497);
 
     @Transactional(readOnly = true)
     public List<Score> findScoresByDate(LocalDate yesterday, LocalDate today) {
@@ -252,6 +255,12 @@ public class ScoreService {
     // 점수 & 키워드 업데이트
     @Transactional
     public void updateScoreAndKeyword(Integer id, COUNTRY country, int yesterdayScore) {
+
+        // 인덱스 종목은 업데이트 하지 않음
+        if(INDEX_STOCK_IDS.contains(id)) {
+            return;
+        }
+
         Stock stock = stockRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Could not find stock"));
         try {
