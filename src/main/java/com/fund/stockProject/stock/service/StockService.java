@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -51,9 +52,6 @@ public class StockService {
     private final KeywordRepository keywordRepository;
 
     private final int LIMITS = 9;
-    private static final int KEYWORD_FETCH_LIMIT = 2; // 제공 개수만 조회
-    private static final int KEYWORD_OUTPUT_LIMIT = 2; // 최종 출력 2개
-    private static final int SENTINEL = 9999; // 지역 구분용 기존 설계 준수
 
     public Mono<StockInfoResponse> searchStockBySymbolName(final String searchKeyword,
         final String country) {
@@ -511,31 +509,37 @@ public class StockService {
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
 
-        List<Score> todayList;
+        List<Score> allScores;
+
         if (country == COUNTRY.KOREA) {
-            todayList = scoreRepository.findTop9ByDateAndScoreOverseaEqualsOrderByDiffDesc(today, SENTINEL);
+            allScores = scoreRepository.findScoresByDatesKorea(today, yesterday);
         } else {
-            todayList = scoreRepository.findTop9ByDateAndScoreKoreaEqualsOrderByDiffDesc(today, SENTINEL);
+            allScores = scoreRepository.findScoresByDatesOversea(today, yesterday);
         }
 
-        // 어제-only 데이터 조회 및 국가별 sentinel 필터
-        List<Score> yesterdayOnly = scoreRepository.findScoresWithoutTodayData(yesterday, today)
-            .stream()
-            .filter(s -> country == COUNTRY.KOREA ?
-                Integer.valueOf(SENTINEL).equals(s.getScoreOversea()) :
-                Integer.valueOf(SENTINEL).equals(s.getScoreKorea()))
-            .collect(Collectors.toList());
+        // 오늘 데이터와 어제 데이터를 구분
+        Set<Integer> todayIdSet = allScores.stream()
+            .filter(score -> score.getDate().isEqual(today))
+            .map(Score::getStockId)
+            .collect(Collectors.toSet());
 
-        // 병합 후 diff 내림차순으로 재정렬, 상위 9개 선택
-        List<Score> merged = new ArrayList<>();
-        merged.addAll(todayList);
-        merged.addAll(yesterdayOnly);
-        merged.sort(Comparator.comparing(Score::getDiff).reversed());
+        // TreeSet을 사용해 정렬된 상태 유지
+        TreeSet<Score> topScores = new TreeSet<>(Comparator.comparing(Score::getDiff).reversed());
 
-        if (merged.size() > LIMITS) {
-            return merged.subList(0, LIMITS);
-        }
-        return merged;
+        allScores.stream()
+            .filter(score -> {
+                if (score.getDate().isEqual(today)) {
+                    return true; // 오늘 데이터는 무조건 포함
+                }
+                // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
+                return !todayIdSet.contains(score.getStockId());
+            })
+            .forEach(topScores::add);
+
+        // 상위 9개만 반환
+        return topScores.stream()
+            .limit(LIMITS)
+            .toList();
     }
 
     /**
@@ -547,31 +551,37 @@ public class StockService {
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
 
-        List<Score> todayList;
+        List<Score> allScores;
+
         if (country == COUNTRY.KOREA) {
-            todayList = scoreRepository.findTop9ByDateAndScoreOverseaEqualsOrderByDiffAsc(today, SENTINEL);
+            allScores = scoreRepository.findScoresByDatesKorea(today, yesterday);
         } else {
-            todayList = scoreRepository.findTop9ByDateAndScoreKoreaEqualsOrderByDiffAsc(today, SENTINEL);
+            allScores = scoreRepository.findScoresByDatesOversea(today, yesterday);
         }
 
-        // 어제-only 데이터 조회 및 국가별 sentinel 필터
-        List<Score> yesterdayOnly = scoreRepository.findScoresWithoutTodayData(yesterday, today)
-            .stream()
-            .filter(s -> country == COUNTRY.KOREA ?
-                Integer.valueOf(SENTINEL).equals(s.getScoreOversea()) :
-                Integer.valueOf(SENTINEL).equals(s.getScoreKorea()))
-            .collect(Collectors.toList());
+        // 오늘 데이터와 어제 데이터를 구분
+        Set<Integer> todayIdSet = allScores.stream()
+            .filter(score -> score.getDate().isEqual(today))
+            .map(Score::getStockId)
+            .collect(Collectors.toSet());
 
-        // 병합 후 diff 오름차순으로 재정렬, 하위 9개 선택
-        List<Score> merged = new ArrayList<>();
-        merged.addAll(todayList);
-        merged.addAll(yesterdayOnly);
-        merged.sort(Comparator.comparing(Score::getDiff));
+        // TreeSet을 사용해 정렬된 상태 유지
+        TreeSet<Score> topScores = new TreeSet<>(Comparator.comparing(Score::getDiff));
 
-        if (merged.size() > LIMITS) {
-            return merged.subList(0, LIMITS);
-        }
-        return merged;
+        allScores.stream()
+            .filter(score -> {
+                if (score.getDate().isEqual(today)) {
+                    return true; // 오늘 데이터는 무조건 포함
+                }
+                // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
+                return !todayIdSet.contains(score.getStockId());
+            })
+            .forEach(topScores::add);
+
+        // 상위 9개만 반환
+        return topScores.stream()
+            .limit(LIMITS)
+            .toList();
     }
 
     /**
@@ -586,14 +596,14 @@ public class StockService {
 
         for (final Score score : scores) {
             final List<String> uniqueKeywords = keywordRepository.findKeywordsByStockId(
-                    score.getStock().getId(), PageRequest.of(0, KEYWORD_FETCH_LIMIT))
+                    score.getStock().getId(), PageRequest.of(0, 10))
                 .stream()
                 .map(Keyword::getName)
                 .filter(
                     keyword -> (!keyword.equals(score.getStock().getSymbolName()) && isValidKeyword(
-                        keyword)))
+                        keyword))) // symbolName과 일치하는 키워드 제거
                 .distinct()
-                .limit(KEYWORD_OUTPUT_LIMIT)
+                .limit(2)
                 .toList();
 
             stockDiffResponses.add(StockDiffResponse.builder()
@@ -644,13 +654,13 @@ public class StockService {
 
         for (final Stock stock : relevantStocksByExchangeNumAndScore) {
             final List<String> uniqueKeywords = keywordRepository.findKeywordsByStockId(
-                    stock.getId(), PageRequest.of(0, KEYWORD_OUTPUT_LIMIT))
+                    stock.getId(), PageRequest.of(0, 10))
                 .stream()
                 .map(Keyword::getName)
                 .filter(keyword -> (!keyword.equals(stock.getSymbolName()) && isValidKeyword(
                     keyword))) // symbolName과 일치하는 키워드 제거
                 .distinct()
-                .limit(KEYWORD_OUTPUT_LIMIT)
+                .limit(2)
                 .toList();
 
             stockRelevantResponses.add(StockRelevantResponse.builder()
