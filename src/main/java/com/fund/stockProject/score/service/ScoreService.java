@@ -52,58 +52,14 @@ public class ScoreService {
 
     public ScoreResponse getScoreById(Integer id, COUNTRY country) {
         LocalDate today = LocalDate.now();
-
-        // 오늘 날짜의 점수가 있는지 확인
+        // 1) 오늘 날짜 점수 우선 조회
         return scoreRepository.findByStockIdAndDate(id, today)
+            .or(() -> scoreRepository.findTopByStockIdOrderByDateDesc(id)) // 2) 없으면 가장 최근 점수
             .map(score -> {
-                // 오늘 점수가 있으면 기존 점수 반환
                 int scoreValue = (country == COUNTRY.KOREA) ? score.getScoreKorea() : score.getScoreOversea();
-                return ScoreResponse.builder()
-                    .score(scoreValue)
-                    .build();
+                return ScoreResponse.builder().score(scoreValue).build();
             })
-            .orElseGet(() -> {
-                // 오늘 점수가 없으면 새로 생성
-                Stock stock = stockRepository.findById(id)
-                    .orElseThrow(() -> new RuntimeException("Could not find stock"));
-
-                // STEP1: AI 실행
-                int finalScore = executeScoreAI(stock.getSymbol(), country);
-
-                // 어제 점수 조회
-                Score yesterdayScore = scoreRepository.findByStockIdAndDate(id, today.minusDays(1))
-                    .orElse(null);
-                int diff = (yesterdayScore != null) ? finalScore - (
-                    country == COUNTRY.KOREA ? yesterdayScore.getScoreKorea()
-                        : yesterdayScore.getScoreOversea()) : 0;
-
-                // STEP2: SCORE 데이터 저장
-                Score newScore = Score.builder()
-                    .stockId(stock.getId())
-                    .date(today)
-                    .scoreKorea(country == COUNTRY.KOREA ? finalScore : 9999)
-                    .scoreNaver(finalScore)
-                    .scoreReddit(9999)
-                    .scoreOversea(country == COUNTRY.OVERSEA ? finalScore : 9999)
-                    .diff(diff)
-                    .build();
-                newScore.setStock(stock);
-                scoreRepository.save(newScore);
-
-                // 첫 인간지표인 경우, 초기 데이터 삭제
-                if (isFirst(id)) {
-                    scoreRepository.deleteByStockIdAndDate(id, LocalDate.of(1111, 11, 11));
-                }
-
-                return ScoreResponse.builder()
-                    .score(finalScore)
-                    .build();
-            });
-    }
-
-    private boolean isFirst(Integer id) {
-        // 1111-11-11 날짜의 데이터가 존재하면 첫 인간지표로 판단
-        return scoreRepository.existsByStockIdAndDate(id, LocalDate.of(1111, 11, 11));
+            .orElseThrow(() -> new RuntimeException("Score not found for stock: " + id));
     }
 
 

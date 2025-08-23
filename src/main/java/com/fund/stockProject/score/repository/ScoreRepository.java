@@ -51,4 +51,9 @@ public interface ScoreRepository extends JpaRepository<Score, Integer> {
 
     @Query("SELECT s FROM Score s WHERE s.date IN (:today) AND s.scoreOversea = 9999")
     List<Score> findScoresByTodayOversea(@Param("today") LocalDate today);
+
+    /**
+     * stock_id로 최신 날짜의 Score 데이터 단건 조회
+     */
+    Optional<Score> findTopByStockIdOrderByDateDesc(Integer stockId);
 }
