@@ -56,4 +56,9 @@ public interface ScoreRepository extends JpaRepository<Score, Integer> {
      * stock_id로 최신 날짜의 Score 데이터 단건 조회
      */
     Optional<Score> findTopByStockIdOrderByDateDesc(Integer stockId);
+
+    /**
+     * 최근 30개 점수 역순 조회 (단기 패턴 분석용)
+     */
+    List<Score> findFirst30ByStockIdOrderByDateDesc(Integer stockId);
 }
