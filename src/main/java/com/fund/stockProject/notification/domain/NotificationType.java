@@ -1,13 +1,11 @@
 package com.fund.stockProject.notification.domain;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "알림 타입 Enum. 시스템이 사용자에게 전달할 수 있는 알림 분류")
 public enum NotificationType {
-    SCORE_SPIKE("점수 급변 알림"),
-    SUBSCRIPTION_STARTED("구독 시작 알림"),
-    SUBSCRIPTION_STOPPED("구독 해제 알림"),
-    DAILY_SUMMARY("일일 요약 알림"),
-    MARKET_OPEN("장 시작 알림"),
-    MARKET_CLOSE("장 마감 알림"),
-    SYSTEM_MAINTENANCE("시스템 점검 알림");
+    @Schema(description = "점수 급변 (스파이크) 발생 시 전달되는 알림")
+    SCORE_SPIKE("점수 급변 알림");
 
     private final String description;
 

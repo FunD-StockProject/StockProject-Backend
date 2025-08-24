@@ -3,6 +3,14 @@ package com.fund.stockProject.notification.controller;
 import com.fund.stockProject.notification.dto.RegisterDeviceTokenRequest;
 import com.fund.stockProject.notification.dto.UnregisterDeviceTokenRequest;
 import com.fund.stockProject.notification.service.DeviceTokenService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -11,9 +19,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+@Tag(name = "Notification", description = "디바이스(Firebase) 푸시 토큰 등록/삭제 API")
 @RestController
-@RequestMapping("/api/device-tokens")
+@RequestMapping("/device-tokens")
 @RequiredArgsConstructor
+@SecurityRequirement(name = "bearerAuth")
 public class DeviceTokenController {
 
     private final DeviceTokenService deviceTokenService;
@@ -22,8 +32,14 @@ public class DeviceTokenController {
      * FCM 토큰 등록
      */
     @PostMapping
+    @Operation(summary = "FCM 디바이스 토큰 등록", description = "사용자 디바이스의 FCM 토큰을 저장/업데이트합니다. 중복 토큰이나 다른 사용자에 매핑된 토큰은 비즈니스 규칙에 따라 처리됩니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "등록 성공", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Map.class))),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (누락/중복/형식 오류)", content = @Content),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류", content = @Content)
+    })
     public ResponseEntity<Map<String, String>> registerToken(
-            @AuthenticationPrincipal(expression = "id") Integer userId,
+            @AuthenticationPrincipal(expression = "id") @Parameter(hidden = true) Integer userId,
             @Valid @RequestBody RegisterDeviceTokenRequest request) {
         try {
             deviceTokenService.registerToken(userId, request);
@@ -40,8 +56,14 @@ public class DeviceTokenController {
      * FCM 토큰 삭제
      */
     @DeleteMapping
+    @Operation(summary = "FCM 디바이스 토큰 삭제", description = "사용자 계정에서 지정한 FCM 디바이스 토큰을 제거합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "삭제 성공", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Map.class))),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (존재하지 않음/형식 오류)", content = @Content),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류", content = @Content)
+    })
     public ResponseEntity<Map<String, String>> unregisterToken(
-            @AuthenticationPrincipal(expression = "id") Integer userId,
+            @AuthenticationPrincipal(expression = "id") @Parameter(hidden = true) Integer userId,
             @Valid @RequestBody UnregisterDeviceTokenRequest request) {
         try {
             deviceTokenService.unregisterToken(userId, request);

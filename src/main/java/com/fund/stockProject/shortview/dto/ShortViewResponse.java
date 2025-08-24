@@ -2,6 +2,7 @@ package com.fund.stockProject.shortview.dto;
 
 import com.fund.stockProject.stock.dto.response.StockInfoResponse;
 import com.fund.stockProject.stock.entity.Stock;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -22,28 +23,36 @@ import java.util.stream.Collectors;
  * - 키워드 3개
  */
 @Getter
+@Schema(description = "개인화 숏뷰 추천 종목 응답 DTO. 실시간 시세 조회 실패 시 가격 관련 필드는 null 일 수 있습니다.")
 public class ShortViewResponse {
 
-    // 기본 정보
+    @Schema(description = "종목 ID", example = "101")
+    private final Integer stockId;
+    @Schema(description = "종목 대표 이미지 URL", example = "https://cdn.example.com/stocks/AAPL.png")
     private final String imageUrl;
+    @Schema(description = "종목 심볼/이름", example = "AAPL")
     private final String stockName;
 
-    // 실시간 가격 정보
+    @Schema(description = "현재 가격 (실시간 조회 실패 시 null)", example = "187.12", nullable = true)
     private final Double price;
+    @Schema(description = "가격 절대 변동값 (실시간 조회 실패 시 null)", example = "-1.45", nullable = true)
     private final Double priceDiff;
+    @Schema(description = "가격 변동 퍼센트 (실시간 조회 실패 시 null)", example = "-0.77", nullable = true)
     private final Double priceDiffPerCent;
 
-    // 인간지표 점수 정보
+    @Schema(description = "현재 인간지표 점수", example = "82")
     private final Integer score;
+    @Schema(description = "점수 변동값 (이전 대비)", example = "+5")
     private final Integer diff;
 
-    // 관련 키워드 정보
+    @Schema(description = "추천 관련 키워드 최대 3개", example = "[\"AI\", \"반도체\", \"전기차\"]")
     private final List<String> keywords;
 
     @Builder
-    private ShortViewResponse(String imageUrl, String stockName,
+    private ShortViewResponse(Integer stockId, String imageUrl, String stockName,
                               Double price, Double priceDiff, Double priceDiffPerCent,
                               Integer score, Integer diff, List<String> keywords) {
+        this.stockId = stockId;
         this.imageUrl = imageUrl;
         this.stockName = stockName;
         this.price = price;
@@ -74,6 +83,7 @@ public class ShortViewResponse {
                 .collect(Collectors.toList());
 
         return ShortViewResponse.builder()
+                .stockId(stock.getId())
                 .imageUrl(stock.getImageUrl())
                 .stockName(stock.getSymbolName())
                 .price(stockInfo.getPrice())
@@ -105,6 +115,7 @@ public class ShortViewResponse {
                 .collect(Collectors.toList());
 
         return ShortViewResponse.builder()
+                .stockId(stock.getId())
                 .imageUrl(stock.getImageUrl())
                 .stockName(stock.getSymbolName())
                 .price(null)

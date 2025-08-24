@@ -1,5 +1,6 @@
 package com.fund.stockProject.notification.service;
 
+import com.fund.stockProject.notification.domain.DevicePlatform;
 import com.fund.stockProject.notification.dto.RegisterDeviceTokenRequest;
 import com.fund.stockProject.notification.dto.UnregisterDeviceTokenRequest;
 import com.fund.stockProject.notification.entity.UserDeviceToken;
@@ -20,7 +21,7 @@ public class DeviceTokenService {
     @Transactional
     public void registerToken(Integer userId, RegisterDeviceTokenRequest request) {
         String token = request.getToken();
-        String platform = request.getPlatform();
+        DevicePlatform platform = request.getPlatform();
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));

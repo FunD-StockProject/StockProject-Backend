@@ -17,7 +17,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-@Service
+// @Service
 @Slf4j
 public class OutboxDispatcher {
     private final OutboxRepository outboxRepo;
@@ -42,9 +42,9 @@ public class OutboxDispatcher {
     }
 
     /**
-     * 즉시 발송 처리 (1.5초마다)
+     * 즉시 발송 처리 (1분5초마다)
      */
-    @Scheduled(fixedDelay = 1500)
+    @Scheduled(fixedDelay = 60000)
     @Transactional
     public void dispatchImmediate() {
         // 즉시 발송할 이벤트들 (scheduledAt이 null이거나 현재 시간 이전)

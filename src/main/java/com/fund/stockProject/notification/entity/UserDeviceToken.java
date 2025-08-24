@@ -1,6 +1,8 @@
 package com.fund.stockProject.notification.entity;
 
+import com.fund.stockProject.notification.domain.DevicePlatform;
 import com.fund.stockProject.user.entity.User;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -35,8 +37,10 @@ public class UserDeviceToken {
     @Column(nullable = false, length = 255, unique = true)
     private String token;
 
+    @Enumerated(EnumType.STRING)
     @Column(length = 20)
-    private String platform;
+    @Schema(description = "디바이스 플랫폼", example = "ANDROID")
+    private DevicePlatform platform;
 
     @Builder.Default
     @Column(name = "is_active")

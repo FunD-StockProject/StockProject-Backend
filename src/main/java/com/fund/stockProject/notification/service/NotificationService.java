@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -92,13 +93,12 @@ public class NotificationService {
         notification = notificationRepository.save(notification);
 
         // OutboxEvent 생성
-        Map<String, Object> payload = Map.of(
-                "notificationId", notification.getId(),
-                "userId", user.getId(),
-                "stockId", stock != null ? stock.getId() : null,
-                "type", type.name(),
-                "scheduledAt", scheduledAt != null ? scheduledAt.toString() : null
-        );
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("notificationId", notification.getId());
+        payload.put("userId", user.getId());
+        payload.put("stockId", stock != null ? stock.getId() : null);
+        payload.put("type", type.name());
+        payload.put("scheduledAt", scheduledAt != null ? scheduledAt.toString() : null);
 
         OutboxEvent.OutboxEventBuilder outboxBuilder = OutboxEvent.builder()
                 .type("ALERT_CREATED")

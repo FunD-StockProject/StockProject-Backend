@@ -14,17 +14,35 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.Parameter;
+
 @Slf4j
+@Tag(name = "ShortView", description = "개인화 종목 추천(숏뷰) API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/shortview")
+@SecurityRequirement(name = "bearerAuth")
 public class ShortViewController {
 
     private final ShortViewService shortViewService;
 
     @GetMapping
+    @Operation(summary = "개인화 추천 종목 조회", description = "현재 사용자 선호/점수 데이터를 기반으로 1개의 추천 종목을 반환합니다.\n" +
+            "실시간 시세 조회 실패 시 가격 필드는 null 로 반환됩니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "추천 성공", content = @Content(schema = @Schema(implementation = ShortViewResponse.class))),
+            @ApiResponse(responseCode = "204", description = "추천 가능한 종목 없음"),
+            @ApiResponse(responseCode = "401", description = "인증 필요 또는 비회원")
+    })
     public ResponseEntity<ShortViewResponse> getRecommendation(
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails userDetails
     ) {
         // 회원인 경우
         if (userDetails != null) {
