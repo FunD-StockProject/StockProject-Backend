@@ -13,5 +13,6 @@ import java.util.Optional;
 public interface PreferenceRepository extends JpaRepository<Preference, PreferenceId> {
     Optional<Preference> findByUserIdAndStockId(Integer userId, Integer stockId);
     List<Preference> findByUserIdAndPreferenceType(Integer userId, PreferenceType preferenceType);
+    List<Preference> findByStockIdAndPreferenceType(Integer stockId, PreferenceType preferenceType);
     long countByUserIdAndPreferenceType(Integer userId, PreferenceType preferenceType);
 }
