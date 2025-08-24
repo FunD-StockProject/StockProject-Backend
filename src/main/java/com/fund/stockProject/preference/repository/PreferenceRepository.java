@@ -1,6 +1,6 @@
 package com.fund.stockProject.preference.repository;
 
-import com.fund.stockProject.auth.entity.User;
+import com.fund.stockProject.user.entity.User;
 import com.fund.stockProject.preference.domain.PreferenceType;
 import com.fund.stockProject.preference.entity.Preference;
 import com.fund.stockProject.preference.entity.PreferenceId;
