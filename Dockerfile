@@ -59,5 +59,8 @@ COPY AuthKey_DKATK95R7J_humanzipyo.p8 /app/config/AuthKey_DKATK95R7J_humanzipyo.
 # 9. FCM 서비스 계정 키 파일 복사
 COPY humanzipyo-fcm-service-account.json /app/config/humanzipyo-fcm-service-account.json
 
+# 9-1. 복사된 파일에 읽기 권한 부여
+RUN chmod 644 /app/config/humanzipyo-fcm-service-account.json
+
 # 10. 실행 파일 최소화
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
