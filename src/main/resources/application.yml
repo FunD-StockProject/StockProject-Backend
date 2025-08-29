@@ -1,6 +1,6 @@
 fcm:
   credentials:
-    path: ENC(/9YzKRaIQGb3lOpR8kl/Ato9dvD8sBBwoWLn6efgLB07n7jZ9Ff24F5JSsp1caYJLsUHw8RzUhY=)
+    path: ENC(yGauksQ7pB/OSLrt2hcvTlCcbyBRUQBIx6QftEkPu5gbawF4RiMkCkixzy/GtEHxC0W+Rosf9J8=)
 app:
   domain:
     prod: ENC(5P9Iq3ZTswvqef+LtMIwKsnvQ0guIfVYyIMmNmYcjDA=)
