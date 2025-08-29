@@ -34,7 +34,7 @@ public class OAuth2Controller {
     })
     public ResponseEntity<LoginResponse> kakaoLogin(
             @Parameter(description = "인가 코드(Authorization Code)", example = "SplxlOBeZQQYbYS6WxSbIA") @RequestParam String code,
-            @Parameter(description = "CSRF 방지 및 요청 추적용 state", example = "abc123xyz") @RequestParam String state) {
+            @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/kakao") @RequestParam String state) {
         try {
             LoginResponse response = oAuth2Service.kakaoLogin(code, state);
 
@@ -57,7 +57,7 @@ public class OAuth2Controller {
     })
     public ResponseEntity<LoginResponse> naverLogin(
             @Parameter(description = "인가 코드", example = "SplxlOBeZQQYbYS6WxSbIA") @RequestParam String code,
-            @Parameter(description = "state 값", example = "abc123xyz") @RequestParam String state) {
+            @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/naver") @RequestParam String state) {
         try {
             LoginResponse response = oAuth2Service.naverLogin(code, state);
 
@@ -80,7 +80,7 @@ public class OAuth2Controller {
     })
     public ResponseEntity<LoginResponse> googleLogin(
             @Parameter(description = "인가 코드", example = "4/0AY0e-g7...") @RequestParam String code,
-            @Parameter(description = "state 값", example = "abc123xyz") @RequestParam String state) {
+            @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/google") @RequestParam String state) {
         try {
             LoginResponse response = oAuth2Service.googleLogin(code, state);
 
@@ -103,7 +103,7 @@ public class OAuth2Controller {
     })
     public ResponseEntity<LoginResponse> appleLogin(
             @Parameter(description = "인가 코드", example = "c1d2e3f4...") @RequestParam String code,
-            @Parameter(description = "state 값", example = "abc123xyz") @RequestParam String state) {
+            @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/apple") @RequestParam String state) {
         try {
             LoginResponse response = oAuth2Service.appleLogin(code, state);
 

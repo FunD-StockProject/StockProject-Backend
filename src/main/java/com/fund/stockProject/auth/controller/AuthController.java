@@ -31,11 +31,10 @@ public class AuthController {
     private final TokenService tokenService;
 
     @PostMapping(value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "소셜 회원가입", description = "OAuth2 프로바이더 정보를 기반으로 신규 사용자를 등록하고 프로필 이미지를 업로드합니다.\n" +
-            "주요 검증: 닉네임/이메일 중복, 마케팅 수신 동의 여부.")
+    @Operation(summary = "소셜 회원가입", description = "신규 사용자를 등록하고 프로필 이미지를 업로드합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "회원가입 성공", content = @Content(mediaType = "application/json")),
-            @ApiResponse(responseCode = "400", description = "잘못된 입력 값 (형식 / 제약 위반)", content = @Content),
+            @ApiResponse(responseCode = "400", description = "잘못된 입력 값", content = @Content),
             @ApiResponse(responseCode = "409", description = "닉네임 또는 이메일 중복", content = @Content),
             @ApiResponse(responseCode = "500", description = "서버 내부 오류", content = @Content)
     })
@@ -55,7 +54,7 @@ public class AuthController {
     }
 
     @DeleteMapping("/withdraw")
-    @Operation(summary = "회원 탈퇴", description = "현재 인증된 사용자를 영구 삭제 처리합니다. 관련 파생 데이터 정책(소프트 삭제 / 하드 삭제)은 비즈니스 로직에 따릅니다.")
+    @Operation(summary = "회원 탈퇴", description = "현재 인증된 사용자를 영구 삭제 처리합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "탈퇴 성공"),
@@ -78,7 +77,7 @@ public class AuthController {
     }
 
     @PostMapping("/reissue")
-    @Operation(summary = "Access 토큰 재발급", description = "만료되거나 만료 예정인 Access 토큰을 Refresh 토큰을 이용해 재발급합니다. Refresh 토큰도 갱신될 수 있습니다.")
+    @Operation(summary = "Access 토큰 재발급", description = "Access 토큰을 Refresh 토큰을 이용해 재발급합니다. Refresh 토큰도 갱신됩니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "재발급 성공", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
             @ApiResponse(responseCode = "400", description = "잘못된 토큰 형식 / 요청"),
@@ -101,7 +100,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "로그아웃", description = "서버 측(또는 저장소)에 보관된 Refresh 토큰을 무효화(블랙리스트/삭제)하여 이후 재발급을 차단합니다.")
+    @Operation(summary = "로그아웃", description = "서버에 보관된 Refresh 토큰을 무효화하여 이후 재발급을 차단합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "로그아웃 성공"),

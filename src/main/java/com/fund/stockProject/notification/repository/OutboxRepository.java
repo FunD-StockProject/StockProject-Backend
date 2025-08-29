@@ -25,4 +25,8 @@ public interface OutboxRepository extends JpaRepository<OutboxEvent, Integer> {
 
     @Query("SELECT e FROM OutboxEvent e WHERE e.status = :status AND e.nextAttemptAt <= :now")
     List<OutboxEvent> findRetryableEvents(@Param("status") String status, @Param("now") Instant now);
+
+    // 메모리 누수 방지를 위한 정리 메소드들 추가
+    @Query("SELECT e FROM OutboxEvent e WHERE e.status = :status AND e.createdAt < :createdBefore")
+    List<OutboxEvent> findByStatusAndCreatedAtBefore(@Param("status") String status, @Param("createdBefore") Instant createdBefore);
 }

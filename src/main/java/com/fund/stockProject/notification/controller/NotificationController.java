@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-@Tag(name = "Notification", description = "사용자 알림 조회/읽음 처리 및 FCM 테스트 API")
+@Tag(name = "Notification", description = "사용자 알림 조회/읽음 처리 및 테스트 API")
 @RestController
 @RequestMapping("/notification")
 @RequiredArgsConstructor
@@ -111,7 +111,7 @@ public class NotificationController {
      * 읽지 않은 알림 개수 조회
      */
     @GetMapping("/unread-count")
-    @Operation(summary = "읽지 않은 알림 개수", description = "현재 사용자 기준 읽지 않은(unread) 알림 건수를 반환합니다.")
+    @Operation(summary = "읽지 않은 알림 개수", description = "현재 사용자 기준 읽지 않은 알림 건수를 반환합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })

@@ -6,18 +6,19 @@ import com.fund.stockProject.notification.entity.Notification;
 import com.fund.stockProject.notification.entity.OutboxEvent;
 import com.fund.stockProject.notification.repository.NotificationRepository;
 import com.fund.stockProject.notification.repository.OutboxRepository;
-import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-// @Service
+@Service
 @Slf4j
 public class OutboxDispatcher {
     private final OutboxRepository outboxRepo;
@@ -42,22 +43,28 @@ public class OutboxDispatcher {
     }
 
     /**
-     * 즉시 발송 처리 (1분5초마다)
+     * 즉시 발송 처리 (15분마다)
      */
-    @Scheduled(fixedDelay = 60000)
-    @Transactional
+    @Scheduled(fixedDelay = 900000) // 15분 = 900,000ms
     public void dispatchImmediate() {
-        // 즉시 발송할 이벤트들 (scheduledAt이 null이거나 현재 시간 이전)
-        var batch = outboxRepo.findReadyToProcessInStatuses(
-                List.of("PENDING", "READY_TO_SEND"),
-                Instant.now(),
-                PageRequest.of(0, 100)
-        );
+        try {
+            // 스케줄러에서는 트랜잭션을 사용하지 않고, 개별 처리에서만 사용
+            var batch = outboxRepo.findReadyToProcessInStatuses(
+                    List.of("PENDING", "READY_TO_SEND"),
+                    Instant.now(),
+                    PageRequest.of(0, 100)
+            );
 
-        for (OutboxEvent e : batch.getContent()) {
-            if (!"ALERT_CREATED".equals(e.getType())) continue;
-            
-            processEvent(e);
+            log.debug("Found {} events to process immediately", batch.getContent().size());
+
+            for (OutboxEvent e : batch.getContent()) {
+                if (!"ALERT_CREATED".equals(e.getType())) continue;
+
+                // 각 이벤트를 개별 트랜잭션으로 처리
+                processEventWithTransaction(e);
+            }
+        } catch (Exception e) {
+            log.error("Error in dispatchImmediate scheduler", e);
         }
     }
 
@@ -65,14 +72,33 @@ public class OutboxDispatcher {
      * 재시도 이벤트 처리 (5분마다)
      */
     @Scheduled(fixedDelay = 300000) // 5분
-    @Transactional
     public void dispatchRetry() {
-        List<OutboxEvent> retryEvents = outboxRepo.findRetryableEvents("RETRY", Instant.now());
-        
-        for (OutboxEvent e : retryEvents) {
-            if (!"ALERT_CREATED".equals(e.getType())) continue;
-            
+        try {
+            List<OutboxEvent> retryEvents = outboxRepo.findRetryableEvents("RETRY", Instant.now());
+
+            log.debug("Found {} events to retry", retryEvents.size());
+
+            for (OutboxEvent e : retryEvents) {
+                if (!"ALERT_CREATED".equals(e.getType())) continue;
+
+                // 각 이벤트를 개별 트랜잭션으로 처리
+                processEventWithTransaction(e);
+            }
+        } catch (Exception e) {
+            log.error("Error in dispatchRetry scheduler", e);
+        }
+    }
+
+    /**
+     * 개별 이벤트를 트랜잭션으로 처리
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void processEventWithTransaction(OutboxEvent e) {
+        try {
             processEvent(e);
+        } catch (Exception ex) {
+            log.error("Failed to process event {}: {}", e.getId(), ex.getMessage());
+            handleError(e, ex);
         }
     }
 
@@ -127,5 +153,37 @@ public class OutboxDispatcher {
         
         log.warn("Notification dispatch failed, will retry: eventId={}, retryCount={}, nextAttempt={}, error={}", 
                 e.getId(), retryCount, e.getNextAttemptAt(), ex.getMessage());
+    }
+
+    /**
+     * 오래된 ���리 완료 이벤트 정리 (매일 새벽 3시)
+     */
+    @Scheduled(cron = "0 0 3 * * ?", zone = "Asia/Seoul")
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void cleanupOldEvents() {
+        try {
+            // 7일 이상 된 PROCESSED 이벤트 삭제
+            Instant cutoffDate = Instant.now().minus(7, java.time.temporal.ChronoUnit.DAYS);
+            List<OutboxEvent> oldEvents = outboxRepo.findByStatusAndCreatedAtBefore("PROCESSED", cutoffDate);
+
+            if (!oldEvents.isEmpty()) {
+                outboxRepo.deleteAll(oldEvents);
+                log.info("Cleaned up {} old outbox events", oldEvents.size());
+            }
+
+            // 30일 이상 재시도에 실패한 이벤트들을 FAILED로 변경
+            Instant veryOldCutoff = Instant.now().minus(30, java.time.temporal.ChronoUnit.DAYS);
+            List<OutboxEvent> failedEvents = outboxRepo.findByStatusAndCreatedAtBefore("RETRY", veryOldCutoff);
+
+            if (!failedEvents.isEmpty()) {
+                failedEvents.forEach(event -> event.setStatus("FAILED"));
+                outboxRepo.saveAll(failedEvents);
+                log.warn("Marked {} old retry events as FAILED", failedEvents.size());
+            }
+
+        } catch (Exception e) {
+            log.error("Error during outbox cleanup", e);
+            // 정리 작업 실패는 시스템에 치명적이지 않으므로 예외를 삼킴
+        }
     }
 }

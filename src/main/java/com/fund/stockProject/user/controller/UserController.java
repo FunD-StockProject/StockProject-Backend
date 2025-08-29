@@ -53,7 +53,7 @@ public class UserController {
 
     @PatchMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "프로필 이미지 수정", description = "멀티파트로 프로필 이미지를 업로드하여 교체합니다. 허용 형식/크기 정책은 서버 설정을 따릅니다.")
+    @Operation(summary = "프로필 이미지 수정", description = "멀티파트로 프로필 이미지를 업로드하여 교체합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공", content = @Content(schema = @Schema(implementation = UserProfileResponse.class))),
             @ApiResponse(responseCode = "400", description = "잘못된 파일 형식/크기", content = @Content),

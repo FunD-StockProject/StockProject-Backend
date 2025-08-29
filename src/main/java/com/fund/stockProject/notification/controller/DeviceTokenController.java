@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-@Tag(name = "Notification", description = "디바이스(Firebase) 푸시 토큰 등록/삭제 API")
+@Tag(name = "Notification")
 @RestController
 @RequestMapping("/device-tokens")
 @RequiredArgsConstructor
@@ -32,7 +32,7 @@ public class DeviceTokenController {
      * FCM 토큰 등록
      */
     @PostMapping
-    @Operation(summary = "FCM 디바이스 토큰 등록", description = "사용자 디바이스의 FCM 토큰을 저장/업데이트합니다. 중복 토큰이나 다른 사용자에 매핑된 토큰은 비즈니스 규칙에 따라 처리됩니다.")
+    @Operation(summary = "FCM 디바이스 토큰 등록", description = "사용자 디바이스의 FCM 토큰을 저장/업데이트합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "등록 성공", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Map.class))),
             @ApiResponse(responseCode = "400", description = "잘못된 요청 (누락/중복/형식 오류)", content = @Content),

@@ -31,8 +31,7 @@ public class SsePushController { // public 으로 변경 (Swagger 스캔 용이)
     private final UserRepository userRepository;
     @GetMapping(value = "/notification/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "알림 SSE 구독", description = "Authorization 헤더(Bearer 토큰)를 이용해 SSE 연결을 수립하고 실시간 알림을 수신합니다.\n" +
-            "이 엔드포인트는 지속 연결을 유지하며 Heartbeat 또는 신규 알림 이벤트를 전송합니다.\n" +
-            "클라이언트는 토큰 갱신 시 재연결해야 하며, 네트워크 단절 시 지수적 backoff 재시도 전략을 권장합니다.")
+            "이 엔드포인트는 지속 연결을 유지하며 Heartbeat 또는 신규 알림 이벤트를 전송합니다.\n")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "SSE 스트림 시작", content = @Content(mediaType = "text/event-stream", schema = @Schema(implementation = String.class))),
             @ApiResponse(responseCode = "401", description = "유효하지 않은 또는 누락된 토큰"),

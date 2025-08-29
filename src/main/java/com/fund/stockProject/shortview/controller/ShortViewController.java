@@ -24,7 +24,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.Parameter;
 
 @Slf4j
-@Tag(name = "ShortView", description = "개인화 종목 추천(숏뷰) API")
+@Tag(name = "ShortView", description = "숏뷰 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/shortview")
@@ -34,7 +34,7 @@ public class ShortViewController {
     private final ShortViewService shortViewService;
 
     @GetMapping
-    @Operation(summary = "개인화 추천 종목 조회", description = "현재 사용자 선호/점수 데이터를 기반으로 1개의 추천 종목을 반환합니다.\n" +
+    @Operation(summary = "숏뷰 추천 종목 조회", description = "현재 사용자 선호/점수 데이터를 기반으로 1개의 추천 종목을 반환합니다.\n" +
             "실시간 시세 조회 실패 시 가격 필드는 null 로 반환됩니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "추천 성공", content = @Content(schema = @Schema(implementation = ShortViewResponse.class))),

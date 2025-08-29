@@ -24,6 +24,7 @@ public class SecurityConfig {
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
     private final CorsConfig corsConfig;
     private final UserRepository userRepository;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     private static final String[] SWAGGER_API_PATHS = {
             "/v3/api-docs/**",
@@ -102,9 +103,9 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                         .sessionFixation().none()); // 세션 고정 방지 비활성화, JWT 기반 인증이므로
 
-        // JWT 검증 필터 등록
+        // JWT 검증 필터 등록 - Bean으로 주입받은 인스턴스 사용
         http
-                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, userRepository), LogoutFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, LogoutFilter.class);
 
         // 로그인 예외 시 실행
         http.exceptionHandling(exception -> exception

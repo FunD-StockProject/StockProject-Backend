@@ -3,6 +3,10 @@ package com.fund.stockProject.auth.service;
 import com.fund.stockProject.auth.dto.*;
 import com.fund.stockProject.user.entity.User;
 import com.fund.stockProject.user.repository.UserRepository;
+import com.fund.stockProject.preference.repository.PreferenceRepository;
+import com.fund.stockProject.notification.repository.NotificationRepository;
+import com.fund.stockProject.notification.repository.UserDeviceTokenRepository;
+import com.fund.stockProject.auth.repository.RefreshTokenRepository;
 import com.fund.stockProject.security.principle.CustomUserDetails;
 import com.fund.stockProject.global.service.S3Service;
 import jakarta.transaction.Transactional;
@@ -19,6 +23,10 @@ import static com.fund.stockProject.auth.domain.ROLE.ROLE_USER;
 @RequiredArgsConstructor
 public class AuthService {
     private final UserRepository userRepository;
+    private final PreferenceRepository preferenceRepository;
+    private final NotificationRepository notificationRepository;
+    private final UserDeviceTokenRepository userDeviceTokenRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final S3Service s3Service;
 
     /**
@@ -52,7 +60,26 @@ public class AuthService {
 
     @Transactional
     public void withdrawUser(String email) {
-        userRepository.deleteUserByEmail(email);
+        // 사용자 조회
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+
+        Integer userId = user.getId();
+
+        // 1. Preference 데이터 삭제 (외래 키 제약 조건 때문에 가장 먼저 삭제)
+        preferenceRepository.deleteByUserId(userId);
+
+        // 2. Notification 데이터 삭제
+        notificationRepository.deleteByUserId(userId);
+
+        // 3. UserDeviceToken 데이터 삭제
+        userDeviceTokenRepository.deleteByUserId(userId);
+
+        // 4. RefreshToken 데이터 삭제 (email 기반)
+        refreshTokenRepository.deleteByEmail(email);
+
+        // 5. 마지막으로 User 삭제
+        userRepository.delete(user);
     }
 
     public boolean isNicknameDuplicate(String nickname) {

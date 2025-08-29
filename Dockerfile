@@ -56,5 +56,8 @@ COPY keystore.p12 /app/config/keystore.p12
 # 8. Apple .p8 파일 복사
 COPY AuthKey_DKATK95R7J_humanzipyo.p8 /app/config/AuthKey_DKATK95R7J_humanzipyo.p8
 
-# 9. 실행 파일 최소화
+# 9. FCM 서비스 계정 키 파일 복사
+COPY humanzipyo-fcm-service-account.json /app/config/humanzipyo-fcm-service-account.json
+
+# 10. 실행 파일 최소화
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
