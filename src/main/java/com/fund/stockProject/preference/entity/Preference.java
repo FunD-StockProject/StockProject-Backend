@@ -25,15 +25,23 @@ public class Preference extends Core {
     @Column(name = "preference_type", nullable = false)
     private PreferenceType preferenceType;
 
+    @Column(name = "notification_enabled", nullable = false)
+    private Boolean notificationEnabled = true; // 알림 구독 여부
+
     protected Preference() {}
 
     public Preference(User user, Stock stock, PreferenceType preferenceType) {
         this.user = user;
         this.stock = stock;
         this.preferenceType = preferenceType;
+        this.notificationEnabled = true; // 기본적으로 알림 활성화
     }
 
     public void setPreferenceType(PreferenceType preferenceType) {
         this.preferenceType = preferenceType;
+    }
+
+    public void setNotificationEnabled(Boolean notificationEnabled) {
+        this.notificationEnabled = notificationEnabled;
     }
 }

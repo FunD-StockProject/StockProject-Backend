@@ -55,6 +55,16 @@ pipeline {
                     }
                 }
 
+        stage('Copy FCM Service Account Key') {
+                    steps {
+                        withCredentials([file(credentialsId: 'google-fcm-json', variable: 'FCM_JSON_FILE')]) {
+                            sh '''
+                                cp $FCM_JSON_FILE $WORKSPACE/humanzipyo-fcm-service-account.json
+                            '''
+                        }
+                    }
+                }
+
         stage('Build Docker Image') {
             steps {
                 script {

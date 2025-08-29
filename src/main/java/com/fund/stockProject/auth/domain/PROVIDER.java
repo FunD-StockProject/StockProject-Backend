@@ -1,10 +1,16 @@
 package com.fund.stockProject.auth.domain;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "OAuth2 인증 제공자 구분 값.\nKAKAO: 카카오 OAuth2\nNAVER: 네이버 OAuth2\nGOOGLE: 구글 OAuth2\nAPPLE: 애플 OAuth2")
 public enum PROVIDER {
-    LOCAL("local"), // 필요하다면 "local" 문자열도 정의할 수 있습니다.
+    /** 카카오 OAuth2 */
     KAKAO("kakao"),
+    /** 네이버 OAuth2 */
     NAVER("naver"),
+    /** 구글 OAuth2 */
     GOOGLE("google"),
+    /** 애플 OAuth2 */
     APPLE("apple");
 
     private final String provider;

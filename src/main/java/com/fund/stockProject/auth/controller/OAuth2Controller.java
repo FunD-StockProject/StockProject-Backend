@@ -10,16 +10,31 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.NoSuchElementException;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.Parameter;
 
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
+@Tag(name = "Auth", description = "소셜 OAuth2 로그인 엔드포인트 (카카오/네이버/구글/애플)")
 public class OAuth2Controller {
     private final OAuth2Service oAuth2Service;
 
     @GetMapping("/login/kakao")
-    public ResponseEntity<LoginResponse> kakaoLogin(@RequestParam String code, @RequestParam String state) {
+    @Operation(summary = "카카오 로그인", description = "카카오 인가 코드(code)와 state 값을 받아 액세스/리프레시 토큰을 발급하거나 회원가입 필요 상태를 반환합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그인 성공", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "404", description = "추가 회원가입 필요 (state=NEED_REGISTER)", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "500", description = "외부 OAuth2 연동 또는 서버 오류", content = @Content)
+    })
+    public ResponseEntity<LoginResponse> kakaoLogin(
+            @Parameter(description = "인가 코드(Authorization Code)", example = "SplxlOBeZQQYbYS6WxSbIA") @RequestParam String code,
+            @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/kakao") @RequestParam String state) {
         try {
             LoginResponse response = oAuth2Service.kakaoLogin(code, state);
 
@@ -34,7 +49,15 @@ public class OAuth2Controller {
     }
 
     @GetMapping("/login/naver")
-    public ResponseEntity<LoginResponse> naverLogin(@RequestParam String code, @RequestParam String state) {
+    @Operation(summary = "네이버 로그인", description = "네이버 인가 코드 처리")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그인 성공", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "404", description = "회원가입 필요", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "500", description = "외부 연동/서버 오류")
+    })
+    public ResponseEntity<LoginResponse> naverLogin(
+            @Parameter(description = "인가 코드", example = "SplxlOBeZQQYbYS6WxSbIA") @RequestParam String code,
+            @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/naver") @RequestParam String state) {
         try {
             LoginResponse response = oAuth2Service.naverLogin(code, state);
 
@@ -49,7 +72,15 @@ public class OAuth2Controller {
     }
 
     @GetMapping("/login/google")
-    public ResponseEntity<LoginResponse> googleLogin(@RequestParam String code, @RequestParam String state) {
+    @Operation(summary = "구글 로그인", description = "구글 인가 코드 처리")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그인 성공", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "404", description = "회원가입 필요", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "500", description = "외부 연동/서버 오류")
+    })
+    public ResponseEntity<LoginResponse> googleLogin(
+            @Parameter(description = "인가 코드", example = "4/0AY0e-g7...") @RequestParam String code,
+            @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/google") @RequestParam String state) {
         try {
             LoginResponse response = oAuth2Service.googleLogin(code, state);
 
@@ -64,7 +95,15 @@ public class OAuth2Controller {
     }
 
     @GetMapping("/login/apple")
-    public ResponseEntity<LoginResponse> appleLogin(@RequestParam String code, @RequestParam String state) {
+    @Operation(summary = "애플 로그인", description = "애플 인가 코드 처리")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그인 성공", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "404", description = "회원가입 필요", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "500", description = "외부 연동/서버 오류")
+    })
+    public ResponseEntity<LoginResponse> appleLogin(
+            @Parameter(description = "인가 코드", example = "c1d2e3f4...") @RequestParam String code,
+            @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/apple") @RequestParam String state) {
         try {
             LoginResponse response = oAuth2Service.appleLogin(code, state);
 

@@ -1,3 +1,6 @@
+fcm:
+  credentials:
+    path: ENC(/9YzKRaIQGb3lOpR8kl/Ato9dvD8sBBwoWLn6efgLB07n7jZ9Ff24F5JSsp1caYJLsUHw8RzUhY=)
 app:
   domain:
     prod: ENC(5P9Iq3ZTswvqef+LtMIwKsnvQ0guIfVYyIMmNmYcjDA=)
@@ -6,7 +9,6 @@ app:
     s3:
       bucket: ENC(JWOQ3iliS4xmdGerB0r3eRXASu4jCbMO5cts0xF26sY=)
       region: ap-northeast-2
-      # CloudFront 도메인이나 S3 퍼블릭 URL 중 택1
       public-base-url: ENC(r3T3si7pQMZjK95dKM3tir9enacrZgYGjvlGmGeZKzTmPNs4wtBOGMUbs2u531mHhKtLTup1BGrzbKh8u8+Mlk/1EFne4MVv)
     credentials:
       access-key: ENC(CIHPfitmBcHyzBwHYfDxSP3Jre5HOBqXuEm8jiMbtQU=)

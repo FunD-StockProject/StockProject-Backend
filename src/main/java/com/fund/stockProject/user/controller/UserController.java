@@ -5,6 +5,12 @@ import com.fund.stockProject.user.dto.UserUpdateRequest;
 import com.fund.stockProject.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -13,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+@Tag(name = "User", description = "사용자 프로필 관리 API")
 @RestController
 @RequestMapping("/user")
 @RequiredArgsConstructor
@@ -21,8 +28,17 @@ public class UserController {
 
     @PatchMapping(value = "/profile", consumes = MediaType.APPLICATION_JSON_VALUE)
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "프로필 수정 API", description = "프로필 수정 API")
-    public ResponseEntity<?> updateUserProfile(@RequestBody UserUpdateRequest request) {
+    @Operation(summary = "프로필 수정", description = "닉네임 / 생년월일 / 마케팅 수신 동의 값을 수정합니다. 일부 필드만 전달하면 부분 업데이트 처리됩니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "수정 성공", content = @Content(schema = @Schema(implementation = UserProfileResponse.class))),
+            @ApiResponse(responseCode = "400", description = "유효하지 않은 입력", content = @Content),
+            @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
+            @ApiResponse(responseCode = "404", description = "사용자 없음", content = @Content),
+            @ApiResponse(responseCode = "500", description = "서버 오류", content = @Content)
+    })
+    public ResponseEntity<?> updateUserProfile(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "수정할 프로필 필드 JSON", required = true)
+            @RequestBody UserUpdateRequest request) {
         try {
             UserProfileResponse response = userService.updateMyProfile(request);
             return ResponseEntity.ok(response);
@@ -37,8 +53,17 @@ public class UserController {
 
     @PatchMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "프로필 이미지 수정 API", description = "프로필 이미지 수정 API")
-    public ResponseEntity<?> updateProfileImage(@RequestParam("image") MultipartFile image) {
+    @Operation(summary = "프로필 이미지 수정", description = "멀티파트로 프로필 이미지를 업로드하여 교체합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "수정 성공", content = @Content(schema = @Schema(implementation = UserProfileResponse.class))),
+            @ApiResponse(responseCode = "400", description = "잘못된 파일 형식/크기", content = @Content),
+            @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
+            @ApiResponse(responseCode = "404", description = "사용자 없음", content = @Content),
+            @ApiResponse(responseCode = "500", description = "서버 오류", content = @Content)
+    })
+    public ResponseEntity<?> updateProfileImage(
+            @Parameter(description = "업로드할 새 프로필 이미지 파일", required = true, schema = @Schema(type = "string", format = "binary"))
+            @RequestParam("image") MultipartFile image) {
         try {
             UserProfileResponse response = userService.updateProfileImage(image);
             return ResponseEntity.ok(response);

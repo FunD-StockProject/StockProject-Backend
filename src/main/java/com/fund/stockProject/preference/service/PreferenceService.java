@@ -1,5 +1,6 @@
 package com.fund.stockProject.preference.service;
 
+
 import com.fund.stockProject.user.entity.User;
 import com.fund.stockProject.user.repository.UserRepository;
 import com.fund.stockProject.auth.service.AuthService;
@@ -14,12 +15,11 @@ import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockRepository;
 import com.fund.stockProject.stock.service.SecurityService;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -29,12 +29,50 @@ public class PreferenceService {
     private final StockRepository stockRepository;
     private final SecurityService securityService;
 
+    @Transactional
     public void addBookmark(Integer stockId) {
-        setPreference(stockId, PreferenceType.BOOKMARK);
+        System.out.println("=== 북마크 추가 시작 ===");
+        System.out.println("stockId: " + stockId);
+        
+        try {
+            setPreference(stockId, PreferenceType.BOOKMARK);
+            System.out.println("Preference 설정 완료");
+            
+            String email = AuthService.getCurrentUserEmail();
+            System.out.println("현재 사용자 이메일: " + email);
+
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new EntityNotFoundException("User not found with email: " + email));
+            System.out.println("사용자 조회 완료: " + user.getNickname());
+            
+            Stock stock = stockRepository.findStockById(stockId)
+                    .orElseThrow(() -> new EntityNotFoundException("Can't find stock: " + stockId));
+            System.out.println("주식 조회 완료: " + stock.getSymbolName());
+
+            // 구독 시작 시점에는 알림을 발송하지 않음 (점수 급변 시에만 알림)
+            System.out.println("구독 시작 완료 - 점수 급변 시 알림을 드릴게요");
+            System.out.println("=== 북마크 추가 완료 ===");
+            
+        } catch (Exception e) {
+            System.out.println("=== 북마크 추가 실패 ===");
+            System.out.println("오류 메시지: " + e.getMessage());
+            System.out.println("오류 타입: " + e.getClass().getSimpleName());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
+    @Transactional
     public void removeBookmark(Integer stockId) {
         removePreference(stockId, PreferenceType.BOOKMARK);
+        String email = AuthService.getCurrentUserEmail();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with email: " + email));
+        Stock stock = stockRepository.findStockById(stockId)
+                .orElseThrow(() -> new EntityNotFoundException("Can't find stock: " + stockId));
+
+        // 구독 해제 시점에는 알림을 발송하지 않음
     }
 
     public void hideStock(Integer stockId) {
@@ -43,6 +81,40 @@ public class PreferenceService {
 
     public void showStock(Integer stockId) {
         removePreference(stockId, PreferenceType.NEVER_SHOW);
+    }
+
+    /**
+     * 알림 토글 - 북마크가 없으면 북마크+알림 생성, 있으면 알림만 토글
+     */
+    @Transactional
+    public boolean toggleNotification(Integer stockId) {
+        String email = AuthService.getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with email: " + email));
+
+        // 기존 Preference 찾기
+        Optional<Preference> existingPreference = preferenceRepository.findByUserIdAndStockId(user.getId(), stockId);
+        
+        if (existingPreference.isPresent()) {
+            // 북마크가 이미 있는 경우: 알림만 토글
+            Preference preference = existingPreference.get();
+            if (preference.getPreferenceType() == PreferenceType.BOOKMARK) {
+                boolean newNotificationState = !preference.getNotificationEnabled();
+                preference.setNotificationEnabled(newNotificationState);
+                preferenceRepository.save(preference);
+                return newNotificationState;
+            } else {
+                // 북마크가 아닌 다른 타입(예: NEVER_SHOW)인 경우: 에러 발생
+                throw new IllegalStateException("Cannot toggle notification for stock with preference type: " + preference.getPreferenceType());
+            }
+        } else {
+            // 북마크가 없는 경우: 북마크+알림 생성
+            Stock stock = getStockOrThrow(stockId);
+            Preference newPreference = new Preference(user, stock, PreferenceType.BOOKMARK);
+            newPreference.setNotificationEnabled(true);
+            preferenceRepository.save(newPreference);
+            return true;
+        }
     }
 
     public List<BookmarkInfoResponse> getBookmarks() {
@@ -68,13 +140,21 @@ public class PreferenceService {
             ).block();
 
             if (stockInfoResponse != null) {
-                BookmarkInfoResponse bookmarkInfoResponse = new BookmarkInfoResponse(
-                        stock.getSymbolName(),
-                        stockInfoResponse.getPrice(),
-                        stockInfoResponse.getPriceDiffPerCent(),
-                        country == COUNTRY.KOREA ? stock.getScores().get(0).getScoreKorea() : stock.getScores().get(0).getScoreOversea(),
-                        stock.getScores().get(0).getDiff()
-                );
+                // Preference에서 알림 활성화 여부 확인
+                Optional<Preference> preference = preferenceRepository.findByUserIdAndStockId(getCurrentUserId(), stock.getId());
+                Boolean isNotificationOn = preference.map(Preference::getNotificationEnabled).orElse(true);
+
+                BookmarkInfoResponse bookmarkInfoResponse = BookmarkInfoResponse.builder()
+                        .stockId(stock.getId())
+                        .name(stock.getSecurityName())
+                        .price(stockInfoResponse.getPrice() != null ? stockInfoResponse.getPrice().intValue() : null)
+                        .priceDiffPerCent(stockInfoResponse.getPriceDiffPerCent())
+                        .score(country == COUNTRY.KOREA ? stock.getScores().get(0).getScoreKorea() : stock.getScores().get(0).getScoreOversea())
+                        .diff(stock.getScores().get(0).getDiff())
+                        .isNotificationOn(isNotificationOn)
+                        .symbolName(stock.getSymbolName())
+                        .country(country)
+                        .build();
 
                 result.add(bookmarkInfoResponse);
             }
@@ -145,4 +225,6 @@ public class PreferenceService {
 
         return user.getId();
     }
+
+
 }

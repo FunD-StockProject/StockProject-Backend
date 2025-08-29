@@ -85,6 +85,9 @@ dependencies {
 
 	// AWS S3 SDK
 	implementation 'software.amazon.awssdk:s3:2.25.62'
+
+	// FCM 연동을 위해
+	implementation 'com.google.firebase:firebase-admin:9.3.0'
 }
 
 tasks.named('test') {
