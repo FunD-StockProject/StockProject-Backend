@@ -8,9 +8,9 @@ import com.fund.stockProject.notification.repository.OutboxRepository;
 import com.fund.stockProject.preference.domain.PreferenceType;
 import com.fund.stockProject.preference.entity.Preference;
 import com.fund.stockProject.preference.repository.PreferenceRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -93,4 +93,3 @@ public class StockScoreAlertService {
         }
     }
 }
-
