@@ -9,12 +9,12 @@ import com.fund.stockProject.notification.repository.UserDeviceTokenRepository;
 import com.fund.stockProject.auth.repository.RefreshTokenRepository;
 import com.fund.stockProject.security.principle.CustomUserDetails;
 import com.fund.stockProject.global.service.S3Service;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import static com.fund.stockProject.auth.domain.ROLE.ROLE_USER;
@@ -90,23 +90,30 @@ public class AuthService {
         return userRepository.existsByEmail(email);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public String register(OAuth2RegisterRequest oAuth2RegisterRequest) {
-        MultipartFile image = oAuth2RegisterRequest.getImage();
-        String imageUrl = (image != null && !image.isEmpty()) ? s3Service.uploadUserImage(image, "users") : null;
+        try {
+            MultipartFile image = oAuth2RegisterRequest.getImage();
+            String imageUrl = (image != null && !image.isEmpty()) ? s3Service.uploadUserImage(image, "users") : null;
 
-        User user = User.builder()
-                .email(oAuth2RegisterRequest.getEmail())
-                .nickname(oAuth2RegisterRequest.getNickname())
-                .birthDate(oAuth2RegisterRequest.getBirthDate())
-                .provider(oAuth2RegisterRequest.getProvider())
-                .role(ROLE_USER)
-                .isActive(true)
-                .marketingAgreement(oAuth2RegisterRequest.getMarketingAgreement())
-                .profileImageUrl(imageUrl)
-                .build();
+            User user = User.builder()
+                    .email(oAuth2RegisterRequest.getEmail())
+                    .nickname(oAuth2RegisterRequest.getNickname())
+                    .birthDate(oAuth2RegisterRequest.getBirthDate())
+                    .provider(oAuth2RegisterRequest.getProvider())
+                    .role(ROLE_USER)
+                    .isActive(true)
+                    .marketingAgreement(oAuth2RegisterRequest.getMarketingAgreement())
+                    .profileImageUrl(imageUrl)
+                    .build();
 
-        userRepository.save(user);
-        return imageUrl;
+            userRepository.save(user);
+            return imageUrl;
+        } catch (Exception e) {
+            // 로그 추가
+            System.err.println("회원가입 중 오류 발생: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 }

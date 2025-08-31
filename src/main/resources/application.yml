@@ -37,13 +37,44 @@ spring:
     username: ENC(0YcumuiWmFs1CZfK0RcslQ==)
     password: ENC(41UmOQt2/KKY36ydEZ2QpigL3PJ6oiFq)
     time-zone: Asia/Seoul
+    hikari:
+      # 커넥션 풀 설정
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+      # 커넥션 테스트 설정
+      connection-test-query: SELECT 1
+      validation-timeout: 5000
+      # 트랜잭션 설정
+      auto-commit: false
   jpa:
     database: mysql
     hibernate:
       ddl-auto: update
-    properties:
-      hibernate.jdbc.time_zone: Asia/Seoul
     show-sql: false
+    # JPA 성능 최적화 및 트랜잭션 관리
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        # 트랜잭션 관리 설정
+        connection:
+          provider_disables_autocommit: true
+        # 트랜잭션 롤백 설정
+        transaction:
+          auto_close_session: false
+        # 세션 관리
+        session:
+          events:
+            log: false
+        # 타임존 설정
+        jdbc:
+          time_zone: Asia/Seoul
 
   batch:
     job:
