@@ -60,6 +60,7 @@ spring:
       hibernate:
         jdbc:
           batch_size: 20
+          time_zone: Asia/Seoul
         order_inserts: true
         order_updates: true
         # 트랜잭션 관리 설정
@@ -72,9 +73,6 @@ spring:
         session:
           events:
             log: false
-        # 타임존 설정
-        jdbc:
-          time_zone: Asia/Seoul
 
   batch:
     job:
