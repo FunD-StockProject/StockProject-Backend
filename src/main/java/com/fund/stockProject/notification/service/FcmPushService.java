@@ -1,6 +1,7 @@
 package com.fund.stockProject.notification.service;
 
 import com.fund.stockProject.notification.repository.UserDeviceTokenRepository;
+import com.google.api.client.http.HttpResponseException;
 import com.google.firebase.messaging.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -111,12 +112,13 @@ public class FcmPushService {
         StringBuilder sb = new StringBuilder();
         try {
             sb.append("errorCode=").append(ex.getErrorCode());
-            try { // MessagingErrorCode (enum) 존재 시
+            // messagingErrorCode (신버전 SDK 에 있을 수 있음)
+            try {
                 var m = ex.getClass().getMethod("getMessagingErrorCode");
                 Object mec = m.invoke(ex);
                 if (mec != null) sb.append(", messagingErrorCode=").append(mec);
             } catch (NoSuchMethodException ignore) {}
-            // HTTP status/code 추출 (내부 구현 반영: getHttpResponse -> getStatusCode())
+            // HttpResponse (내부) 추출
             try {
                 var mResp = ex.getClass().getMethod("getHttpResponse");
                 Object resp = mResp.invoke(ex);
@@ -126,23 +128,37 @@ public class FcmPushService {
                         Object sc = mStatus.invoke(resp);
                         sb.append(", httpStatus=").append(sc);
                     } catch (NoSuchMethodException ignore) {}
+                    // parseAsString 시도
                     try {
-                        var mBody = resp.getClass().getMethod("getContent");
-                        Object body = mBody.invoke(resp);
-                        if (body != null) {
-                            String bodyStr = body.toString();
-                            if (bodyStr.length() > 400) bodyStr = bodyStr.substring(0, 400) + "..."; // 과다 방지
-                            sb.append(", httpBody=").append(bodyStr.replaceAll("\n", " "));
+                        var mParse = resp.getClass().getMethod("parseAsString");
+                        Object bodyStr = mParse.invoke(resp);
+                        if (bodyStr != null) {
+                            String s = bodyStr.toString();
+                            if (s.length() > 400) s = s.substring(0, 400) + "...";
+                            sb.append(", httpBody=").append(s.replaceAll("\n", " "));
                         }
                     } catch (NoSuchMethodException ignore) {}
                 }
             } catch (NoSuchMethodException ignore) {}
+
+            // cause 가 HttpResponseException 인 경우 직접 content 추출(이 경우가 더 신뢰도 높음)
+            if (ex.getCause() instanceof HttpResponseException hre) {
+                sb.append(", status=").append(hre.getStatusCode())
+                  .append(", statusMsg=").append(hre.getStatusMessage());
+                String content = hre.getContent(); // 이미 String
+                if (content != null && !content.isBlank()) {
+                    String c = content.trim();
+                    if (c.length() > 400) c = c.substring(0, 400) + "...";
+                    sb.append(", httpContent=").append(c.replaceAll("\n", " "));
+                }
+            }
+
             if (ex.getCause() != null) {
                 sb.append(", cause=").append(ex.getCause().getClass().getSimpleName())
-                  .append(":" ).append(ex.getCause().getMessage());
+                  .append(":").append(ex.getCause().getMessage());
             }
         } catch (Exception reflectionErr) {
-            sb.append("(detail-extract-failed:" ).append(reflectionErr.getClass().getSimpleName()).append(")");
+            sb.append("(detail-extract-failed:").append(reflectionErr.getClass().getSimpleName()).append(")");
         }
         return sb.toString();
     }
