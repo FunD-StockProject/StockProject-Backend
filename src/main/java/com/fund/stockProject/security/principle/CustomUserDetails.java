@@ -23,6 +23,10 @@ public class CustomUserDetails implements UserDetails {
         return user;
     }
 
+    public Integer getId() {
+        return user != null ? user.getId() : null;
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return authorities;
