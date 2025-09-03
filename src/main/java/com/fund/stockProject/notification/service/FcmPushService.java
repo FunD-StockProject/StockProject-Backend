@@ -81,8 +81,7 @@ public class FcmPushService {
                 }
             }
         } catch (FirebaseMessagingException e) {
-            // 네트워크/일시적 오류 – Outbox 레이어에서 재시도하므로 여기선 로그만
-            log.warn("FCM batch send failed userId={}, err={}", userId, e.getMessage());
+            log.warn("FCM batch send failed userId={}, err={}, detail={}", userId, e.getMessage(), buildDetail(e));
         }
     }
 
@@ -96,9 +95,55 @@ public class FcmPushService {
                 t.setIsActive(false);
                 tokenRepo.save(t);
             });
-            log.info("deactivated invalid token={}", token);
+            log.info("deactivated invalid token={} detail={}", token, buildDetail(ex));
+        } else if ("UNAUTHENTICATED".equalsIgnoreCase(code)) {
+            // 인증 자체 문제: 서비스 계정/프로젝트/권한/시계 불일치 가능
+            log.warn("send fail (auth) token={}, code={}, detail={}", token, code, buildDetail(ex));
         } else {
-            log.warn("send fail token={}, code={}, msg={}", token, code, ex.getMessage());
+            log.warn("send fail token={}, code={}, msg={}, detail={}", token, code, ex.getMessage(), buildDetail(ex));
         }
+    }
+
+    /**
+     * FirebaseMessagingException 에서 가능한 한 많은 진단 정보를 문자열로 구성.
+     */
+    private String buildDetail(FirebaseMessagingException ex) {
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("errorCode=").append(ex.getErrorCode());
+            try { // MessagingErrorCode (enum) 존재 시
+                var m = ex.getClass().getMethod("getMessagingErrorCode");
+                Object mec = m.invoke(ex);
+                if (mec != null) sb.append(", messagingErrorCode=").append(mec);
+            } catch (NoSuchMethodException ignore) {}
+            // HTTP status/code 추출 (내부 구현 반영: getHttpResponse -> getStatusCode())
+            try {
+                var mResp = ex.getClass().getMethod("getHttpResponse");
+                Object resp = mResp.invoke(ex);
+                if (resp != null) {
+                    try {
+                        var mStatus = resp.getClass().getMethod("getStatusCode");
+                        Object sc = mStatus.invoke(resp);
+                        sb.append(", httpStatus=").append(sc);
+                    } catch (NoSuchMethodException ignore) {}
+                    try {
+                        var mBody = resp.getClass().getMethod("getContent");
+                        Object body = mBody.invoke(resp);
+                        if (body != null) {
+                            String bodyStr = body.toString();
+                            if (bodyStr.length() > 400) bodyStr = bodyStr.substring(0, 400) + "..."; // 과다 방지
+                            sb.append(", httpBody=").append(bodyStr.replaceAll("\n", " "));
+                        }
+                    } catch (NoSuchMethodException ignore) {}
+                }
+            } catch (NoSuchMethodException ignore) {}
+            if (ex.getCause() != null) {
+                sb.append(", cause=").append(ex.getCause().getClass().getSimpleName())
+                  .append(":" ).append(ex.getCause().getMessage());
+            }
+        } catch (Exception reflectionErr) {
+            sb.append("(detail-extract-failed:" ).append(reflectionErr.getClass().getSimpleName()).append(")");
+        }
+        return sb.toString();
     }
 }
