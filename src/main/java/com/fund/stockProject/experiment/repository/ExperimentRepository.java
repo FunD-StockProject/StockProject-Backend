@@ -12,18 +12,18 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ExperimentRepository extends JpaRepository<ExperimentItem, Integer> {
-    @Query("SELECT e FROM ExperimentItem e WHERE e.email = :email")
-    List<ExperimentItem> findExperimentItemsByEmail(@Param("email") String email);
+    @Query("SELECT e FROM ExperimentItem e WHERE e.user.email = :email")
+    List<ExperimentItem> findExperimentItemsByUser_Email(@Param("email") String email);
 
     @Query("SELECT COUNT(e) FROM ExperimentItem e WHERE e.tradeStatus = 'PROGRESS'")
     int countByTradeStatusProgress();
 
-    @Query("SELECT e FROM ExperimentItem e WHERE e.stock.id = :stockId AND e.buyAy = :today")
+    @Query("SELECT e FROM ExperimentItem e WHERE e.stock.id = :stockId AND e.buyAt = :today")
     Optional<ExperimentItem> findExperimentItemByStockIdAndBuyAt(@Param("stockId") Integer stockId, @Param("today") LocalDate today);
 
     @Query("SELECT e FROM ExperimentItem e WHERE e.stock.id = :stockId AND e.buyAt BETWEEN :start AND :end")
     Optional<ExperimentItem> findExperimentItemByStockIdAndBuyAtBetween(@Param("stockId") Integer stockId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT e FROM experiment_item E WHERE DATE(e.buy_at) = CURDATE() - INTERVAL 5 DAY;")
+    @Query("SELECT e FROM ExperimentItem e WHERE e.buyAt <= FUNCTION('DATE_SUB', CURRENT_DATE, 5)")
     List<ExperimentItem> findExperimentItemsAfter5BusinessDays();
 }

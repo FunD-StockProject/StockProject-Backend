@@ -1,7 +1,7 @@
 package com.fund.stockProject.experiment.service;
 
-import com.fund.stockProject.auth.entity.User;
-import com.fund.stockProject.auth.repository.UserRepository;
+import com.fund.stockProject.user.entity.User;
+import com.fund.stockProject.user.repository.UserRepository;
 import com.fund.stockProject.experiment.dto.ExperimentSimpleResponse;
 import com.fund.stockProject.experiment.dto.ExperimentStatusResponse;
 import com.fund.stockProject.experiment.dto.ExperimentItemInfoResponse;
@@ -44,7 +44,7 @@ public class ExperimentService {
     public Mono<ExperimentStatusResponse> getExperimentStatus(
         final CustomUserDetails customUserDetails) {
         // 로그인한 유저 관련 모의 투자 정보 조회
-        final List<ExperimentItem> experimentItemsByUserId = experimentRepository.findExperimentItemsByEmail(
+        final List<ExperimentItem> experimentItemsByUserId = experimentRepository.findExperimentItemsByUser_Email(
             customUserDetails.getEmail());
 
         if (experimentItemsByUserId.isEmpty()) {

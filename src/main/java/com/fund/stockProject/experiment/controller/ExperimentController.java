@@ -25,7 +25,7 @@ import reactor.core.publisher.Mono;
 @RequestMapping("/experiment")
 public class ExperimentController {
 
-    private ExperimentService experimentService;
+    private final ExperimentService experimentService;
 
     @GetMapping("/status")
     @Operation(summary = "실험(모의 매수) 현황 API", description = "실험(모의 매수) 현황 조회")
