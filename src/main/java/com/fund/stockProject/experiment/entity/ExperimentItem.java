@@ -1,7 +1,7 @@
 package com.fund.stockProject.experiment.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fund.stockProject.auth.entity.User;
+import com.fund.stockProject.user.entity.User;
 import com.fund.stockProject.stock.entity.Stock;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
