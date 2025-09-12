@@ -42,32 +42,51 @@ public class FirebaseConfig {
             }
         }
 
-        GoogleCredentials base = GoogleCredentials.fromStream(serviceAccount.getInputStream())
-                .createScoped(List.of("https://www.googleapis.com/auth/firebase.messaging"));
-        // 토큰 한 번 미리 받아서 인증 경로/시계 확인
-        base.refreshIfExpired();
+        try {
+            GoogleCredentials base = GoogleCredentials.fromStream(serviceAccount.getInputStream())
+                    .createScoped(List.of(
+                            "https://www.googleapis.com/auth/firebase.messaging",
+                            "https://www.googleapis.com/auth/cloud-platform"
+                    ));
 
-        FirebaseOptions options = FirebaseOptions.builder()
-                .setCredentials(base)
-                .setProjectId(projectId) // ★ 명시
-                .build();
+            // 토큰 한 번 미리 받아서 인증 경로/시계 확인
+            base.refreshIfExpired();
+            log.info("[FCM] Credentials refreshed successfully");
 
-        FirebaseApp app = FirebaseApp.initializeApp(options, APP_NAME);
+            FirebaseOptions options = FirebaseOptions.builder()
+                    .setCredentials(base)
+                    .setProjectId(projectId) // ★ 명시
+                    .build();
 
-        // 디버그: 실제 사용 중인 서비스계정/프로젝트 로깅
-        if (base instanceof ServiceAccountCredentials sac) {
-            log.info("[FCM] Initialized app={} svcEmail={} saProjectId={} effectiveProjectId={}",
-                    APP_NAME, sac.getClientEmail(), sac.getProjectId(), projectId);
-        } else {
-            log.info("[FCM] Initialized app={} with non-service-account credentials, effectiveProjectId={}",
-                    APP_NAME, projectId);
+            FirebaseApp app = FirebaseApp.initializeApp(options, APP_NAME);
+
+            // 디버그: 실제 사용 중인 서비스계정/프로젝트 로깅
+            if (base instanceof ServiceAccountCredentials sac) {
+                log.info("[FCM] Initialized app={} svcEmail={} saProjectId={} effectiveProjectId={}",
+                        APP_NAME, sac.getClientEmail(), sac.getProjectId(), projectId);
+
+                // APNs 설정 확인을 위한 추가 로깅
+                log.info("[FCM] Service account private key ID: {}", sac.getPrivateKeyId());
+            } else {
+                log.info("[FCM] Initialized app={} with non-service-account credentials, effectiveProjectId={}",
+                        APP_NAME, projectId);
+            }
+
+            return app;
+
+        } catch (IOException e) {
+            log.error("[FCM] Failed to initialize Firebase credentials", e);
+            throw new IllegalStateException("Failed to initialize FCM credentials", e);
+        } catch (Exception e) {
+            log.error("[FCM] Unexpected error during Firebase initialization", e);
+            throw new IllegalStateException("Unexpected error during FCM initialization", e);
         }
-
-        return app;
     }
 
     @Bean
     public FirebaseMessaging firebaseMessaging(FirebaseApp app) {
-        return FirebaseMessaging.getInstance(app);
+        FirebaseMessaging messaging = FirebaseMessaging.getInstance(app);
+        log.info("[FCM] FirebaseMessaging instance created successfully");
+        return messaging;
     }
 }
