@@ -1,7 +1,6 @@
 package com.fund.stockProject.experiment.repository;
 
-import com.fund.stockProject.experiment.entity.ExperimentItem;
-import java.time.LocalDate;
+import com.fund.stockProject.experiment.entity.Experiment;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -11,19 +10,90 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface ExperimentRepository extends JpaRepository<ExperimentItem, Integer> {
-    @Query("SELECT e FROM ExperimentItem e WHERE e.email = :email")
-    List<ExperimentItem> findExperimentItemsByEmail(@Param("email") String email);
+public interface ExperimentRepository extends JpaRepository<Experiment, Integer> {
+    @Query("SELECT e FROM Experiment e JOIN e.user u  WHERE u.email = :email ORDER BY e.roi ASC")
+    List<Experiment> findExperimentsByEmail(@Param("email") String email); // 이메일을 기준으로 해당 유저의 실험정보 조회
 
-    @Query("SELECT COUNT(e) FROM ExperimentItem e WHERE e.tradeStatus = 'PROGRESS'")
-    int countByTradeStatusProgress();
+    @Query("SELECT COUNT(e) FROM Experiment e WHERE e.status = :status")
+    int countExperimentsByStatus(@Param("status") String status); // 상태(진행/완료) 별 실험 개수
 
-    @Query("SELECT e FROM ExperimentItem e WHERE e.stock.id = :stockId AND e.buyAy = :today")
-    Optional<ExperimentItem> findExperimentItemByStockIdAndBuyAt(@Param("stockId") Integer stockId, @Param("today") LocalDate today);
+    @Query("SELECT e FROM Experiment e JOIN e.user u  WHERE u.email = :email and e.status = :status ORDER BY e.roi ASC")
+    List<Experiment> findExperimentsByEmailAndStatus(@Param("email") String email, @Param("status") String status); // 이메일과 완료된 실험을 기준으로 해당 유저의 실험정보 조회
 
-    @Query("SELECT e FROM ExperimentItem e WHERE e.stock.id = :stockId AND e.buyAt BETWEEN :start AND :end")
-    Optional<ExperimentItem> findExperimentItemByStockIdAndBuyAtBetween(@Param("stockId") Integer stockId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+    @Query("SELECT e FROM Experiment e WHERE e.experimentId = :experimentId")
+    Optional<Experiment> findExperimentByExperimentId(@Param("experimentId") Integer experimentId); // 실험Id 값으로 실험 내용 조회
 
-    @Query("SELECT e FROM experiment_item E WHERE DATE(e.buy_at) = CURDATE() - INTERVAL 5 DAY;")
-    List<ExperimentItem> findExperimentItemsAfter5BusinessDays();
+    @Query("SELECT e FROM Experiment e WHERE e.stock.id = :stockId AND e.buyAt BETWEEN :startOfDay and :endOfDay")
+    Optional<Experiment> findExperimentByStockIdForToday(@Param("stockId") Integer stockId, @Param("startOfDay") LocalDateTime startOfDay, @Param("endOfDay") LocalDateTime endOfDay); // 금일 진행중인 실험 상세정보
+
+    @Query("SELECT count(e) FROM Experiment e WHERE e.buyAt BETWEEN :startOfWeek and :endOfWeek")
+    int countExperimentsForWeek(@Param("stockId") String email, @Param("startOfWeek") LocalDateTime startOfWeek, @Param("endOfWeek") LocalDateTime endOfWeek);
+
+    @Query("SELECT e FROM Experiment e JOIN e.user u  WHERE u.email = :email and e.status = :status ORDER BY e.roi ASC")
+    List<Experiment> findAllExperimentsByEmailAndStatus(@Param("email") String email, @Param("status") String status); // 이메일과 완료된 실험을 기준으로 해당 유저의 실험정보 조회
+
+    @Query("SELECT e FROM Experiment e WHERE e.buyAt BETWEEN :start AND :end")
+    List<Experiment> findExperimentsAfterFiveDays(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT e FROM Experiment e WHERE e.buyAt > :start AND e.status = :status")
+    List<Experiment> findProgressExperiments(@Param("start") LocalDateTime start, @Param("status") String status);
+
+    @Query("SELECT AVG(e.roi) FROM Experiment e WHERE e.score BETWEEN :start AND :end AND e.email = :email")
+    double findUserAvgRoi(@Param("start") int start, @Param("end") int end, @Param("email") String email);
+
+    @Query("SELECT AVG(e.roi) FROM Experiment e WHERE e.score BETWEEN :start AND :end")
+    double findTotalAvgRoi(@Param("start") int start, @Param("end") int end);
+
+    @Query("SELECT ROUND(IFNULL(profitable.cnt, 0) / total.cnt * 100, 1) AS ratio "
+        + "FROM ( "
+        + " SELECT e.email, COUNT(e.email) AS cnt "
+        + " FROM Experiment e "
+        + " GROUP BY e.email "
+        + " ) AS total "
+        + "LEFT JOIN "
+        + " ( "
+        + " SELECT e.email, COUNT(e.email) AS cnt "
+        + " FROM Experiment e. "
+        + " WHERE e.roi > 0 "
+        + " GROUP BY e.email "
+        + " ) AS profitable "
+        + "ON total.email = profitable.email "
+        + "WHERE total.email = :email ")
+    double findSuccessExperimentRate(@Param("email") String email);
+
+    @Query("SELECT count(*) "
+        + "FROM "
+        + "( "
+        + "  SELECT ROUND(IFNULL(profitable.cnt, 0) / total.cnt * 100, 1) AS ratio "
+        + "  FROM "
+        + "  ( SELECT e.email, COUNT(e.email) AS cnt "
+        + "    FROM Experiment e "
+        + "    GROUP BY e.email "
+        + "   ) AS total "
+        + " LEFT JOIN "
+        + "  ( "
+        + "    SELECT e.email, COUNT(e.email) AS cnt "
+        + "    FROM Experiment e "
+        + "    WHERE e.roi > 0 "
+        + "    GROUP BY e.email "
+        + "  ) AS profitable "
+        + " ON total.email = profitable.email "
+        + ") a "
+        + "WHERE a.ratio BETWEEN :startRange AND :endRange")
+    int countSameGradeUser(@Param("startRange") int startRange, @Param("endRange") int endRange);
+
+    @Query("SELECT "
+        + "    sub.buy_date, "
+        + "    ROUND(AVG(sub.roi), 1) AS avg_roi, "
+        + "    ROUND(AVG(sub.score), 0) AS avg_score "
+        + "FROM ( "
+        + "    SELECT "
+        + "        DATE(e.buy_at) AS buy_date, "
+        + "        e.roi, "
+        + "        e.score "
+        + "    FROM Experiment e "
+        + ") AS sub "
+        + "GROUP BY sub.buy_date "
+        + "ORDER BY sub.buy_date ")
+    List<Experiment> findExperimentGroupByBuyAt();
 }

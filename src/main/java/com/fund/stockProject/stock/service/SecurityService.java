@@ -37,6 +37,67 @@ public class SecurityService {
     /**
      * 국내, 해외 주식 정보 조회
      */
+    public Mono<StockInfoResponse> getSecurityStockInfoKorea2(Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum, COUNTRY country) {
+        if (country == COUNTRY.KOREA) {
+            return webClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/quotations/inquire-price-2")
+                    .queryParam("fid_cond_mrkt_div_code", "J")
+                    .queryParam("fid_input_iscd", symbol)
+                    .build())
+                .headers(httpHeaders -> {
+                    HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                    headers.set("tr_id", "FHKST01010100"); // 추가 헤더 설정
+                    httpHeaders.addAll(headers);
+                })
+                .retrieve()
+                .bodyToMono(String.class)
+                .flatMap(response -> parseFStockInfoKorea2(response, id, symbolName, securityName, symbol, exchangenum, country));
+        } else if (country == COUNTRY.OVERSEA) {
+            return webClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/uapi/overseas-price/v1/quotations/price")
+                    .queryParam("AUTH", "")
+                    .queryParam("EXCD", exchangenum.name())
+                    .queryParam("SYMB", symbol)
+                    .build())
+                .headers(httpHeaders -> {
+                    HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
+                    headers.set("tr_id", "HHDFS00000300"); // 추가 헤더 설정
+                    httpHeaders.addAll(headers);
+                })
+                .retrieve()
+                .bodyToMono(String.class)
+                .flatMap(response -> parseFStockInfoOversea(response, id, symbolName, securityName, symbol, exchangenum, country));
+        } else {
+            return Mono.error(new UnsupportedOperationException("COUNTRY 입력 에러"));
+        }
+    }
+
+    private Mono<StockInfoResponse> parseFStockInfoKorea2(String response, Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum, COUNTRY country) {
+        try {
+            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode outputNode = rootNode.get("output");
+            StockInfoResponse stockInfoResponse = new StockInfoResponse();
+
+            if (outputNode != null) {
+                stockInfoResponse.setStockId(id);
+                stockInfoResponse.setSymbolName(symbolName);
+                stockInfoResponse.setSecurityName(securityName);
+                stockInfoResponse.setSymbol(symbol);
+                stockInfoResponse.setExchangeNum(exchangenum);
+                stockInfoResponse.setCountry(country);
+                stockInfoResponse.setYesterdayPrice(outputNode.get("stck_prdy_clpr").asDouble()); // 전일 종가
+                stockInfoResponse.setPrice(outputNode.get("stck_prpr").asDouble()); // 현재가
+            }
+
+            return Mono.just(stockInfoResponse);
+        } catch (Exception e) {
+            return Mono.error(new UnsupportedOperationException("국내 종목 정보가 없습니다"));
+        }
+    }
+
+    /**
+     * 국내, 해외 주식 정보 조회
+     */
     public Mono<StockInfoResponse> getSecurityStockInfoKorea(Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum, COUNTRY country) {
         if (country == COUNTRY.KOREA) {
             return webClient.get()
@@ -85,10 +146,6 @@ public class SecurityService {
                 stockInfoResponse.setSymbol(symbol);
                 stockInfoResponse.setExchangeNum(exchangenum);
                 stockInfoResponse.setCountry(country);
-                stockInfoResponse.setPrice(outputNode.get("stck_prpr").asDouble());
-                stockInfoResponse.setPriceDiff(outputNode.get("prdy_vrss").asDouble());
-                stockInfoResponse.setYesterdayPrice(outputNode.get("bfdy_clpr").asDouble()); // 전일종가
-                stockInfoResponse.setTodayPrice(outputNode.get("thdt_clpr").asDouble()); // 당일종가
             }
 
             return Mono.just(stockInfoResponse);
@@ -110,9 +167,8 @@ public class SecurityService {
                 stockInfoResponse.setCountry(country);
                 stockInfoResponse.setSymbol(symbol);
                 stockInfoResponse.setExchangeNum(exchangenum);
-                stockInfoResponse.setPrice(outputNode.get("last").asDouble());
-                stockInfoResponse.setYesterdayPrice(outputNode.get("last").asDouble()); // 전일종가
-                stockInfoResponse.setTodayPrice(outputNode.get("base").asDouble()); // 당일종가
+                stockInfoResponse.setYesterdayPrice(outputNode.get("base").asDouble()); // 전일종가
+                stockInfoResponse.setPrice(outputNode.get("last").asDouble()); // 현재가
                 // 해외는 diff가 절대값이므로 절대값에 따라 음수로 변경
                 if(outputNode.get("rate").asDouble() < 0) {
                     stockInfoResponse.setPriceDiff(outputNode.get("diff").asDouble() * -1);
@@ -125,7 +181,7 @@ public class SecurityService {
 
             return Mono.just(stockInfoResponse);
         } catch (Exception e) {
-            return Mono.error(new UnsupportedOperationException("국내 종목 정보가 없습니다"));
+            return Mono.error(new UnsupportedOperationException("해외 종목 정보가 없습니다"));
         }
     }
 

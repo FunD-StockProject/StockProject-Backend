@@ -4,14 +4,19 @@ import com.fund.stockProject.security.entrypoint.CustomAuthenticationEntryPoint;
 import com.fund.stockProject.security.filter.JwtAuthenticationFilter;
 import com.fund.stockProject.security.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.task.DelegatingSecurityContextAsyncTaskExecutor;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.LogoutFilter;
 
@@ -65,8 +70,23 @@ public class SecurityConfig {
             "/stock/{id}/info/{country}",
             "/stock/category/{category}/{country}",
             "/stock/rankings/hot",
-            "/stock/summary/{symbol}/{country}"
+            "/stock/summary/{symbol}/{country}",
+            "/experiment/status",
+            "/experiment/{id}/buy/{country}",
+            "/experiment/status/{id}/detail",
+            "/experiment/report"
     };
+
+    @Bean
+    public AsyncTaskExecutor taskExecutor() {
+        ThreadPoolTaskExecutor delegate = new ThreadPoolTaskExecutor();
+        delegate.setCorePoolSize(4);
+        delegate.setMaxPoolSize(8);
+        delegate.setQueueCapacity(100);
+        delegate.initialize();
+        // 작업 실행 시 SecurityContext를 복사/복원
+        return new DelegatingSecurityContextAsyncTaskExecutor(delegate);
+    }
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
