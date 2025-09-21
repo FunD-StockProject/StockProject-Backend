@@ -14,6 +14,7 @@ jobs:
     env:
       IMAGE_NAME: muuigong/stock-app
       DEPLOY_DIR: /srv/stock
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,24 +27,57 @@ jobs:
 
       - name: Build & Push image
         run: |
-          docker build -t $IMAGE_NAME:latest .
-          docker push $IMAGE_NAME:latest
+          docker build -t "$IMAGE_NAME:latest" .
+          docker push "$IMAGE_NAME:latest"
 
       - name: SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      - name: Add known_hosts
+      - name: Add known_hosts (robust)
+        shell: bash
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
-          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+          HOST="${EC2_HOST#*@}"      # strip user@
+          HOST="${HOST%%:*}"         # strip :port if any
+          HOST="$(printf '%s' "$HOST" | tr -d '\r\n')"
+          if [ -z "$HOST" ]; then
+            echo "❌ EC2_HOST invalid. Expected 'user@host'." >&2
+            exit 1
+          fi
+          echo "→ adding $HOST to known_hosts"
+          ssh-keyscan -T 15 -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
           chmod 644 ~/.ssh/known_hosts
 
-      - name: Pull & Restart on EC2
+      - name: Upload compose & optional .env (first-time friendly)
+        shell: bash
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          DEPLOY_DIR: /srv/stock
+          APP_ENV_FILE: ${{ secrets.APP_ENV_FILE }}   # optional
         run: |
-          ssh ${{ secrets.EC2_HOST }} "
-            cd ${DEPLOY_DIR}
+          set -euo pipefail
+          # upload compose if missing on server
+          if ! ssh -o StrictHostKeyChecking=no "$EC2_HOST" "[ -f $DEPLOY_DIR/docker-compose.yml ]"; then
+            scp -o StrictHostKeyChecking=no docker-compose.yml "$EC2_HOST:$DEPLOY_DIR/docker-compose.yml"
+          fi
+          # upload .env if provided via secret
+          if [ -n "${APP_ENV_FILE:-}" ]; then
+            printf "%s" "$APP_ENV_FILE" | ssh -o StrictHostKeyChecking=no "$EC2_HOST" "cat > $DEPLOY_DIR/config/.env && chmod 600 $DEPLOY_DIR/config/.env"
+          fi
+
+      - name: Pull & Restart on EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          DEPLOY_DIR: /srv/stock
+        run: |
+          ssh -o StrictHostKeyChecking=no "$EC2_HOST" "
+            set -e
+            cd $DEPLOY_DIR
             docker compose pull
             docker compose up -d
             docker image prune -f
