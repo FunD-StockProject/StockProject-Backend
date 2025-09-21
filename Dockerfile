@@ -13,7 +13,7 @@ COPY src ./src
 RUN gradle clean bootJar -x test
 
 # ===== Runtime stage =====
-FROM openjdk:17-jdk-slim
+FROM eclipse-temurin:17-jre
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
