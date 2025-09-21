@@ -34,8 +34,8 @@ spring:
     name: stockProject
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ENC(o/t/6E2gqepkhCGzNBKxqTHqdl2am/LXx7oza/aQ+1ORZS9y1NoMWeYad76lBg7AnSmV5bOElouEv3o2S4NSkn6pyrZ0QGOwuskx3CIAQkPCrqYo666ODs7bHzJCu0le4Up7BlE3QRTFBBcKdlnt7KfO0V97XyIxsclC6IXj0cqkzXWLw+2vWACrmhCfdZ6RzTHqYrxRr7I=)
-    username: ENC(0YcumuiWmFs1CZfK0RcslQ==)
+    url: ENC(d/6PmtvqBpZOSgQTwJTh14o25ySJAidbHTVXOS8KywU9Pl7/USA26oXGGtrR45KkRutCPQNY9IstlOXmFSzrTU9mP1xJwttEmugCk16ZT/7JPxqf46XQcEk0HMfcLFLnFOQ+UUt7V9LTN9ZZoEbWylIWcjSFn8aSkxGeHZiTeN+TD0CCs1mBMrCKt7KlZQFpRBUnxE6i739NfcWkHhbLRA==)
+    username: ENC(kzbR6xiq25tTE8NOGW/AqQ==)
     password: ENC(41UmOQt2/KKY36ydEZ2QpigL3PJ6oiFq)
     time-zone: Asia/Seoul
     hikari:
