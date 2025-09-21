@@ -1,0 +1,14 @@
+.git
+.gradle
+build
+out
+target
+*.iml
+*.log
+
+*.p12
+*.p8
+*service-account*.json
+.env
+config/
+srv/
