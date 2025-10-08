@@ -11,7 +11,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -24,17 +23,17 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ExperimentItem {
+public class Experiment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "stock_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @JoinColumn(name = "stock_id", nullable = false)
     private Stock stock;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @JsonIgnore
@@ -46,18 +45,21 @@ public class ExperimentItem {
     @Column(nullable = false)
     private Double buyPrice;
 
-    @Column(nullable = false)
+    @Column
     private Double sellPrice;
 
     @Column(nullable = false)
     private Double roi;
 
     @Column(nullable = false)
-    private String tradeStatus;
+    private String status;
 
-    public void updateAutoSellResult(Double sellPrice, String tradeStatus, LocalDateTime sellAt, Double roi) {
+    @Column(nullable = false)
+    private int score;
+
+    public void updateExperiment(Double sellPrice, String status, LocalDateTime sellAt, Double roi) {
         this.sellPrice = sellPrice;
-        this.tradeStatus = tradeStatus;
+        this.status = status;
         this.sellAt = sellAt;
         this.roi = roi;
     }

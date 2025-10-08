@@ -1,14 +1,15 @@
 package com.fund.stockProject.experiment.dto;
 
+import com.fund.stockProject.stock.domain.COUNTRY;
 import java.time.LocalDateTime;
 import lombok.Builder;
 import lombok.Getter;
 
 @Getter
 @Builder
-public class ExperimentItemInfoResponse {
+public class ExperimentInfoResponse {
 
-    private Integer id;
+    private Integer experimentId;
 
     private String symbolName;
 
@@ -16,13 +17,9 @@ public class ExperimentItemInfoResponse {
 
     private Integer buyPrice;
 
-    private Double currentPrice;
-
-    private Integer autoSellIn;
-
-    private Double diffPrice;
-
     private Double roi;
 
-    private String tradeStatus;
+    private String status;
+
+    private COUNTRY country;
 }

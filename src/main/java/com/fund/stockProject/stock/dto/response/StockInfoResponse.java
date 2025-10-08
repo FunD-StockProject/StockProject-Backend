@@ -32,6 +32,4 @@ public class StockInfoResponse {
     private Double priceDiffPerCent;
 
     private Double yesterdayPrice;
-
-    private Double todayPrice;
 }
