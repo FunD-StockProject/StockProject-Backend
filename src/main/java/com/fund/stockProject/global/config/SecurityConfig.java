@@ -80,38 +80,27 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfig.corsConfigurationSource()));
-
-        // 기본 설정 비활성화
         http
-                .csrf(AbstractHttpConfigurer::disable); // CSRF 보호 비활성화 (JWT 사용 시 필요 없음)
-        http
-                .formLogin(AbstractHttpConfigurer::disable);
-        http
+                .csrf(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable);
-
-        // 경로 권한 설정
         http
                 .authorizeHttpRequests((auth) -> auth
-                        .requestMatchers(PUBLIC_API_PATHS).permitAll() // 이 경로들은 모두 인증 없이 접근 허용
-                        .requestMatchers(SWAGGER_API_PATHS).permitAll() // Swagger 관련 경로는 모두 인증 없이 접근 허용
-                        .anyRequest().authenticated() // 그 외 모든 요청은 인증 필요
+                        .requestMatchers(PUBLIC_API_PATHS).permitAll()
+                        .requestMatchers(SWAGGER_API_PATHS).permitAll()
+                        .anyRequest().authenticated()
                 );
-
-        // 세션 설정
+        // 부분 stateful: 필요 시 세션 생성 & SecurityContext 자동 저장
         http
                 .sessionManagement((session) -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                        .sessionFixation().none()); // 세션 고정 방지 비활성화, JWT 기반 인증이므로
-
-        // JWT 검증 필터 등록 - Bean으로 주입받은 인스턴스 사용
+                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+                        .sessionFixation().migrateSession())
+                .securityContext(sc -> sc.requireExplicitSave(false));
         http
                 .addFilterBefore(jwtAuthenticationFilter, LogoutFilter.class);
-
-        // 로그인 예외 시 실행
         http.exceptionHandling(exception -> exception
                 .authenticationEntryPoint(customAuthenticationEntryPoint)
         );
-
         return http.build();
     }
 }
