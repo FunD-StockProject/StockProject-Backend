@@ -10,9 +10,9 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ExperimentTradeItemRepository extends JpaRepository<ExperimentTradeItem, Integer> {
-    @Query("SELECT e FROM ExperimentTradeItem e WHERE e.experimentId = :experimentId")
+    @Query("SELECT e FROM ExperimentTradeItem e WHERE e.experiment.id = :experimentId")
     List<ExperimentTradeItem> findExperimentTradeItemsByExperimentId(@Param("experimentId") Integer experimentId);
 
-    @Query("SELECT e FROM ExperimentTradeItem e WHERE e.experimentId = :experimentId AND e.tradeAt BETWEEN :start and :end ORDER BY e.tradeAt")
+    @Query("SELECT e FROM ExperimentTradeItem e WHERE e.experiment.id = :experimentId AND e.tradeAt BETWEEN :start and :end ORDER BY e.tradeAt")
     List<ExperimentTradeItem> findExperimentTradeItemsForToday(@Param("experimentId") Integer experimentId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }
