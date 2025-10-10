@@ -1,7 +1,7 @@
 package com.fund.stockProject.experiment.service;
 
-import com.fund.stockProject.auth.entity.User;
-import com.fund.stockProject.auth.repository.UserRepository;
+import com.fund.stockProject.user.entity.User;
+import com.fund.stockProject.user.repository.UserRepository;
 import com.fund.stockProject.experiment.domain.SCORERANGE;
 import com.fund.stockProject.experiment.dto.ExperimentReportResponse;
 import com.fund.stockProject.experiment.dto.ExperimentSimpleResponse;
@@ -355,7 +355,7 @@ public class ExperimentService {
             .atTime(LocalTime.MAX);
 
         // 이번주 진행 실험 횟수
-        final int weeklyExperimentCount = experimentRepository.countExperimentsForWeek(email,
+        final int weeklyExperimentCount = experimentRepository.countExperimentsForWeek(
             startOfWeek, endOfWeek);
 
         // 특정 사용자가 진행한 총 실험
@@ -398,14 +398,19 @@ public class ExperimentService {
         final List<ReportPatternDto> reportPatternDtos = new ArrayList<>();
 
         // 인간지표 점수 별 투자 유형 패턴 데이터
-        final List<Experiment> experimentGroupByBuyAt = experimentRepository.findExperimentGroupByBuyAt();
+        final List<Object[]> experimentGroupByBuyAt = experimentRepository.findExperimentGroupByBuyAt();
 
-        for (final Experiment experiment : experimentGroupByBuyAt) {
+        for (final Object[] row : experimentGroupByBuyAt) {
+            // Object[]에서 데이터 추출: [buy_date, avg_roi, avg_score]
+            LocalDate buyDate = ((java.sql.Date) row[0]).toLocalDate();
+            Double avgRoi = (Double) row[1];
+            Double avgScore = (Double) row[2];
+            
             reportPatternDtos.add(
                 ReportPatternDto.builder()
-                    .score(experiment.getScore())
-                    .buyAt(experiment.getBuyAt())
-                    .roi(experiment.getRoi())
+                    .score(avgScore.intValue())
+                    .buyAt(buyDate.atStartOfDay())
+                    .roi(avgRoi)
                     .build()
             );
         }
