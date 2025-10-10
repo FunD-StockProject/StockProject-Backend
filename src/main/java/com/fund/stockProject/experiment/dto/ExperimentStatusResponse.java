@@ -8,15 +8,15 @@ import lombok.Getter;
 @Builder
 public class ExperimentStatusResponse {
 
-    private List<ExperimentItemInfoResponse> progressExperimentItems;
+    private List<ExperimentInfoResponse> progressExperiments; // 진행중인 실험 데이터
 
-    private List<ExperimentItemInfoResponse> completeExperimentItems;
+    private List<ExperimentInfoResponse> completeExperiments; // 완료된 실험 데이터
 
     private double avgRoi; // 평균수익률
 
-    private int totalPaperTradeCount; // 총 실험 수
+    private int totalTradeCount; // 총 실험 수
 
-    private int progressPaperTradeCount; // 진행중인 실험 수
+    private int progressTradeCount; // 진행중인 실험 수
 
     private double successRate; // 성공률
 }
