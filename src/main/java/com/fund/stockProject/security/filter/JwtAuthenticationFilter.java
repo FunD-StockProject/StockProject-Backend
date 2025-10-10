@@ -17,6 +17,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -63,32 +64,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
-        try {
-            // 이미 인증된 경우는 그대로 다음 필터로 진행
-            var currentAuth = SecurityContextHolder.getContext().getAuthentication();
-            if (currentAuth != null && currentAuth.isAuthenticated() && !(currentAuth instanceof AnonymousAuthenticationToken)) {
-                filterChain.doFilter(request, response);
-                return;
+        String accessToken = resolveToken(request);
+        Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
+
+        if (accessToken != null) {
+            try {
+                if (!isReusable(currentAuth, accessToken)) {
+                    processJwtAuthentication(accessToken); // JWT 파싱/검증
+                }
+            } catch (ExpiredJwtException | MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
+                log.warn("JWT 검증 실패: {}", e.getMessage());
+                SecurityContextHolder.clearContext(); // 토큰 자체 문제일 때만 초기화
             }
-
-            // 토큰 추출
-            String accessToken = resolveToken(request);
-
-            // 토큰이 있으면 검증 및 컨텍스트 설정
-            if (accessToken != null) {
-                processJwtAuthentication(accessToken);
-            }
-
-            // 체인은 정확히 한 번만 호출
-            filterChain.doFilter(request, response);
-
-        } catch (Exception e) {
-            // 예외 상황에서만 컨텍스트 정리 후 스프링에 위임
-            log.error("JWT 인증 처리 중 오류", e);
-            SecurityContextHolder.clearContext();
-            throw e;
         }
-        // finally 블록 없음: getAsyncContext() 접근 금지 + 중복 체인 호출 방지
+
+        // 비즈니스 예외는 여기서 잡지 않고 그대로 상위로 전달 (double dispatch 방지)
+        filterChain.doFilter(request, response);
+    }
+
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        // async 재디스패치에도 필터 실행하여 SecurityContext 재구성
+        return false;
     }
 
     /**
@@ -104,11 +101,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String email = jwtUtil.getEmail(accessToken);
             String role = jwtUtil.getRole(accessToken);
 
-            // ROLE_ 접두어 부여
+            // ROLE_ 접두어 중복 방지 및 중복 권한 제거
             List<SimpleGrantedAuthority> authorities = Stream.of(role.split(","))
                     .map(String::trim)
                     .filter(r -> !r.isEmpty())
-                    .map(r -> new SimpleGrantedAuthority("ROLE_" + r))
+                    .map(r -> r.startsWith("ROLE_") ? r : "ROLE_" + r)
+                    .distinct()
+                    .map(SimpleGrantedAuthority::new)
                     .collect(Collectors.toList());
 
             User user = findUserByEmailOptimized(email);
@@ -165,6 +164,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (Exception e) {
             log.error("사용자 조회 오류 email={}", email, e);
             return null;
+        }
+    }
+
+    private boolean isReusable(Authentication auth, String token) {
+        if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) return false;
+        if (!(auth.getPrincipal() instanceof CustomUserDetails principal)) return false;
+        try {
+            if (!JWT_CATEGORY_ACCESS.equals(jwtUtil.getCategory(token))) return false;
+            String emailFromToken = jwtUtil.getEmail(token);
+            return principal.getEmail().equals(emailFromToken);
+        } catch (Exception e) {
+            return false;
         }
     }
 }

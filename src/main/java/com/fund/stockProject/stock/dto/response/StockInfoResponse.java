@@ -30,4 +30,6 @@ public class StockInfoResponse {
     private Double priceDiff;
 
     private Double priceDiffPerCent;
+
+    private Double yesterdayPrice;
 }
