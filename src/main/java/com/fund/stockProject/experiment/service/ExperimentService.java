@@ -1,14 +1,9 @@
 package com.fund.stockProject.experiment.service;
 
-<<<<<<< HEAD
 import com.fund.stockProject.user.entity.User;
 import com.fund.stockProject.user.repository.UserRepository;
-=======
-import com.fund.stockProject.auth.entity.User;
-import com.fund.stockProject.auth.repository.UserRepository;
 import com.fund.stockProject.experiment.domain.SCORERANGE;
 import com.fund.stockProject.experiment.dto.ExperimentReportResponse;
->>>>>>> 4334be4 (FEAT(#129): 실험실 관련 API 개발 (리포트, 자동매매, 모의투자현황 조회, 모의투자종목 상세조회))
 import com.fund.stockProject.experiment.dto.ExperimentSimpleResponse;
 import com.fund.stockProject.experiment.dto.ExperimentStatusDetailResponse;
 import com.fund.stockProject.experiment.dto.ExperimentStatusDetailResponse.TradeInfo;
@@ -61,12 +56,8 @@ public class ExperimentService {
      * */
     public Mono<ExperimentStatusResponse> getExperimentStatus(final CustomUserDetails customUserDetails) {
         // 로그인한 유저 관련 모의 투자 정보 조회
-<<<<<<< HEAD
-        final List<ExperimentItem> experimentItemsByUserId = experimentRepository.findExperimentItemsByUser_Email(
-=======
-        final List<Experiment> experimentsByUserId = experimentRepository.findExperimentsByEmail(
->>>>>>> 4334be4 (FEAT(#129): 실험실 관련 API 개발 (리포트, 자동매매, 모의투자현황 조회, 모의투자종목 상세조회))
-            customUserDetails.getEmail());
+final List<Experiment> experimentsByUserId = experimentRepository.findExperimentsByEmail(
+    customUserDetails.getEmail());
 
         if (experimentsByUserId.isEmpty()) {
             return Mono.empty();
@@ -364,7 +355,7 @@ public class ExperimentService {
             .atTime(LocalTime.MAX);
 
         // 이번주 진행 실험 횟수
-        final int weeklyExperimentCount = experimentRepository.countExperimentsForWeek(email,
+        final int weeklyExperimentCount = experimentRepository.countExperimentsForWeek(
             startOfWeek, endOfWeek);
 
         // 특정 사용자가 진행한 총 실험
