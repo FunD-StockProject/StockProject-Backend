@@ -18,9 +18,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.keyword.dto.KeywordDto;
-import com.fund.stockProject.keyword.entity.Keyword;
-import com.fund.stockProject.keyword.entity.StockKeyword;
-import com.fund.stockProject.keyword.repository.KeywordRepository;
 import com.fund.stockProject.keyword.repository.StockKeywordRepository;
 import com.fund.stockProject.score.dto.response.ScoreIndexResponse;
 import com.fund.stockProject.score.dto.response.ScoreKeywordResponse;
@@ -40,8 +37,8 @@ public class ScoreService {
 
     private final ScoreRepository scoreRepository;
     private final StockRepository stockRepository;
-    private final KeywordRepository keywordRepository;
     private final StockKeywordRepository stockKeywordRepository;
+    private final ScorePersistenceService scorePersistenceService;
 
     private static final Set<Integer> INDEX_STOCK_IDS = Set.of(16492, 16493, 16494, 16495, 16496, 16497);
 
@@ -181,7 +178,6 @@ public class ScoreService {
     }
 
     // 점수 & 키워드 업데이트
-    @Transactional
     public void updateScoreAndKeyword(Integer id, COUNTRY country, int yesterdayScore) {
 
         // 인덱스 종목은 업데이트 하지 않음
@@ -189,45 +185,13 @@ public class ScoreService {
             return;
         }
 
-        Stock stock = stockRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Could not find stock"));
         try {
+            Stock stock = stockRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Could not find stock"));
             // STEP1: AI 결과 가져오기
             ScoreKeywordResponse scoreKeywordResponse = executeUpdateAI(stock.getSymbol(), country);
-
-            // STEP2: SCORE 데이터 저장
-            int finalScore = scoreKeywordResponse.getFinalScore();
-            Score newScore = Score.builder()
-                .stockId(stock.getId())
-                .date(LocalDate.now())
-                .scoreKorea(country == COUNTRY.KOREA ? finalScore : 9999)
-                .scoreNaver(finalScore)
-                .scoreReddit(9999)
-                .scoreOversea(country == COUNTRY.OVERSEA ? finalScore : 9999)
-                .diff(finalScore - yesterdayScore)
-                .build();
-
-            // `stock` 연관 설정
-            newScore.setStock(stock);
-            scoreRepository.save(newScore);
-
-            // 기존 StockKeyword 삭제
-            stockKeywordRepository.deleteByStock(stock);
-            scoreKeywordResponse.getTopKeywords().forEach(keywordDto -> {
-                Keyword newKeyword = Keyword.builder()
-                    .name(keywordDto.getWord())
-                    .frequency(keywordDto.getFreq())
-                    .build();
-
-                keywordRepository.save(newKeyword);
-
-                // StockKeyword 테이블에 매핑 정보 저장
-                StockKeyword stockKeyword = StockKeyword.builder()
-                    .stock(stock)
-                    .keyword(newKeyword)
-                    .build();
-                stockKeywordRepository.save(stockKeyword);
-            });
+            scorePersistenceService.saveScoreAndKeyword(stock.getId(), country, yesterdayScore,
+                scoreKeywordResponse);
         } catch (Exception e) {
             throw new RuntimeException("Failed to update score and keyword", e);
         }
