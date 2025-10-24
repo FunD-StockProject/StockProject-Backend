@@ -7,7 +7,6 @@ import org.springframework.stereotype.Service;
 
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
-import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
 import com.fund.stockProject.stock.repository.StockRepository;
@@ -40,19 +39,19 @@ public class ScoreBatchService {
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
 
-        List<Stock> targetStocks = getStocksByCountry(country);
-        log.info("Starting score batch for {} with {} candidate stocks", country, targetStocks.size());
+        List<Integer> targetStockIds = getStockIdsByCountry(country);
+        log.info("Starting score batch for {} with {} candidate stocks", country, targetStockIds.size());
 
-        for (Stock stock : targetStocks) {
-            if (scoreRepository.existsByStockIdAndDate(stock.getId(), today)) {
+        for (Integer stockId : targetStockIds) {
+            if (scoreRepository.existsByStockIdAndDate(stockId, today)) {
                 continue;
             }
 
             try {
-                int yesterdayScore = resolveYesterdayScore(stock.getId(), country, yesterday, today);
-                scoreService.updateScoreAndKeyword(stock.getId(), country, yesterdayScore);
+                int yesterdayScore = resolveYesterdayScore(stockId, country, yesterday, today);
+                scoreService.updateScoreAndKeyword(stockId, country, yesterdayScore);
             } catch (Exception e) {
-                log.error("Error processing score {}", stock.getId(), e);
+                log.error("Error processing score {}", stockId, e);
             }
         }
     }
@@ -65,9 +64,9 @@ public class ScoreBatchService {
         }
     }
 
-    private List<Stock> getStocksByCountry(COUNTRY country) {
+    private List<Integer> getStockIdsByCountry(COUNTRY country) {
         List<EXCHANGENUM> exchanges = country == COUNTRY.KOREA ? KOREA_EXCHANGES : OVERSEA_EXCHANGES;
-        return stockRepository.findByExchangeNumIn(exchanges);
+        return stockRepository.findIdsByExchangeNumIn(exchanges);
     }
 
     private int resolveYesterdayScore(Integer stockId, COUNTRY country, LocalDate yesterday, LocalDate today) {
