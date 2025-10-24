@@ -36,4 +36,6 @@ public interface StockRepository extends JpaRepository<Stock, Integer> {
     Optional<Stock> findBySymbol(String symbol);
 
     List<Stock> findTop20ByOrderByCreatedAtDesc();
+
+    List<Stock> findByExchangeNumIn(List<EXCHANGENUM> exchangeNums);
 }
