@@ -37,6 +37,6 @@ public interface StockRepository extends JpaRepository<Stock, Integer> {
 
     List<Stock> findTop20ByOrderByCreatedAtDesc();
 
-    @Query("SELECT s.id FROM Stock s WHERE s.exchangeNum IN :exchangeNums")
+    @Query("SELECT s.id FROM Stock s WHERE s.exchangeNum IN :exchangeNums AND s.valid = true")
     List<Integer> findIdsByExchangeNumIn(@Param("exchangeNums") List<EXCHANGENUM> exchangeNums);
 }
