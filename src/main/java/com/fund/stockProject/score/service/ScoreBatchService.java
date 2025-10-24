@@ -5,11 +5,8 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import com.fund.stockProject.stock.domain.COUNTRY;
-import com.fund.stockProject.stock.domain.EXCHANGENUM;
-import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
-import com.fund.stockProject.stock.repository.StockRepository;
+import com.fund.stockProject.stock.domain.COUNTRY;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,27 +16,15 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ScoreBatchService {
 
-    private static final List<EXCHANGENUM> KOREA_EXCHANGES = List.of(
-        EXCHANGENUM.KOSPI,
-        EXCHANGENUM.KOSDAQ,
-        EXCHANGENUM.KOREAN_ETF
-    );
-
-    private static final List<EXCHANGENUM> OVERSEA_EXCHANGES = List.of(
-        EXCHANGENUM.NAS,
-        EXCHANGENUM.NYS,
-        EXCHANGENUM.AMS
-    );
-
     private final ScoreService scoreService;
     private final ScoreRepository scoreRepository;
-    private final StockRepository stockRepository;
+    private final StockBatchQueryService stockBatchQueryService;
 
     public void runCountryBatch(COUNTRY country) {
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
 
-        List<Integer> targetStockIds = getStockIdsByCountry(country);
+        List<Integer> targetStockIds = stockBatchQueryService.getStockIdsByCountry(country);
         log.info("Starting score batch for {} with {} candidate stocks", country, targetStockIds.size());
 
         for (Integer stockId : targetStockIds) {
@@ -62,11 +47,6 @@ public class ScoreBatchService {
         } catch (Exception e) {
             log.error("Error processing index scores", e);
         }
-    }
-
-    private List<Integer> getStockIdsByCountry(COUNTRY country) {
-        List<EXCHANGENUM> exchanges = country == COUNTRY.KOREA ? KOREA_EXCHANGES : OVERSEA_EXCHANGES;
-        return stockRepository.findIdsByExchangeNumIn(exchanges);
     }
 
     private int resolveYesterdayScore(Integer stockId, COUNTRY country, LocalDate yesterday, LocalDate today) {
