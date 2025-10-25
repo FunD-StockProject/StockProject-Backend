@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -29,6 +31,8 @@ import reactor.core.publisher.Mono;
 @Service
 @RequiredArgsConstructor
 public class SecurityService {
+
+    private static final Logger log = LoggerFactory.getLogger(SecurityService.class);
 
     private final SecurityHttpConfig securityHttpConfig;
     private final WebClient webClient;
@@ -137,19 +141,37 @@ public class SecurityService {
         try {
             JsonNode rootNode = objectMapper.readTree(response);
             JsonNode outputNode = rootNode.get("output");
+            String resultCode = rootNode.path("rt_cd").asText("");
+            String messageCode = rootNode.path("msg_cd").asText("");
+            String message = rootNode.path("msg1").asText("");
             StockInfoResponse stockInfoResponse = new StockInfoResponse();
 
-            if (outputNode != null) {
+            if (outputNode != null && !outputNode.isNull()) {
                 stockInfoResponse.setStockId(id);
                 stockInfoResponse.setSymbolName(symbolName);
                 stockInfoResponse.setSecurityName(securityName);
                 stockInfoResponse.setSymbol(symbol);
                 stockInfoResponse.setExchangeNum(exchangenum);
                 stockInfoResponse.setCountry(country);
-                stockInfoResponse.setYesterdayPrice(outputNode.get("stck_prdy_clpr").asDouble());
-                stockInfoResponse.setPrice(outputNode.get("stck_prpr").asDouble());
-                stockInfoResponse.setPriceDiff(outputNode.get("prdy_vrss").asDouble());
-                stockInfoResponse.setPriceDiffPerCent(outputNode.get("prdy_ctrt").asDouble());
+                JsonNode yesterdayPriceNode = outputNode.get("stck_prdy_clpr");
+                if (yesterdayPriceNode != null && !yesterdayPriceNode.isNull()) {
+                    stockInfoResponse.setYesterdayPrice(yesterdayPriceNode.asDouble());
+                }
+                JsonNode currentPriceNode = outputNode.get("stck_prpr");
+                if (currentPriceNode != null && !currentPriceNode.isNull()) {
+                    stockInfoResponse.setPrice(currentPriceNode.asDouble());
+                }
+                JsonNode priceDiffNode = outputNode.get("prdy_vrss");
+                if (priceDiffNode != null && !priceDiffNode.isNull()) {
+                    stockInfoResponse.setPriceDiff(priceDiffNode.asDouble());
+                }
+                JsonNode priceDiffPercentNode = outputNode.get("prdy_ctrt");
+                if (priceDiffPercentNode != null && !priceDiffPercentNode.isNull()) {
+                    stockInfoResponse.setPriceDiffPerCent(priceDiffPercentNode.asDouble());
+                }
+            } else {
+                log.warn("KIS domestic price inquiry returned no output. rt_cd={}, msg_cd={}, msg1={}, symbol={}",
+                    resultCode, messageCode, message, symbol);
             }
 
             return Mono.just(stockInfoResponse);
