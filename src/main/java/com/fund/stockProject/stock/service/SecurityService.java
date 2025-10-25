@@ -102,8 +102,8 @@ public class SecurityService {
         if (country == COUNTRY.KOREA) {
             return webClient.get()
                             .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/quotations/inquire-price")
-                                                         .queryParam("fid_cond_mrkt_div_code", "J")
-                                                         .queryParam("fid_input_iscd", symbol)
+                                                         .queryParam("FID_COND_MRKT_DIV_CODE", "J")
+                                                         .queryParam("FID_INPUT_ISCD", symbol)
                                                          .build())
                             .headers(httpHeaders -> {
                                 HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
@@ -146,6 +146,10 @@ public class SecurityService {
                 stockInfoResponse.setSymbol(symbol);
                 stockInfoResponse.setExchangeNum(exchangenum);
                 stockInfoResponse.setCountry(country);
+                stockInfoResponse.setYesterdayPrice(outputNode.get("stck_prdy_clpr").asDouble());
+                stockInfoResponse.setPrice(outputNode.get("stck_prpr").asDouble());
+                stockInfoResponse.setPriceDiff(outputNode.get("prdy_vrss").asDouble());
+                stockInfoResponse.setPriceDiffPerCent(outputNode.get("prdy_ctrt").asDouble());
             }
 
             return Mono.just(stockInfoResponse);
