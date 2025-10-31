@@ -7,7 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -39,6 +41,8 @@ public class ScoreService {
     private final StockRepository stockRepository;
     private final StockKeywordRepository stockKeywordRepository;
     private final ScorePersistenceService scorePersistenceService;
+    private final ExecutorService pythonExecutorService;
+    private final Semaphore pythonProcessSemaphore;
 
     private static final Set<Integer> INDEX_STOCK_IDS = Set.of(16492, 16493, 16494, 16495, 16496, 16497);
 
@@ -67,23 +71,31 @@ public class ScoreService {
             ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol,
                 country.toString());
             processBuilder.redirectErrorStream(true);
+            pythonProcessSemaphore.acquire();
             Process process = processBuilder.start();
 
-            // Asynchronously read the script output
-            String output = Executors.newSingleThreadExecutor().submit(() -> {
-                BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()));
+            Future<String> outputFuture = pythonExecutorService.submit(() -> {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                 return reader.lines()
-                    .filter(line -> line.trim().startsWith("{") && line.trim()
-                        .endsWith("}")) // JSON format filtering
+                    .filter(line -> line.trim().startsWith("{") && line.trim().endsWith("}"))
                     .collect(Collectors.joining("\n"));
-            }).get(60, TimeUnit.SECONDS); // Maximum 60 seconds wait
+            });
 
-            // Check the process exit code
-            int exitCode = process.waitFor();
+            String output;
+            try {
+                output = outputFuture.get(65, TimeUnit.SECONDS);
+            } catch (Exception ex) {
+                process.destroyForcibly();
+                throw new RuntimeException("Python script timed out", ex);
+            }
+
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new RuntimeException("Python process did not terminate in time");
+            }
+            int exitCode = process.exitValue();
             if (exitCode != 0) {
-                throw new RuntimeException(
-                    "Python script execution failed with exit code: " + exitCode);
+                throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
             }
 
             // Parse the JSON output from the Python script
@@ -102,6 +114,10 @@ public class ScoreService {
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute Python script", e);
+        } finally {
+            if (pythonProcessSemaphore.availablePermits() < 2) {
+                pythonProcessSemaphore.release();
+            }
         }
     }
 
@@ -290,23 +306,31 @@ public class ScoreService {
             ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol,
                 country.toString());
             processBuilder.redirectErrorStream(true);
+            pythonProcessSemaphore.acquire();
             Process process = processBuilder.start();
 
-            // 비동기 스트림 읽기
-            String output = Executors.newSingleThreadExecutor().submit(() -> {
-                BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()));
+            Future<String> outputFuture = pythonExecutorService.submit(() -> {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                 return reader.lines()
-                    .filter(line -> line.trim().startsWith("{") && line.trim()
-                        .endsWith("}")) // JSON 형식 필터링
+                    .filter(line -> line.trim().startsWith("{") && line.trim().endsWith("}"))
                     .collect(Collectors.joining("\n"));
-            }).get(60, TimeUnit.SECONDS); // 최대 120초 대기
+            });
 
-            // 프로세스 종료 코드 확인
-            int exitCode = process.waitFor();
+            String output;
+            try {
+                output = outputFuture.get(65, TimeUnit.SECONDS);
+            } catch (Exception ex) {
+                process.destroyForcibly();
+                throw new RuntimeException("Python script timed out", ex);
+            }
+
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new RuntimeException("Python process did not terminate in time");
+            }
+            int exitCode = process.exitValue();
             if (exitCode != 0) {
-                throw new RuntimeException(
-                    "Python script execution failed with exit code: " + exitCode);
+                throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
             }
 
             // Python 스크립트에서 출력된 JSON 파싱
@@ -316,6 +340,10 @@ public class ScoreService {
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute Python script", e);
+        } finally {
+            if (pythonProcessSemaphore.availablePermits() < 2) {
+                pythonProcessSemaphore.release();
+            }
         }
     }
 
@@ -328,20 +356,29 @@ public class ScoreService {
             ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol,
                 country.toString());
             processBuilder.redirectErrorStream(true);
+            pythonProcessSemaphore.acquire();
             Process process = processBuilder.start();
 
-            // 비동기 스트림 읽기
-            String output = Executors.newSingleThreadExecutor().submit(() -> {
-                BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()));
+            Future<String> outputFuture = pythonExecutorService.submit(() -> {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                 return reader.lines().collect(Collectors.joining("\n"));
-            }).get(60, TimeUnit.SECONDS); // 최대 60초 대기
+            });
 
-            // 프로세스 종료 코드 확인
-            int exitCode = process.waitFor();
+            String output;
+            try {
+                output = outputFuture.get(65, TimeUnit.SECONDS);
+            } catch (Exception ex) {
+                process.destroyForcibly();
+                throw new RuntimeException("Python script timed out", ex);
+            }
+
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new RuntimeException("Python process did not terminate in time");
+            }
+            int exitCode = process.exitValue();
             if (exitCode != 0) {
-                throw new RuntimeException(
-                    "Python script execution failed with exit code: " + exitCode);
+                throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
             }
 
             // Python 스크립트에서 출력된 JSON 파싱
@@ -360,6 +397,10 @@ public class ScoreService {
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute Python script", e);
+        } finally {
+            if (pythonProcessSemaphore.availablePermits() < 2) {
+                pythonProcessSemaphore.release();
+            }
         }
     }
 

@@ -32,6 +32,10 @@ spring:
     time-zone: Asia/Seoul
   application:
     name: stockProject
+  task:
+    scheduling:
+      pool:
+        size: 2
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ENC(d/6PmtvqBpZOSgQTwJTh14o25ySJAidbHTVXOS8KywU9Pl7/USA26oXGGtrR45KkRutCPQNY9IstlOXmFSzrTU9mP1xJwttEmugCk16ZT/7JPxqf46XQcEk0HMfcLFLnFOQ+UUt7V9LTN9ZZoEbWylIWcjSFn8aSkxGeHZiTeN+TD0CCs1mBMrCKt7KlZQFpRBUnxE6i739NfcWkHhbLRA==)
