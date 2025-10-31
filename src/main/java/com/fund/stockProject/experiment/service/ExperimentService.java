@@ -38,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
+import com.fund.stockProject.portfolio.dto.PortfolioResultResponse;
 
 @Service
 @RequiredArgsConstructor
@@ -426,6 +427,146 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .build();
 
         return Mono.just(experimentReportResponse);
+    }
+
+    // Lab 결과 화면용 응답 (mock 구조 기반)
+    public Mono<PortfolioResultResponse> getPortfolioResult(final CustomUserDetails customUserDetails) {
+        final String email = customUserDetails.getEmail();
+
+        // 완료/진행 실험 분리 집계
+        final List<Experiment> completed = experimentRepository.findExperimentsByEmailAndStatus(email, "COMPLETED");
+        final List<Experiment> progress = experimentRepository.findExperimentsByEmailAndStatus(email, "PROGRESS");
+
+        long totalCompleted = completed.size();
+        long totalProgress = progress.size();
+        long purchasedCountAll = totalCompleted + totalProgress; // 전체 진행(완료+진행)
+        long profitCount = completed.stream().filter(e -> e.getRoi() != null && e.getRoi() > 0).count();
+
+        // 성공률(%) 및 구간 라벨 생성
+        double successRateVal = totalCompleted == 0 ? 0.0 : (profitCount * 100.0 / totalCompleted);
+        String successRateLabel;
+        if (successRateVal <= 20) successRateLabel = "0~20%";
+        else if (successRateVal <= 40) successRateLabel = "21~40%";
+        else if (successRateVal <= 60) successRateLabel = "41~60%";
+        else if (successRateVal <= 80) successRateLabel = "61~80%";
+        else successRateLabel = "81~100%";
+
+        // 최고/최저 수익률 기준 점수 및 구간명 산출
+        PortfolioResultResponse.ProfitBound highest = null;
+        PortfolioResultResponse.ProfitBound lowest = null;
+        if (!completed.isEmpty()) {
+            Experiment max = completed.stream().max((a, b) -> Double.compare(a.getRoi(), b.getRoi())).get();
+            Experiment min = completed.stream().min((a, b) -> Double.compare(a.getRoi(), b.getRoi())).get();
+            highest = PortfolioResultResponse.ProfitBound.builder()
+                .score(max.getScore())
+                .range(toScoreRangeLabel(max.getScore()))
+                .build();
+            lowest = PortfolioResultResponse.ProfitBound.builder()
+                .score(min.getScore())
+                .range(toScoreRangeLabel(min.getScore()))
+                .build();
+        }
+
+        // 점수 구간별 사용자 평균 수익률 → scoreTable (avg)
+        double u_0_59 = experimentRepository.findUserAvgRoi(0, 59, email);
+        double u_60_69 = experimentRepository.findUserAvgRoi(60, 69, email);
+        double u_70_79 = experimentRepository.findUserAvgRoi(70, 79, email);
+        double u_80_100 = experimentRepository.findUserAvgRoi(80, 100, email);
+
+        // median 계산: 완료된 실험에서 구간별 ROI 중앙값
+        java.util.function.Function<int[], Double> medianByRange = (range) -> {
+            int start = range[0], end = range[1];
+            List<Double> list = completed.stream()
+                .filter(e -> e.getRoi() != null)
+                .filter(e -> e.getScore() >= start && e.getScore() <= end)
+                .map(Experiment::getRoi)
+                .sorted()
+                .toList();
+            if (list.isEmpty()) return null;
+            int n = list.size();
+            if (n % 2 == 1) return list.get(n / 2);
+            return (list.get(n / 2 - 1) + list.get(n / 2)) / 2.0;
+        };
+
+        List<PortfolioResultResponse.ScoreTableItem> scoreTable = new ArrayList<>();
+        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("60점 이하").avg(u_0_59).median(medianByRange.apply(new int[]{0,59})).build());
+        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("60-70점").avg(u_60_69).median(medianByRange.apply(new int[]{60,69})).build());
+        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("70-80점").avg(u_70_79).median(medianByRange.apply(new int[]{70,79})).build());
+        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("80점 이상").avg(u_80_100).median(medianByRange.apply(new int[]{80,100})).build());
+
+        // 패턴 그래프용 히스토리 포인트 (score, roi, buyAt → x,y,label)
+        final List<Object[]> experimentGroupByBuyAt = experimentRepository.findExperimentGroupByBuyAt();
+        List<PortfolioResultResponse.HistoryPoint> history = experimentGroupByBuyAt.stream().map(row -> {
+                java.time.LocalDate buyDate = ((java.sql.Date) row[0]).toLocalDate();
+                Double avgRoi = (Double) row[1];
+                Double avgScore = (Double) row[2];
+                return PortfolioResultResponse.HistoryPoint.builder()
+                    .x(avgScore.intValue())
+                    .y(avgRoi)
+                    .label(PortfolioResultResponse.HistoryPoint.toLabel(buyDate.atStartOfDay()))
+                    .build();
+            })
+            .collect(java.util.stream.Collectors.toList());
+
+        // HumanIndex 계산: userScore(평균 점수 반올림), userType(성공률 기반 라벨), maintainRate(진행/전체)
+        Integer userScore = completed.isEmpty() ? null : (int) Math.round(completed.stream()
+            .mapToInt(Experiment::getScore)
+            .average().orElse(Double.NaN));
+
+        String userType;
+        if (successRateVal <= 20) userType = "초심자형";
+        else if (successRateVal <= 40) userType = "보수형";
+        else if (successRateVal <= 60) userType = "균형형";
+        else if (successRateVal <= 80) userType = "공격형";
+        else userType = "고수형";
+
+        String maintainRate = purchasedCountAll == 0 ? "0%" : Math.round(totalProgress * 100.0 / purchasedCountAll) + "%";
+
+        PortfolioResultResponse.HumanIndex humanIndex = PortfolioResultResponse.HumanIndex.builder()
+            .userScore(userScore)
+            .userType(userType)
+            .successRate(successRateLabel)
+            .maintainRate(maintainRate)
+            .purchasedCount(purchasedCountAll)
+            .profitCount(profitCount)
+            .build();
+
+        // InvestmentPattern: 사용자 평균 수익률이 가장 높은 구간 레이블 기반으로 간단 추론
+        double maxAvg = Math.max(Math.max(u_0_59, u_60_69), Math.max(u_70_79, u_80_100));
+        String patternType;
+        String patternDesc;
+        if (maxAvg == u_0_59) { patternType = "역발상형"; patternDesc = "점수가 낮을 때 진입해 반등을 노리는 경향"; }
+        else if (maxAvg == u_60_69) { patternType = "보수 추세형"; patternDesc = "중간 점수대에서 안정적 추세를 선호"; }
+        else if (maxAvg == u_70_79) { patternType = "가치 선점형"; patternDesc = "높아지기 전 구간에서 선제 진입을 선호"; }
+        else { patternType = "추세 추종형"; patternDesc = "높은 점수대의 강한 추세를 추종"; }
+
+        PortfolioResultResponse.InvestmentPattern investmentPattern = PortfolioResultResponse.InvestmentPattern.builder()
+            .patternType(patternType)
+            .patternDescription(patternDesc)
+            .build();
+
+        PortfolioResultResponse.ExperimentSummary summary = PortfolioResultResponse.ExperimentSummary.builder()
+            .totalExperiments(purchasedCountAll)
+            .highestProfit(highest)
+            .lowestProfit(lowest)
+            .build();
+
+        PortfolioResultResponse response = PortfolioResultResponse.builder()
+            .scoreTable(scoreTable)
+            .experimentSummary(summary)
+            .humanIndex(humanIndex)
+            .investmentPattern(investmentPattern)
+            .history(history)
+            .build();
+
+        return Mono.just(response);
+    }
+
+    private String toScoreRangeLabel(int score) {
+        if (score <= 59) return "60점 이하";
+        if (score <= 69) return "60-70점";
+        if (score <= 79) return "70-80점";
+        return "80점 이상";
     }
 
     // 영업일 기준 실험 진행한 기간이 5일째인 실험 데이터 조회

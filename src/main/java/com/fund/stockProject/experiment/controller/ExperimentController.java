@@ -24,6 +24,12 @@ public class ExperimentController {
 
     private final ExperimentService experimentService;
 
+    @GetMapping
+    @Operation(summary = "실험(모의 매수) 현황 API (alias)", description = "실험(모의 매수) 현황 조회 - /experiment/status와 동일")
+    public ResponseEntity<Mono<ExperimentStatusResponse>> getExperimentStatusAlias(@AuthenticationPrincipal CustomUserDetails customUserDetails) {
+        return ResponseEntity.ok().body(experimentService.getExperimentStatus(customUserDetails));
+    }
+
     @GetMapping("/status")
     @Operation(summary = "실험(모의 매수) 현황 API", description = "실험(모의 매수) 현황 조회")
     public ResponseEntity<Mono<ExperimentStatusResponse>> getExperimentStatus(@AuthenticationPrincipal CustomUserDetails customUserDetails) {
