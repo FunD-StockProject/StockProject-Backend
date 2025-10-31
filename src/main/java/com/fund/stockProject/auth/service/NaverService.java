@@ -1,19 +1,17 @@
 package com.fund.stockProject.auth.service;
 
-import com.fund.stockProject.auth.dto.KakaoTokenResponse;
 import com.fund.stockProject.auth.dto.NaverTokenResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.util.retry.Retry;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Map;
 
@@ -47,6 +45,9 @@ public class NaverService {
                 .uri(fullUrl)
                 .retrieve()
                 .bodyToMono(NaverTokenResponse.class)
+                .timeout(Duration.ofSeconds(6))
+                .retryWhen(Retry.backoff(2, Duration.ofMillis(200))
+                    .filter(ex -> ex instanceof java.io.IOException))
                 .block();
 
         if (response == null || response.getAccessToken() == null) {
@@ -65,6 +66,9 @@ public class NaverService {
                 })
                 .retrieve()
                 .bodyToMono(String.class)
+                .timeout(Duration.ofSeconds(6))
+                .retryWhen(Retry.backoff(2, Duration.ofMillis(200))
+                    .filter(ex -> ex instanceof java.io.IOException))
                 .block();
 
         System.out.println("Naver userInfo API result: " + result);
@@ -77,6 +81,9 @@ public class NaverService {
                 })
                 .retrieve()
                 .bodyToMono(Map.class)
+                .timeout(Duration.ofSeconds(6))
+                .retryWhen(Retry.backoff(2, Duration.ofMillis(200))
+                    .filter(ex -> ex instanceof java.io.IOException))
                 .block();
     }
 }
