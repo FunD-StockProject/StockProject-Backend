@@ -5,13 +5,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.util.retry.Retry;
 
+import java.time.Duration;
 import java.util.Map;
 
 @Component
@@ -44,6 +45,9 @@ public class KakaoService {
                 .body(BodyInserters.fromFormData(params))
                 .retrieve()
                 .bodyToMono(KakaoTokenResponse.class)
+                .timeout(Duration.ofSeconds(6))
+                .retryWhen(Retry.backoff(2, Duration.ofMillis(200))
+                    .filter(ex -> ex instanceof java.io.IOException))
                 .block();
         // TODO: KakaoTokenResponse를 반환
         if (response == null || response.getAccessToken() == null) {
@@ -59,6 +63,9 @@ public class KakaoService {
                 .headers(headers -> headers.setBearerAuth(accessToken))
                 .retrieve()
                 .bodyToMono(Map.class)
+                .timeout(Duration.ofSeconds(6))
+                .retryWhen(Retry.backoff(2, Duration.ofMillis(200))
+                    .filter(ex -> ex instanceof java.io.IOException))
                 .block();
     }
 }
