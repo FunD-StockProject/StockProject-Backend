@@ -43,7 +43,6 @@ public class AppleService {
     @Value("${spring.security.oauth2.apple.private-key-path}")
     private String privateKeyPath;
     private final AppleJwksHelper appleJwksHelper;
-    private final RestTemplate restTemplate;
 
     public AppleTokenResponse getAccessToken(String code, String redirectUri) {
         String clientSecret = generateClientSecret();
@@ -59,6 +58,7 @@ public class AppleService {
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(params, headers);
 
+        RestTemplate restTemplate = new RestTemplate();
         ResponseEntity<AppleTokenResponse> response =
                 restTemplate.postForEntity("https://appleid.apple.com/auth/token", request, AppleTokenResponse.class);
 

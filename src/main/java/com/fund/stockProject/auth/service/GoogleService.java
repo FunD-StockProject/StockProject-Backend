@@ -1,6 +1,7 @@
 package com.fund.stockProject.auth.service;
 
 import com.fund.stockProject.auth.dto.GoogleTokenResponse;
+import com.fund.stockProject.auth.dto.KakaoTokenResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,9 +11,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.util.retry.Retry;
 
-import java.time.Duration;
 import java.util.Map;
 
 @Component
@@ -45,9 +44,6 @@ public class GoogleService {
                 .body(BodyInserters.fromFormData(params))
                 .retrieve()
                 .bodyToMono(GoogleTokenResponse.class)
-                .timeout(Duration.ofSeconds(6))
-                .retryWhen(Retry.backoff(2, Duration.ofMillis(200))
-                    .filter(ex -> ex instanceof java.io.IOException))
                 .block();
         // TODO: KakaoTokenResponse를 반환
         if (response == null || response.getAccessToken() == null) {
@@ -63,9 +59,6 @@ public class GoogleService {
                 .headers(headers -> headers.setBearerAuth(accessToken))
                 .retrieve()
                 .bodyToMono(Map.class)
-                .timeout(Duration.ofSeconds(6))
-                .retryWhen(Retry.backoff(2, Duration.ofMillis(200))
-                    .filter(ex -> ex instanceof java.io.IOException))
                 .block();
     }
 }

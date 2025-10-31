@@ -3,8 +3,8 @@ package com.fund.stockProject.global.config;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -26,8 +26,12 @@ public class SecurityHttpConfig {
     private volatile String accessToken;
     private volatile LocalDateTime expiredDateTime = LocalDateTime.now();
 
-    @Autowired
-    private WebClient webClient;
+    @Bean
+    public WebClient webClient() {
+        return WebClient.builder()
+                        .baseUrl("https://openapi.koreainvestment.com:9443")
+                        .build(); // 기본 헤더는 WebClient 호출 시 동적으로 설정
+    }
 
     public HttpHeaders createSecurityHeaders() {
         refreshTokenIfNeeded(); // 항상 최신 토큰을 보장
@@ -41,6 +45,7 @@ public class SecurityHttpConfig {
     }
 
     private String fetchAccessTokenFromApi() {
+        WebClient webClient = WebClient.create();
         AccessTokenRequest request = new AccessTokenRequest("client_credentials", appkey, appSecret);
 
         try {
@@ -50,9 +55,6 @@ public class SecurityHttpConfig {
                                                     .bodyValue(request)
                                                     .retrieve()
                                                     .bodyToMono(AccessTokenResponse.class)
-                                                    .timeout(java.time.Duration.ofSeconds(6))
-                                                    .retryWhen(reactor.util.retry.Retry.backoff(2, java.time.Duration.ofMillis(200))
-                                                        .filter(ex -> ex instanceof java.io.IOException))
                                                     .block();
 
             if (response != null) {

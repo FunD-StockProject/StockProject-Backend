@@ -36,8 +36,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-import reactor.util.retry.Retry;
-import java.time.Duration;
 
 @Service
 @RequiredArgsConstructor
@@ -117,9 +115,6 @@ public class StockService {
                 .headers(httpHeaders -> httpHeaders.addAll(headers))
                 .retrieve()
                 .bodyToMono(String.class)
-                .timeout(Duration.ofSeconds(6))
-                .retryWhen(Retry.backoff(2, Duration.ofMillis(200))
-                    .filter(ex -> ex instanceof java.io.IOException))
                 .block();
 
             // JSON 파싱
