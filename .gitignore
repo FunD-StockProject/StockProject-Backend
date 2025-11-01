@@ -243,3 +243,7 @@ gradle-app.setting
 # IntelliJ project files
 out
 gen
+
+# 외부 저장소 (별도 관리)
+StockProject-Frontend/
+open-trading-api/
