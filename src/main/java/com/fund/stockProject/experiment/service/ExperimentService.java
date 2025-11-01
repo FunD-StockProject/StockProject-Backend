@@ -379,6 +379,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .status("PROGRESS")
             .buyAt(now)
             .buyPrice(price)
+            .roi(0.0d)  // 매수 시점에는 ROI 0%
             .score(score)
             .build();
 
