@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-@Tag(name = "Auth", description = "인증 및 회원 관리 API (회원가입, 토큰 재발급, 로그아웃, 중복 체크 등)")
+@Tag(name = "인증 (Auth)", description = "인증 및 회원 관리 API (회원가입, 토큰 재발급, 로그아웃, 중복 체크 등)")
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor

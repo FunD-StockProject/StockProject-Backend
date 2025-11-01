@@ -24,7 +24,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.Parameter;
 
 @Slf4j
-@Tag(name = "ShortView", description = "숏뷰 API")
+@Tag(name = "숏뷰 (ShortView)", description = "숏뷰 추천 종목 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/shortview")

@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-@Tag(name = "Preference", description = "사용자 종목 선호(북마크/숨김/알림 설정) 관리 API")
+@Tag(name = "선호도 (Preference)", description = "사용자 종목 선호(북마크/숨김/알림 설정) 관리 API")
 @RestController
 @RequestMapping("/preference")
 @RequiredArgsConstructor

@@ -27,8 +27,7 @@ public class PortfolioController {
     @GetMapping("/report")
     @Operation(
             summary = "실험 결과 리포트 조회 (Alias)",
-            description = "/experiment/report와 동일한 응답을 반환합니다.",
-            tags = {"포트폴리오 (Portfolio)"}
+            description = "/experiment/report와 동일한 응답을 반환합니다."
     )
     public ResponseEntity<Mono<ExperimentReportResponse>> getReport(
             @io.swagger.v3.oas.annotations.Parameter(hidden = true)
@@ -40,8 +39,7 @@ public class PortfolioController {
     @GetMapping("/result")
     @Operation(
             summary = "포트폴리오 결과 조회",
-            description = "사용자의 투자 포트폴리오 결과를 종합 분석하여 반환합니다. 점수 테이블, 인간지표, 투자 패턴, 히스토리 데이터를 포함합니다.",
-            tags = {"포트폴리오 (Portfolio)"}
+            description = "사용자의 투자 포트폴리오 결과를 종합 분석하여 반환합니다. 점수 테이블, 인간지표, 투자 패턴, 히스토리 데이터를 포함합니다."
     )
     public ResponseEntity<Mono<PortfolioResultResponse>> getResult(
             @io.swagger.v3.oas.annotations.Parameter(hidden = true)

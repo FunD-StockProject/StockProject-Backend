@@ -50,7 +50,10 @@ public class SwaggerConfig {
                         new Tag().name("인증 (Auth)"),
                         new Tag().name("주식 (Stock)"),
                         new Tag().name("키워드 (Keyword)"),
-                        new Tag().name("알림 (Notification)")
+                        new Tag().name("알림 (Notification)"),
+                        new Tag().name("사용자 (User)"),
+                        new Tag().name("숏뷰 (ShortView)"),
+                        new Tag().name("선호도 (Preference)")
                 ));
     }
 }

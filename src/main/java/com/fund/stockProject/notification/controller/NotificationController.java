@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-@Tag(name = "Notification", description = "사용자 알림 조회/읽음 처리 및 테스트 API")
+@Tag(name = "알림 (Notification)", description = "사용자 알림 조회/읽음 처리 및 테스트 API")
 @RestController
 @RequestMapping("/notification")
 @RequiredArgsConstructor

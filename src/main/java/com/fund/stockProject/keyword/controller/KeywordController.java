@@ -5,6 +5,7 @@ import com.fund.stockProject.keyword.service.KeywordService;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.dto.response.StockInfoResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/keyword")
+@Tag(name = "키워드 (Keyword)", description = "키워드 검색 및 조회 API")
 public class KeywordController {
 
     private final KeywordService keywordService;

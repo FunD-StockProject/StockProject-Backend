@@ -19,7 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-@Tag(name = "User", description = "사용자 프로필 관리 API")
+@Tag(name = "사용자 (User)", description = "사용자 프로필 관리 API")
 @RestController
 @RequestMapping("/user")
 @RequiredArgsConstructor

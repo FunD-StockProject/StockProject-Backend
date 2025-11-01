@@ -6,6 +6,7 @@ import com.fund.stockProject.stock.dto.response.*;
 import com.fund.stockProject.stock.service.StockService;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -23,6 +24,7 @@ import reactor.core.publisher.Mono;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/stock")
+@Tag(name = "주식 (Stock)", description = "주식 정보 조회 API")
 public class StockController {
 
     private final StockService stockService;
