@@ -184,44 +184,88 @@ public class SecurityService {
 
     private Mono<StockInfoResponse> parseFStockInfoKorea(String response, Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum, COUNTRY country) {
         try {
+            log.debug("Parsing StockInfo response (inquire-price) - symbol: {}, response: {}", symbol, response);
             JsonNode rootNode = objectMapper.readTree(response);
-            JsonNode outputNode = rootNode.get("output");
+            
+            // 에러 코드 확인
             String resultCode = rootNode.path("rt_cd").asText("");
             String messageCode = rootNode.path("msg_cd").asText("");
             String message = rootNode.path("msg1").asText("");
+            
+            // 응답이 에러인 경우 처리
+            if (!resultCode.isEmpty() && !resultCode.equals("0")) {
+                log.error("API returned error - symbol: {}, rt_cd: {}, msg_cd: {}, msg1: {}, full response: {}", 
+                    symbol, resultCode, messageCode, message, response);
+                return Mono.error(new UnsupportedOperationException("국내 종목 정보 조회 실패: " + message + " (rt_cd: " + resultCode + ")"));
+            }
+            
+            JsonNode outputNode = rootNode.get("output");
             StockInfoResponse stockInfoResponse = new StockInfoResponse();
+            
+            // 기본 정보 설정
+            stockInfoResponse.setStockId(id);
+            stockInfoResponse.setSymbolName(symbolName);
+            stockInfoResponse.setSecurityName(securityName);
+            stockInfoResponse.setSymbol(symbol);
+            stockInfoResponse.setExchangeNum(exchangenum);
+            stockInfoResponse.setCountry(country);
 
-            if (outputNode != null && !outputNode.isNull()) {
-                stockInfoResponse.setStockId(id);
-                stockInfoResponse.setSymbolName(symbolName);
-                stockInfoResponse.setSecurityName(securityName);
-                stockInfoResponse.setSymbol(symbol);
-                stockInfoResponse.setExchangeNum(exchangenum);
-                stockInfoResponse.setCountry(country);
+            if (outputNode != null && !outputNode.isNull() && !outputNode.isEmpty()) {
+                // 안전하게 필드 파싱
                 JsonNode yesterdayPriceNode = outputNode.get("stck_prdy_clpr");
                 if (yesterdayPriceNode != null && !yesterdayPriceNode.isNull()) {
-                    stockInfoResponse.setYesterdayPrice(yesterdayPriceNode.asDouble());
+                    try {
+                        stockInfoResponse.setYesterdayPrice(yesterdayPriceNode.asDouble());
+                    } catch (Exception e) {
+                        log.warn("Failed to parse yesterdayPrice for symbol: {}, value: {}", symbol, yesterdayPriceNode.asText());
+                    }
                 }
+                
                 JsonNode currentPriceNode = outputNode.get("stck_prpr");
                 if (currentPriceNode != null && !currentPriceNode.isNull()) {
-                    stockInfoResponse.setPrice(currentPriceNode.asDouble());
+                    try {
+                        stockInfoResponse.setPrice(currentPriceNode.asDouble());
+                    } catch (Exception e) {
+                        log.warn("Failed to parse currentPrice for symbol: {}, value: {}", symbol, currentPriceNode.asText());
+                    }
                 }
+                
                 JsonNode priceDiffNode = outputNode.get("prdy_vrss");
                 if (priceDiffNode != null && !priceDiffNode.isNull()) {
-                    stockInfoResponse.setPriceDiff(priceDiffNode.asDouble());
+                    try {
+                        stockInfoResponse.setPriceDiff(priceDiffNode.asDouble());
+                    } catch (Exception e) {
+                        log.warn("Failed to parse priceDiff for symbol: {}", symbol);
+                    }
                 }
+                
                 JsonNode priceDiffPercentNode = outputNode.get("prdy_ctrt");
                 if (priceDiffPercentNode != null && !priceDiffPercentNode.isNull()) {
-                    stockInfoResponse.setPriceDiffPerCent(priceDiffPercentNode.asDouble());
+                    try {
+                        stockInfoResponse.setPriceDiffPerCent(priceDiffPercentNode.asDouble());
+                    } catch (Exception e) {
+                        log.warn("Failed to parse priceDiffPerCent for symbol: {}", symbol);
+                    }
+                }
+                
+                // 가격 정보가 하나도 없는 경우 에러
+                if (stockInfoResponse.getPrice() == null && stockInfoResponse.getYesterdayPrice() == null) {
+                    log.error("Both price and yesterdayPrice are missing - symbol: {}, output: {}", symbol, outputNode.toString());
+                    return Mono.error(new UnsupportedOperationException("주가 정보가 없습니다 (symbol: " + symbol + ")"));
                 }
             } else {
-                log.warn("KIS domestic price inquiry returned no output. rt_cd={}, msg_cd={}, msg1={}, symbol={}",
-                    resultCode, messageCode, message, symbol);
+                log.error("output node is null, missing or empty - symbol: {}, rt_cd: {}, msg_cd: {}, msg1: {}, full response: {}", 
+                    symbol, resultCode, messageCode, message, response);
+                return Mono.error(new UnsupportedOperationException("주가 정보가 없습니다 (output node missing, symbol: " + symbol + ")"));
             }
 
+            log.debug("Successfully parsed StockInfo (inquire-price) - symbol: {}, price: {}, yesterdayPrice: {}", 
+                symbol, stockInfoResponse.getPrice(), stockInfoResponse.getYesterdayPrice());
             return Mono.just(stockInfoResponse);
         } catch (Exception e) {
-            return Mono.error(new UnsupportedOperationException("국내 종목 정보가 없습니다"));
+            log.error("Failed to parse StockInfo response - symbol: {}, response: {}, error: {}", 
+                symbol, response, e.getMessage(), e);
+            return Mono.error(new UnsupportedOperationException("국내 종목 정보 파싱 실패: " + e.getMessage()));
         }
     }
 
