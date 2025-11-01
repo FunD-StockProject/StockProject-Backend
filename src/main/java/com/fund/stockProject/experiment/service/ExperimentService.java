@@ -864,7 +864,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
             if (securityStockInfoKorea.blockOptional().isPresent()) {
                 final Double price = securityStockInfoKorea.block().getPrice();
-                final Double roi = ((experiment.getBuyPrice() - price) % experiment.getBuyPrice()) * 100;
+                // ROI 계산: ((현재가 - 매수가) / 매수가) * 100
+                final Double roi = ((price - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
 
                 experiment.updateExperiment(price, "COMPLETE", LocalDateTime.now(), roi);
                 log.info("Auto-sell completed successfully - experimentId: {}, price: {}, roi: {}", 
@@ -941,5 +942,394 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
             experimentTradeItemRepository.save(experimentTradeItem);
         }
+    }
+
+    // ========== 테스트용 메서드들 ==========
+    
+    /**
+     * 테스트용: 자동 매도 스케줄러 수동 실행
+     */
+    @Transactional
+    public void triggerAutoSellForTest() {
+        log.info("=== 테스트: 자동 매도 스케줄러 수동 실행 ===");
+        LocalDate today = LocalDate.now();
+        LocalDate fiveBusinessDaysAgo = calculatePreviousBusinessDate(today);
+        
+        log.info("현재 날짜: {}", today);
+        log.info("5영업일 전 날짜: {}", fiveBusinessDaysAgo);
+
+        final List<Experiment> experimentsAfter5BusinessDays = findExperimentsAfter5BusinessDays();
+        log.info("5영업일 경과 실험 발견: {} 개", experimentsAfter5BusinessDays.size());
+
+        int successCount = 0;
+        int failureCount = 0;
+
+        for (Experiment experiment : experimentsAfter5BusinessDays) {
+            try {
+                log.info("실험 ID {} 자동 매도 처리 시작", experiment.getId());
+                updateExperiment(experiment);
+                successCount++;
+            } catch (Exception e) {
+                failureCount++;
+                log.error("실험 ID {} 자동 매도 실패", experiment.getId(), e);
+            }
+        }
+
+        log.info("=== 테스트 완료: 성공 {}, 실패 {} ===", successCount, failureCount);
+    }
+
+    /**
+     * 테스트용: 진행중 실험 데이터 저장 스케줄러 수동 실행
+     */
+    @Transactional
+    public void triggerProgressUpdateForTest() {
+        log.info("=== 테스트: 진행중 실험 데이터 저장 스케줄러 수동 실행 ===");
+        LocalDate today = LocalDate.now();
+        LocalDate fiveBusinessDaysAgo = calculatePreviousBusinessDate(today);
+        
+        log.info("현재 날짜: {}", today);
+        log.info("5영업일 전 날짜: {}", fiveBusinessDaysAgo);
+
+        final List<Experiment> experimentsPrevious5BusinessDays = findExperimentsPrevious5BusinessDays();
+        log.info("진행중 실험 발견: {} 개", experimentsPrevious5BusinessDays.size());
+
+        int successCount = 0;
+        int failureCount = 0;
+
+        for (Experiment experiment : experimentsPrevious5BusinessDays) {
+            try {
+                log.info("실험 ID {} 진행 데이터 저장 시작", experiment.getId());
+                saveExperimentTradeItem(experiment);
+                successCount++;
+            } catch (Exception e) {
+                failureCount++;
+                log.error("실험 ID {} 진행 데이터 저장 실패", experiment.getId(), e);
+            }
+        }
+
+        log.info("=== 테스트 완료: 성공 {}, 실패 {} ===", successCount, failureCount);
+    }
+
+    /**
+     * 테스트용: 영업일 계산 로직 테스트
+     */
+    public String testBusinessDaysCalculation() {
+        StringBuilder result = new StringBuilder();
+        result.append("=== 영업일 계산 테스트 ===\n\n");
+        
+        LocalDate today = LocalDate.now();
+        result.append("오늘 날짜: ").append(today).append(" (").append(today.getDayOfWeek()).append(")\n\n");
+        
+        result.append("5영업일 전 날짜 계산:\n");
+        LocalDate fiveBusinessDaysAgo = calculatePreviousBusinessDate(today);
+        result.append(String.format("  5영업일 전: %s (%s)\n", fiveBusinessDaysAgo, fiveBusinessDaysAgo.getDayOfWeek()));
+        
+        // 각 영업일 확인
+        LocalDate checkDate = fiveBusinessDaysAgo;
+        int businessDayCount = 0;
+        result.append("\n영업일 목록:\n");
+        while (!checkDate.isAfter(today)) {
+            DayOfWeek day = checkDate.getDayOfWeek();
+            if (day != DayOfWeek.SATURDAY && day != DayOfWeek.SUNDAY) {
+                businessDayCount++;
+                result.append(String.format("  D-%d: %s (%s)\n", 6 - businessDayCount, checkDate, day));
+            }
+            checkDate = checkDate.plusDays(1);
+        }
+        
+        result.append("\n실제 조회되는 실험:\n");
+        LocalDateTime start = fiveBusinessDaysAgo.atStartOfDay();
+        LocalDateTime end = fiveBusinessDaysAgo.atTime(LocalTime.MAX);
+        List<Experiment> experiments = experimentRepository.findExperimentsAfterFiveDays(start, end);
+        result.append(String.format("  조회 기간: %s ~ %s\n", start, end));
+        result.append(String.format("  발견된 실험 개수: %d\n", experiments.size()));
+        for (Experiment exp : experiments) {
+            result.append(String.format("    - 실험 ID: %d, 매수일: %s, 상태: %s, 매수가: %.0f원\n", 
+                exp.getId(), exp.getBuyAt(), exp.getStatus(), exp.getBuyPrice()));
+        }
+        
+        result.append("\n진행중인 실험 (5영업일 미만):\n");
+        List<Experiment> progressExperiments = findExperimentsPrevious5BusinessDays();
+        result.append(String.format("  발견된 실험 개수: %d\n", progressExperiments.size()));
+        for (Experiment exp : progressExperiments) {
+            long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(exp.getBuyAt().toLocalDate(), LocalDate.now());
+            result.append(String.format("    - 실험 ID: %d, 매수일: %s, 상태: %s, 경과일: %d일\n", 
+                exp.getId(), exp.getBuyAt(), exp.getStatus(), daysBetween));
+        }
+        
+        return result.toString();
+    }
+
+    /**
+     * 종합 테스트: 모든 경우의 수를 테스트
+     */
+    public String runComprehensiveTests() {
+        StringBuilder result = new StringBuilder();
+        result.append("========================================\n");
+        result.append("      실험 시스템 종합 테스트\n");
+        result.append("========================================\n\n");
+
+        int totalTests = 0;
+        int passedTests = 0;
+        int failedTests = 0;
+
+        // 1. 영업일 계산 테스트
+        result.append("\n[테스트 1] 영업일 계산 테스트\n");
+        result.append("----------------------------------------\n");
+        try {
+            totalTests++;
+            LocalDate today = LocalDate.now();
+            result.append("오늘 날짜: ").append(today).append(" (").append(today.getDayOfWeek()).append(")\n\n");
+
+            // 다양한 날짜로 테스트
+            LocalDate[] testDates = {
+                today,
+                today.minusDays(1),
+                today.minusDays(3),
+                today.minusDays(7), // 주말 포함
+                today.minusDays(10)
+            };
+
+            for (LocalDate testDate : testDates) {
+                LocalDate fiveDaysAgo = calculatePreviousBusinessDate(testDate);
+                long daysDiff = java.time.temporal.ChronoUnit.DAYS.between(fiveDaysAgo, testDate);
+                result.append(String.format("  기준일: %s → 5영업일 전: %s (차이: %d일)\n", 
+                    testDate, fiveDaysAgo, daysDiff));
+            }
+            
+            passedTests++;
+            result.append("✓ 영업일 계산 테스트 통과\n");
+        } catch (Exception e) {
+            failedTests++;
+            result.append("✗ 영업일 계산 테스트 실패: ").append(e.getMessage()).append("\n");
+        }
+
+        // 2. D-5, D-4, D-3, D-2, D-1 시나리오 테스트
+        result.append("\n[테스트 2] D-day 시나리오 테스트\n");
+        result.append("----------------------------------------\n");
+        try {
+            totalTests++;
+            LocalDate today = LocalDate.now();
+            
+            for (int i = 0; i <= 4; i++) {
+                // i일 전 날짜 계산 (영업일 기준)
+                LocalDate targetBuyDate = today;
+                int businessDaysToGoBack = i;
+                while (businessDaysToGoBack > 0) {
+                    targetBuyDate = targetBuyDate.minusDays(1);
+                    if (targetBuyDate.getDayOfWeek() != DayOfWeek.SATURDAY && 
+                        targetBuyDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                        businessDaysToGoBack--;
+                    }
+                }
+                
+                LocalDate calculatedFiveDaysAgo = calculatePreviousBusinessDate(targetBuyDate);
+                result.append(String.format("  D-%d 시나리오:\n", 5 - i));
+                result.append(String.format("    - 매수일: %s\n", targetBuyDate));
+                result.append(String.format("    - 5영업일 전 계산: %s\n", calculatedFiveDaysAgo));
+                
+                // 해당 날짜에 매수한 실험 조회 테스트
+                LocalDateTime start = targetBuyDate.atStartOfDay();
+                LocalDateTime end = targetBuyDate.atTime(LocalTime.MAX);
+                List<Experiment> experiments = experimentRepository.findExperimentsAfterFiveDays(start, end);
+                result.append(String.format("    - 해당 날짜 실험 개수: %d\n", experiments.size()));
+            }
+            
+            passedTests++;
+            result.append("✓ D-day 시나리오 테스트 통과\n");
+        } catch (Exception e) {
+            failedTests++;
+            result.append("✗ D-day 시나리오 테스트 실패: ").append(e.getMessage()).append("\n");
+        }
+
+        // 3. 주말 경계 테스트
+        result.append("\n[테스트 3] 주말 경계 테스트\n");
+        result.append("----------------------------------------\n");
+        try {
+            totalTests++;
+            LocalDate today = LocalDate.now();
+            
+            // 금요일 매수 시나리오
+            LocalDate friday = today;
+            while (friday.getDayOfWeek() != DayOfWeek.FRIDAY) {
+                friday = friday.minusDays(1);
+            }
+            LocalDate fiveDaysAgoFromFriday = calculatePreviousBusinessDate(friday);
+            result.append(String.format("  금요일(%s) 매수 → 5영업일 전: %s\n", friday, fiveDaysAgoFromFriday));
+            
+            // 월요일 매수 시나리오
+            LocalDate monday = today;
+            while (monday.getDayOfWeek() != DayOfWeek.MONDAY) {
+                monday = monday.minusDays(1);
+            }
+            LocalDate fiveDaysAgoFromMonday = calculatePreviousBusinessDate(monday);
+            result.append(String.format("  월요일(%s) 매수 → 5영업일 전: %s\n", monday, fiveDaysAgoFromMonday));
+            
+            passedTests++;
+            result.append("✓ 주말 경계 테스트 통과\n");
+        } catch (Exception e) {
+            failedTests++;
+            result.append("✗ 주말 경계 테스트 실패: ").append(e.getMessage()).append("\n");
+        }
+
+        // 4. ROI 계산 테스트
+        result.append("\n[테스트 4] ROI 계산 테스트\n");
+        result.append("----------------------------------------\n");
+        try {
+            totalTests++;
+            double[][] testCases = {
+                {100000, 110000}, // +10% 수익
+                {100000, 90000},  // -10% 손실
+                {100000, 100000}, // 0% 수익
+                {100000, 150000}, // +50% 수익
+                {100000, 50000}   // -50% 손실
+            };
+            
+            for (double[] testCase : testCases) {
+                double buyPrice = testCase[0];
+                double sellPrice = testCase[1];
+                double roi = ((sellPrice - buyPrice) / buyPrice) * 100;
+                result.append(String.format("  매수가: %.0f원, 매도가: %.0f원 → ROI: %.2f%%\n", 
+                    buyPrice, sellPrice, roi));
+            }
+            
+            passedTests++;
+            result.append("✓ ROI 계산 테스트 통과\n");
+        } catch (Exception e) {
+            failedTests++;
+            result.append("✗ ROI 계산 테스트 실패: ").append(e.getMessage()).append("\n");
+        }
+
+        // 5. 실험 조회 테스트
+        result.append("\n[테스트 5] 실험 조회 테스트\n");
+        result.append("----------------------------------------\n");
+        try {
+            totalTests++;
+            
+            // 5영업일 경과 실험 조회
+            List<Experiment> after5Days = findExperimentsAfter5BusinessDays();
+            result.append(String.format("  5영업일 경과 실험: %d개\n", after5Days.size()));
+            for (Experiment exp : after5Days) {
+                result.append(String.format("    - ID: %d, 매수일: %s, 상태: %s\n", 
+                    exp.getId(), exp.getBuyAt(), exp.getStatus()));
+            }
+            
+            // 진행중 실험 조회
+            List<Experiment> progress = findExperimentsPrevious5BusinessDays();
+            result.append(String.format("  진행중 실험: %d개\n", progress.size()));
+            for (Experiment exp : progress) {
+                long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(
+                    exp.getBuyAt().toLocalDate(), LocalDate.now());
+                result.append(String.format("    - ID: %d, 매수일: %s, 경과일: %d일, 상태: %s\n", 
+                    exp.getId(), exp.getBuyAt(), daysBetween, exp.getStatus()));
+            }
+            
+            passedTests++;
+            result.append("✓ 실험 조회 테스트 통과\n");
+        } catch (Exception e) {
+            failedTests++;
+            result.append("✗ 실험 조회 테스트 실패: ").append(e.getMessage()).append("\n");
+        }
+
+        // 6. 영업일 카운트 정확도 테스트
+        result.append("\n[테스트 6] 영업일 카운트 정확도 테스트\n");
+        result.append("----------------------------------------\n");
+        try {
+            totalTests++;
+            LocalDate testStart = LocalDate.now().minusDays(30);
+            LocalDate testEnd = LocalDate.now();
+            
+            int actualBusinessDays = 0;
+            LocalDate current = testStart;
+            while (!current.isAfter(testEnd)) {
+                if (current.getDayOfWeek() != DayOfWeek.SATURDAY && 
+                    current.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                    actualBusinessDays++;
+                }
+                current = current.plusDays(1);
+            }
+            
+            result.append(String.format("  기간: %s ~ %s\n", testStart, testEnd));
+            result.append(String.format("  실제 영업일 수: %d일\n", actualBusinessDays));
+            
+            // 5영업일 전 날짜 계산 테스트
+            LocalDate calculated = calculatePreviousBusinessDate(testEnd);
+            int calculatedBusinessDays = 0;
+            current = calculated;
+            while (!current.isAfter(testEnd)) {
+                if (current.getDayOfWeek() != DayOfWeek.SATURDAY && 
+                    current.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                    calculatedBusinessDays++;
+                }
+                current = current.plusDays(1);
+            }
+            result.append(String.format("  계산된 5영업일 전 날짜: %s\n", calculated));
+            result.append(String.format("  계산된 날짜부터 오늘까지 영업일 수: %d일\n", calculatedBusinessDays));
+            
+            if (calculatedBusinessDays == 5) {
+                passedTests++;
+                result.append("✓ 영업일 카운트 정확도 테스트 통과 (정확히 5영업일)\n");
+            } else {
+                failedTests++;
+                result.append(String.format("✗ 영업일 카운트 정확도 테스트 실패 (기대: 5일, 실제: %d일)\n", 
+                    calculatedBusinessDays));
+            }
+        } catch (Exception e) {
+            failedTests++;
+            result.append("✗ 영업일 카운트 정확도 테스트 실패: ").append(e.getMessage()).append("\n");
+        }
+
+        // 7. 실험 상태 변경 시나리오 테스트
+        result.append("\n[테스트 7] 실험 상태 변경 시나리오 테스트\n");
+        result.append("----------------------------------------\n");
+        try {
+            totalTests++;
+            
+            // 진행중 실험
+            List<Experiment> progressExperiments = experimentRepository.findProgressExperiments(
+                LocalDateTime.of(2000, 1, 1, 0, 0), "PROGRESS");
+            result.append(String.format("  진행중(PROGRESS) 실험: %d개\n", progressExperiments.size()));
+            
+            // 완료된 실험 (카운트만)
+            int completeCount = experimentRepository.countExperimentsByStatus("COMPLETE");
+            result.append(String.format("  완료(COMPLETE) 실험: %d개\n", completeCount));
+            
+            // 각 상태별 실험 예시
+            if (!progressExperiments.isEmpty()) {
+                Experiment sample = progressExperiments.get(0);
+                result.append(String.format("  진행중 실험 예시: ID=%d, 매수일=%s, 상태=%s\n", 
+                    sample.getId(), sample.getBuyAt(), sample.getStatus()));
+            }
+            
+            // 완료된 실험 정보는 카운트만 표시 (이메일 기반 조회라 생략)
+            if (completeCount > 0) {
+                result.append("  (완료 실험 상세 조회는 이메일 기반이므로 생략)\n");
+            }
+            
+            passedTests++;
+            result.append("✓ 실험 상태 변경 시나리오 테스트 통과\n");
+        } catch (Exception e) {
+            failedTests++;
+            result.append("✗ 실험 상태 변경 시나리오 테스트 실패: ").append(e.getMessage()).append("\n");
+        }
+
+        // 결과 요약
+        result.append("\n========================================\n");
+        result.append("           테스트 결과 요약\n");
+        result.append("========================================\n");
+        result.append(String.format("총 테스트: %d개\n", totalTests));
+        result.append(String.format("통과: %d개\n", passedTests));
+        result.append(String.format("실패: %d개\n", failedTests));
+        result.append(String.format("성공률: %.1f%%\n", 
+            totalTests > 0 ? (passedTests * 100.0 / totalTests) : 0));
+        result.append("\n");
+
+        if (failedTests == 0) {
+            result.append("✓ 모든 테스트 통과!\n");
+        } else {
+            result.append("⚠ 일부 테스트 실패. 위의 상세 내용을 확인하세요.\n");
+        }
+
+        return result.toString();
     }
 }

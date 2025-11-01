@@ -53,4 +53,47 @@ public class ExperimentController {
     public ResponseEntity<Mono<ExperimentReportResponse>> getReport(@AuthenticationPrincipal CustomUserDetails customUserDetails) {
         return ResponseEntity.ok().body(experimentService.getReport(customUserDetails));
     }
+
+    // 개발 환경 테스트용 엔드포인트들 (프로덕션에서는 제거하거나 보안 강화 필요)
+    @PostMapping("/test/trigger-auto-sell")
+    @Operation(summary = "[테스트] 자동 매도 스케줄러 수동 실행", description = "5영업일 경과 실험 자동 매도 테스트용")
+    public ResponseEntity<String> triggerAutoSell() {
+        try {
+            experimentService.triggerAutoSellForTest();
+            return ResponseEntity.ok("자동 매도 스케줄러가 실행되었습니다. 로그를 확인하세요.");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("에러: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/test/trigger-progress-update")
+    @Operation(summary = "[테스트] 진행중 실험 데이터 저장 스케줄러 수동 실행", description = "진행중 실험 데이터 저장 테스트용")
+    public ResponseEntity<String> triggerProgressUpdate() {
+        try {
+            experimentService.triggerProgressUpdateForTest();
+            return ResponseEntity.ok("진행중 실험 데이터 저장 스케줄러가 실행되었습니다. 로그를 확인하세요.");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("에러: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/test/business-days")
+    @Operation(summary = "[테스트] 영업일 계산 테스트", description = "영업일 계산 로직 테스트용")
+    public ResponseEntity<String> testBusinessDays() {
+        try {
+            return ResponseEntity.ok(experimentService.testBusinessDaysCalculation());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("에러: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/test/comprehensive")
+    @Operation(summary = "[테스트] 종합 테스트", description = "모든 경우의 수를 테스트합니다")
+    public ResponseEntity<String> comprehensiveTest() {
+        try {
+            return ResponseEntity.ok(experimentService.runComprehensiveTests());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("에러: " + e.getMessage());
+        }
+    }
 }

@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AutoSellScheduler {
 
-    private ExperimentService experimentService;
+    private final ExperimentService experimentService;
 
     /**
      * 모의투자 자동매매 스케줄러
