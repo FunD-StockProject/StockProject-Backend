@@ -71,6 +71,7 @@ public class PortfolioResultResponse {
     public static class InvestmentPattern {
         private String patternType;        // 미정: null
         private String patternDescription; // 미정: null
+        private Double avgScore;           // 사용자 평균 점수 (사분면 분류 기준)
     }
 
     @Getter

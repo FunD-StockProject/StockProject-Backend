@@ -835,10 +835,11 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         // - 하단-우측 (수익률 < 0, 점수 높음): 후행 추종형
         String patternType = "보수 추세형"; // 기본값
         String patternDesc = "중간 점수대에서 안정적 추세를 선호"; // 기본값
+        Double avgScore = 50.0; // 기본값: 50점
         
         if (!completed.isEmpty()) {
             // 사용자 평균 점수 계산 (사분면 분류 기준)
-            double avgScore = completed.stream()
+            avgScore = completed.stream()
                 .mapToInt(Experiment::getScore)
                 .average()
                 .orElse(50.0); // 평균 점수가 없으면 50점 기준
@@ -890,6 +891,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         PortfolioResultResponse.InvestmentPattern investmentPattern = PortfolioResultResponse.InvestmentPattern.builder()
             .patternType(patternType)
             .patternDescription(patternDesc)
+            .avgScore(avgScore)
             .build();
 
         PortfolioResultResponse.ExperimentSummary summary = PortfolioResultResponse.ExperimentSummary.builder()
