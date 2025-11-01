@@ -63,7 +63,15 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
     customUserDetails.getEmail());
 
         if (experimentsByUserId.isEmpty()) {
-            return Mono.empty();
+            // 빈 실험일 때도 기본값을 가진 응답 반환 (에러가 아닌 빈 상태)
+            return Mono.just(ExperimentStatusResponse.builder()
+                .progressExperiments(new ArrayList<>())
+                .completeExperiments(new ArrayList<>())
+                .avgRoi(0.0)
+                .totalTradeCount(0)
+                .progressTradeCount(0)
+                .successRate(0.0)
+                .build());
         }
 
         // 진행중인 모의 투자 종목
@@ -95,6 +103,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                     .experimentId(experiment.getId())
                     .roi(experiment.getRoi())
                     .buyAt(experiment.getBuyAt())
+                    .buyPrice(experiment.getBuyPrice().intValue())
                     .symbolName(stock.getSymbolName())
                     .status(experiment.getStatus())
                     .country(stockInfoKorea.getCountry())
@@ -107,6 +116,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 .experimentId(experiment.getId())
                 .roi(experiment.getRoi())
                 .buyAt(experiment.getBuyAt())
+                .buyPrice(experiment.getBuyPrice().intValue())
                 .symbolName(stock.getSymbolName())
                 .status(experiment.getStatus())
                 .country(stockInfoKorea.getCountry())

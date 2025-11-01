@@ -169,6 +169,12 @@ public class PreferenceService {
         return (int) preferenceRepository.countByUserIdAndPreferenceType(currentUserId, PreferenceType.BOOKMARK);
     }
 
+    public Integer getNotificationCount() {
+        Integer currentUserId = getCurrentUserId();
+        return (int) preferenceRepository.countByUserIdAndPreferenceTypeAndNotificationEnabled(
+            currentUserId, PreferenceType.BOOKMARK, true);
+    }
+
     private User getUserOrThrow(Integer userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("Can't find user: " + userId));

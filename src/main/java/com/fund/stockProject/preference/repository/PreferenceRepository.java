@@ -19,6 +19,10 @@ public interface PreferenceRepository extends JpaRepository<Preference, Preferen
     List<Preference> findByUserIdAndPreferenceType(Integer userId, PreferenceType preferenceType);
     List<Preference> findByStockIdAndPreferenceType(Integer stockId, PreferenceType preferenceType);
     long countByUserIdAndPreferenceType(Integer userId, PreferenceType preferenceType);
+    
+    // 북마크 중 알림이 활성화된 개수
+    long countByUserIdAndPreferenceTypeAndNotificationEnabled(
+        Integer userId, PreferenceType preferenceType, Boolean notificationEnabled);
 
     // 사용자의 모든 Preference 조회
     List<Preference> findByUserId(Integer userId);

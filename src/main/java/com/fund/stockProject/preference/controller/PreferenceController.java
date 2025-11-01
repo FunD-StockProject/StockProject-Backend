@@ -130,6 +130,15 @@ public class PreferenceController {
         return ResponseEntity.ok().body(preferenceService.getBookmarkCount());
     }
 
+    @GetMapping("/notification/count")
+    @Operation(summary = "변동알림 개수", description = "사용자의 북마크 중 알림이 활성화된 종목 개수를 반환합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    public ResponseEntity<Integer> getNotificationCount() {
+        return ResponseEntity.ok().body(preferenceService.getNotificationCount());
+    }
+
     @PatchMapping("/notification/toggle/{stockId}")
     @Operation(summary = "알림 토글", description = "해당 종목의 알림을 토글합니다. 북마크가 없으면 북마크+알림을 생성하고, 있으면 알림만 토글합니다.")
     @ApiResponses({
