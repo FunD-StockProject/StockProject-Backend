@@ -947,7 +947,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         return ExperimentsAfter5BusinessDays;
     }
 
-    // 5영업일 전 날짜 찾는 함수
+    // 5영업일 전 날짜 찾는 함수 (주말 및 공휴일 제외)
     private LocalDate calculatePreviousBusinessDate(LocalDate fromDate) {
         int daysCounted = 0;
         LocalDate date = fromDate;
@@ -958,11 +958,51 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
             // 주말 제외
             if (day != DayOfWeek.SATURDAY && day != DayOfWeek.SUNDAY) {
-                daysCounted++;
+                // 공휴일 제외 (2025년 기준)
+                if (!isHoliday(date)) {
+                    daysCounted++;
+                }
             }
         }
 
         return date;
+    }
+
+    // 공휴일 체크 함수 (2025년 기준)
+    private boolean isHoliday(LocalDate date) {
+        // 2025년 공휴일 목록 (국내/해외 공통 주요 공휴일 포함)
+        // 프론트엔드와 동일한 로직으로 국내/해외 구분 없이 주요 공휴일만 체크
+        int year = date.getYear();
+        int month = date.getMonthValue();
+        int day = date.getDayOfMonth();
+
+        // 2025년 공휴일
+        if (year == 2025) {
+            // 신정
+            if (month == 1 && day == 1) return true;
+            // 설날 연휴
+            if (month == 1 && (day == 28 || day == 29 || day == 30)) return true;
+            // 삼일절
+            if (month == 3 && day == 3) return true;
+            // 근로자의날
+            if (month == 5 && day == 1) return true;
+            // 어린이날, 대체공휴일
+            if (month == 5 && (day == 5 || day == 6)) return true;
+            // 현충일
+            if (month == 6 && day == 6) return true;
+            // 광복절
+            if (month == 8 && day == 15) return true;
+            // 개천절
+            if (month == 10 && day == 3) return true;
+            // 추석 연휴
+            if (month == 10 && (day == 6 || day == 7 || day == 8 || day == 9)) return true;
+            // 크리스마스
+            if (month == 12 && day == 25) return true;
+            // 연말
+            if (month == 12 && day == 31) return true;
+        }
+
+        return false;
     }
 
     // 자동판매 - 실험 데이터 수정
