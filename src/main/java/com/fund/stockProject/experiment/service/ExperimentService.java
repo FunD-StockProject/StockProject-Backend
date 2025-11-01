@@ -827,21 +827,65 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .sameGradeUserRate(sameGradeUserRate)
             .build();
 
-        // InvestmentPattern: 사용자 평균 수익률이 가장 높은 구간 레이블 기반으로 간단 추론
-        // null 값은 0으로 처리
-        double u_0_59_val = u_0_59 != null ? u_0_59 : 0.0;
-        double u_60_69_val = u_60_69 != null ? u_60_69 : 0.0;
-        double u_70_79_val = u_70_79 != null ? u_70_79 : 0.0;
-        double u_80_100_val = u_80_100 != null ? u_80_100 : 0.0;
+        // InvestmentPattern: 완료된 실험들을 사분면 기준으로 분류하여 가장 많이 속한 패턴 결정
+        // 사분면 기준:
+        // - 상단-좌측 (수익률 > 0, 점수 낮음): 가치 선점형
+        // - 상단-우측 (수익률 > 0, 점수 높음): 트렌드 선점형
+        // - 하단-좌측 (수익률 < 0, 점수 낮음): 역행 투자형
+        // - 하단-우측 (수익률 < 0, 점수 높음): 후행 추종형
+        String patternType = "보수 추세형"; // 기본값
+        String patternDesc = "중간 점수대에서 안정적 추세를 선호"; // 기본값
         
-        double maxAvg = Math.max(Math.max(u_0_59_val, u_60_69_val), Math.max(u_70_79_val, u_80_100_val));
-        String patternType;
-        String patternDesc;
-        if (maxAvg == u_0_59_val && u_0_59 != null) { patternType = "역발상형"; patternDesc = "점수가 낮을 때 진입해 반등을 노리는 경향"; }
-        else if (maxAvg == u_60_69_val && u_60_69 != null) { patternType = "보수 추세형"; patternDesc = "중간 점수대에서 안정적 추세를 선호"; }
-        else if (maxAvg == u_70_79_val && u_70_79 != null) { patternType = "가치 선점형"; patternDesc = "높아지기 전 구간에서 선제 진입을 선호"; }
-        else if (maxAvg == u_80_100_val && u_80_100 != null) { patternType = "추세 추종형"; patternDesc = "높은 점수대의 강한 추세를 추종"; }
-        else { patternType = "보수 추세형"; patternDesc = "중간 점수대에서 안정적 추세를 선호"; } // 기본값
+        if (!completed.isEmpty()) {
+            // 사용자 평균 점수 계산 (사분면 분류 기준)
+            double avgScore = completed.stream()
+                .mapToInt(Experiment::getScore)
+                .average()
+                .orElse(50.0); // 평균 점수가 없으면 50점 기준
+            
+            // 각 사분면별 카운트
+            int topLeftCount = 0;    // 가치 선점형: ROI > 0, Score < avgScore
+            int topRightCount = 0;   // 트렌드 선점형: ROI > 0, Score >= avgScore
+            int bottomLeftCount = 0;  // 역행 투자형: ROI <= 0, Score < avgScore
+            int bottomRightCount = 0; // 후행 추종형: ROI <= 0, Score >= avgScore
+            
+            for (Experiment e : completed) {
+                if (e.getRoi() == null) continue;
+                
+                double roi = e.getRoi();
+                int score = e.getScore();
+                
+                if (roi > 0 && score < avgScore) {
+                    topLeftCount++; // 가치 선점형
+                } else if (roi > 0 && score >= avgScore) {
+                    topRightCount++; // 트렌드 선점형
+                } else if (roi <= 0 && score < avgScore) {
+                    bottomLeftCount++; // 역행 투자형
+                } else if (roi <= 0 && score >= avgScore) {
+                    bottomRightCount++; // 후행 추종형
+                }
+            }
+            
+            // 가장 많이 속한 사분면 결정
+            int maxCount = Math.max(Math.max(topLeftCount, topRightCount), 
+                                   Math.max(bottomLeftCount, bottomRightCount));
+            
+            if (maxCount > 0) {
+                if (maxCount == topLeftCount) {
+                    patternType = "가치 선점형";
+                    patternDesc = "점수가 낮을 때 매수하여 수익을 보는 투자 패턴";
+                } else if (maxCount == topRightCount) {
+                    patternType = "트렌드 선점형";
+                    patternDesc = "점수가 높을 때 매수하여 수익을 보는 투자 패턴";
+                } else if (maxCount == bottomLeftCount) {
+                    patternType = "역행 투자형";
+                    patternDesc = "점수가 낮을 때 매수하여 손실을 보는 투자 패턴";
+                } else if (maxCount == bottomRightCount) {
+                    patternType = "후행 추종형";
+                    patternDesc = "점수가 높을 때 매수하여 손실을 보는 투자 패턴";
+                }
+            }
+        }
 
         PortfolioResultResponse.InvestmentPattern investmentPattern = PortfolioResultResponse.InvestmentPattern.builder()
             .patternType(patternType)
