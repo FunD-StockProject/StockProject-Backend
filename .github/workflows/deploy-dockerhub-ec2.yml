@@ -80,8 +80,16 @@ jobs:
           ssh -o StrictHostKeyChecking=no "$EC2_HOST" "
             set -e
             cd $DEPLOY_DIR
+            # 기존 컨테이너 중지 및 제거 (orphan 포함)
+            docker compose down --remove-orphans || true
+            # 443 포트를 사용하는 다른 컨테이너가 있다면 종료
+            docker stop \$(docker ps -q --filter 'publish=443') 2>/dev/null || true
+            # 최신 이미지 pull
             docker compose pull
+            # 컨테이너 시작
             docker compose up -d
+            # 사용하지 않는 이미지 정리
             docker image prune -f
+            # 상태 확인
             docker ps
           "
