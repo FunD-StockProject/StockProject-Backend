@@ -284,8 +284,12 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         StockInfoResponse stockInfoResponse;
         try {
             stockInfoResponse = securityStockInfoKorea
-                .onErrorReturn(null)  // 에러 발생 시 null 반환
-                .block();
+                .onErrorResume(error -> {
+                    log.warn("Failed to get StockInfo for stock - stockId: {}, error: {}", stockId, error.getMessage());
+                    return Mono.empty();  // 에러 발생 시 빈 Mono 반환
+                })
+                .blockOptional()
+                .orElse(null);  // Optional이 비어있으면 null 반환
         } catch (Exception e) {
             log.warn("Failed to get StockInfo for stock - stockId: {}, error: {}", stockId, e.getMessage());
             return Mono.just(ExperimentSimpleResponse.builder()
