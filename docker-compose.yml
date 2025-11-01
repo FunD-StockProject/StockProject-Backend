@@ -6,7 +6,6 @@ services:
       - "127.0.0.1:8443:443"   # Nginx만 접근 (백엔드가 내부 HTTPS:443로 뜬다는 전제)
     env_file:
       - ./config/.env  # config/.env 파일에서 환경 변수 로드
-      - .env           # 프로젝트 루트의 .env 파일도 지원 (선택적)
     environment:
       - TZ=Asia/Seoul
       - LOG_PATH=/app/logs
