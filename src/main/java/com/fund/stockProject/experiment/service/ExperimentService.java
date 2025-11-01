@@ -53,6 +53,7 @@ public class ExperimentService {
     private final SecurityService securityService;
     private final StockQueryRepository stockQueryRepository;
     private final ExperimentTradeItemRepository experimentTradeItemRepository;
+    private final HolidayService holidayService;
 
     /*
      * 실험실 - 매수 현황
@@ -947,7 +948,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         return ExperimentsAfter5BusinessDays;
     }
 
-    // 5영업일 전 날짜 찾는 함수 (주말만 제외)
+    // 5영업일 전 날짜 찾는 함수 (주말 및 공휴일 제외)
     private LocalDate calculatePreviousBusinessDate(LocalDate fromDate) {
         int daysCounted = 0;
         LocalDate date = fromDate;
@@ -958,7 +959,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
             // 주말 제외
             if (day != DayOfWeek.SATURDAY && day != DayOfWeek.SUNDAY) {
-                daysCounted++;
+                // 공휴일 제외 (API로 확인)
+                if (!holidayService.isHolidaySync(date)) {
+                    daysCounted++;
+                }
             }
         }
 
