@@ -35,11 +35,13 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 import com.fund.stockProject.portfolio.dto.PortfolioResultResponse;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ExperimentService {
@@ -606,6 +608,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
     // 자동판매 - 실험 데이터 수정
     public void updateExperiment(Experiment experiment) {
         try {
+            log.info("Starting auto-sell update for experiment - experimentId: {}, stockId: {}, symbol: {}", 
+                    experiment.getId(), experiment.getStock().getId(), experiment.getStock().getSymbol());
             final Stock stock = experiment.getStock();
 
             final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea
@@ -623,10 +627,15 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 final Double roi = ((experiment.getBuyPrice() - price) % experiment.getBuyPrice()) * 100;
 
                 experiment.updateExperiment(price, "COMPLETE", LocalDateTime.now(), roi);
+                log.info("Auto-sell completed successfully - experimentId: {}, price: {}, roi: {}", 
+                        experiment.getId(), price, roi);
+            } else {
+                log.warn("Failed to get stock info for auto-sell - experimentId: {}, stockId: {}", 
+                        experiment.getId(), stock.getId());
             }
 
         } catch (Exception e) {
-            System.err.println("Failed to autoSell");
+            log.error("Failed to auto-sell experiment - experimentId: {}", experiment.getId(), e);
         }
     }
 

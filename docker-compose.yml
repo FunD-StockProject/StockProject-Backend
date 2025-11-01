@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  stockproject-backend:
+    image: muuigong/stock-app:latest
+    container_name: stockproject-backend
+    ports:
+      - "443:443"
+    environment:
+      - TZ=Asia/Seoul
+      - LOG_PATH=/app/logs
+      - JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD}
+    volumes:
+      # 로그 디렉토리를 호스트 머신의 ./logs 디렉토리에 마운트
+      # EC2에서는 /srv/stock/logs 디렉토리에 로그가 저장됨
+      - ./logs:/app/logs
+      # 설정 파일 디렉토리 (keystore.p12 등)
+      - ./config:/app/config
+    restart: unless-stopped
+    networks:
+      - stockproject-network
+
+networks:
+  stockproject-network:
+    driver: bridge
+

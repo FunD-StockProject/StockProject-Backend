@@ -61,10 +61,12 @@ jobs:
           APP_ENV_FILE: ${{ secrets.APP_ENV_FILE }}   # optional
         run: |
           set -euo pipefail
-          # upload compose if missing on server
-          if ! ssh -o StrictHostKeyChecking=no "$EC2_HOST" "[ -f $DEPLOY_DIR/docker-compose.yml ]"; then
-            scp -o StrictHostKeyChecking=no docker-compose.yml "$EC2_HOST:$DEPLOY_DIR/docker-compose.yml"
-          fi
+          # 로그 디렉토리 생성 (볼륨 마운트용)
+          ssh -o StrictHostKeyChecking=no "$EC2_HOST" "mkdir -p $DEPLOY_DIR/logs"
+          # config 디렉토리 생성
+          ssh -o StrictHostKeyChecking=no "$EC2_HOST" "mkdir -p $DEPLOY_DIR/config"
+          # 항상 최신 docker-compose.yml 업로드 (로그 볼륨 설정 등 최신 변경사항 반영)
+          scp -o StrictHostKeyChecking=no docker-compose.yml "$EC2_HOST:$DEPLOY_DIR/docker-compose.yml"
           # upload .env if provided via secret
           if [ -n "${APP_ENV_FILE:-}" ]; then
             printf "%s" "$APP_ENV_FILE" | ssh -o StrictHostKeyChecking=no "$EC2_HOST" "cat > $DEPLOY_DIR/config/.env && chmod 600 $DEPLOY_DIR/config/.env"

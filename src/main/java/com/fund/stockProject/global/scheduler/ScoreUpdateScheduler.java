@@ -3,9 +3,11 @@ package com.fund.stockProject.global.scheduler;
 import com.fund.stockProject.score.service.ScoreBatchService;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ScoreUpdateScheduler {
@@ -17,7 +19,14 @@ public class ScoreUpdateScheduler {
      */
     @Scheduled(cron = "0 0 6 * * ?", zone = "Asia/Seoul") // 6시에 실행
     public void processScoresOversea() {
-        scoreBatchService.runCountryBatch(COUNTRY.OVERSEA);
+        log.info("Starting oversea score batch scheduler");
+        try {
+            scoreBatchService.runCountryBatch(COUNTRY.OVERSEA);
+            log.info("Oversea score batch scheduler completed successfully");
+        } catch (Exception e) {
+            log.error("Oversea score batch scheduler failed", e);
+            throw e;
+        }
     }
 
     /**
@@ -25,7 +34,14 @@ public class ScoreUpdateScheduler {
      */
     @Scheduled(cron = "0 0 17 * * ?", zone = "Asia/Seoul") // 17시에 실행
     public void processScoresKorea() {
-        scoreBatchService.runCountryBatch(COUNTRY.KOREA);
+        log.info("Starting korea score batch scheduler");
+        try {
+            scoreBatchService.runCountryBatch(COUNTRY.KOREA);
+            log.info("Korea score batch scheduler completed successfully");
+        } catch (Exception e) {
+            log.error("Korea score batch scheduler failed", e);
+            throw e;
+        }
     }
 
     /**
@@ -33,6 +49,13 @@ public class ScoreUpdateScheduler {
      */
     @Scheduled(cron = "0 5 7 * * ?", zone = "Asia/Seoul") // 매일 7시 5분 실행
     public void processIndexScores() {
-        scoreBatchService.runIndexBatch();
+        log.info("Starting index score batch scheduler");
+        try {
+            scoreBatchService.runIndexBatch();
+            log.info("Index score batch scheduler completed successfully");
+        } catch (Exception e) {
+            log.error("Index score batch scheduler failed", e);
+            throw e;
+        }
     }
 }
