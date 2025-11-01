@@ -117,3 +117,4 @@ cd /Users/jongwon/Projects/toTheEnd/StockProject-Backend
 - ✅ 인덱스 점수 표시
 - ✅ 숏뷰 추천 (로그인 후)
 
+

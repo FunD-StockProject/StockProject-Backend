@@ -577,11 +577,11 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
         // 5. 90이상 평균 수익률
         final double totalAvgRoi_90_100 = experimentRepository.findTotalAvgRoi(90, 100);
-        final double userAvgRoi_90_100 = experimentRepository.findUserAvgRoi(90, 100, email);
+        final Double userAvgRoi_90_100 = experimentRepository.findUserAvgRoi(90, 100, email);
 
         reportStatisticDtos.add(ReportStatisticDto.builder()
             .totalAvgRoi(totalAvgRoi_90_100)
-            .userAvgRoi(userAvgRoi_90_100)
+            .userAvgRoi(userAvgRoi_90_100 != null ? userAvgRoi_90_100 : 0.0)
             .scoreRange(SCORERANGE.RANGE_90_100.getRange())
             .build());
 
@@ -714,11 +714,11 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 .build();
         }
 
-        // 점수 구간별 사용자 평균 수익률 → scoreTable (avg)
-        double u_0_59 = experimentRepository.findUserAvgRoi(0, 59, email);
-        double u_60_69 = experimentRepository.findUserAvgRoi(60, 69, email);
-        double u_70_79 = experimentRepository.findUserAvgRoi(70, 79, email);
-        double u_80_100 = experimentRepository.findUserAvgRoi(80, 100, email);
+        // 점수 구간별 사용자 평균 수익률 → scoreTable (avg) (완료된 실험만 대상)
+        Double u_0_59 = experimentRepository.findUserAvgRoi(0, 59, email);
+        Double u_60_69 = experimentRepository.findUserAvgRoi(60, 69, email);
+        Double u_70_79 = experimentRepository.findUserAvgRoi(70, 79, email);
+        Double u_80_100 = experimentRepository.findUserAvgRoi(80, 100, email);
 
         // median 계산: 완료된 실험에서 구간별 ROI 중앙값
         java.util.function.Function<int[], Double> medianByRange = (range) -> {
@@ -784,13 +784,20 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .build();
 
         // InvestmentPattern: 사용자 평균 수익률이 가장 높은 구간 레이블 기반으로 간단 추론
-        double maxAvg = Math.max(Math.max(u_0_59, u_60_69), Math.max(u_70_79, u_80_100));
+        // null 값은 0으로 처리
+        double u_0_59_val = u_0_59 != null ? u_0_59 : 0.0;
+        double u_60_69_val = u_60_69 != null ? u_60_69 : 0.0;
+        double u_70_79_val = u_70_79 != null ? u_70_79 : 0.0;
+        double u_80_100_val = u_80_100 != null ? u_80_100 : 0.0;
+        
+        double maxAvg = Math.max(Math.max(u_0_59_val, u_60_69_val), Math.max(u_70_79_val, u_80_100_val));
         String patternType;
         String patternDesc;
-        if (maxAvg == u_0_59) { patternType = "역발상형"; patternDesc = "점수가 낮을 때 진입해 반등을 노리는 경향"; }
-        else if (maxAvg == u_60_69) { patternType = "보수 추세형"; patternDesc = "중간 점수대에서 안정적 추세를 선호"; }
-        else if (maxAvg == u_70_79) { patternType = "가치 선점형"; patternDesc = "높아지기 전 구간에서 선제 진입을 선호"; }
-        else { patternType = "추세 추종형"; patternDesc = "높은 점수대의 강한 추세를 추종"; }
+        if (maxAvg == u_0_59_val && u_0_59 != null) { patternType = "역발상형"; patternDesc = "점수가 낮을 때 진입해 반등을 노리는 경향"; }
+        else if (maxAvg == u_60_69_val && u_60_69 != null) { patternType = "보수 추세형"; patternDesc = "중간 점수대에서 안정적 추세를 선호"; }
+        else if (maxAvg == u_70_79_val && u_70_79 != null) { patternType = "가치 선점형"; patternDesc = "높아지기 전 구간에서 선제 진입을 선호"; }
+        else if (maxAvg == u_80_100_val && u_80_100 != null) { patternType = "추세 추종형"; patternDesc = "높은 점수대의 강한 추세를 추종"; }
+        else { patternType = "보수 추세형"; patternDesc = "중간 점수대에서 안정적 추세를 선호"; } // 기본값
 
         PortfolioResultResponse.InvestmentPattern investmentPattern = PortfolioResultResponse.InvestmentPattern.builder()
             .patternType(patternType)

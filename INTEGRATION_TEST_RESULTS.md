@@ -95,3 +95,4 @@ npm run dev
    - MOCK_DATA_ALIGNMENT_CHECK.md 참고
    - 브라우저 개발자 도구에서 응답 구조 확인
 
+

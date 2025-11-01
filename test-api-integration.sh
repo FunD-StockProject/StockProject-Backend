@@ -92,3 +92,4 @@ echo "   ./gradlew bootRun --args='--server.port=8080 --server.ssl.enabled=false
 echo "   또는"
 echo "   java -jar build/libs/stockProject-0.0.1-SNAPSHOT.jar --server.port=8080 --server.ssl.enabled=false"
 
+

@@ -38,8 +38,8 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
     @Query("SELECT e FROM Experiment e WHERE e.buyAt > :start AND e.status = :status")
     List<Experiment> findProgressExperiments(@Param("start") LocalDateTime start, @Param("status") String status);
 
-    @Query("SELECT AVG(e.roi) FROM Experiment e WHERE e.score BETWEEN :start AND :end AND e.user.email = :email")
-    double findUserAvgRoi(@Param("start") int start, @Param("end") int end, @Param("email") String email);
+    @Query("SELECT AVG(e.roi) FROM Experiment e WHERE e.score BETWEEN :start AND :end AND e.user.email = :email AND e.status = 'COMPLETE'")
+    Double findUserAvgRoi(@Param("start") int start, @Param("end") int end, @Param("email") String email);
 
     @Query("SELECT AVG(e.roi) FROM Experiment e WHERE e.score BETWEEN :start AND :end")
     double findTotalAvgRoi(@Param("start") int start, @Param("end") int end);
