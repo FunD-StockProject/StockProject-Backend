@@ -603,7 +603,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
         // 특정 사용자가 진행한 총 실험
         final List<Experiment> experimentsByEmailAndStatus = experimentRepository.findExperimentsByEmailAndStatus(
-            email, "COMPLETED");
+            email, "COMPLETE");
 
         // 전체 진행한 실험 개수
         long totalExperimentCount = experimentsByEmailAndStatus.size();
@@ -681,7 +681,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         final String email = customUserDetails.getEmail();
 
         // 완료/진행 실험 분리 집계
-        final List<Experiment> completed = experimentRepository.findExperimentsByEmailAndStatus(email, "COMPLETED");
+        final List<Experiment> completed = experimentRepository.findExperimentsByEmailAndStatus(email, "COMPLETE");
         final List<Experiment> progress = experimentRepository.findExperimentsByEmailAndStatus(email, "PROGRESS");
 
         long totalCompleted = completed.size();
