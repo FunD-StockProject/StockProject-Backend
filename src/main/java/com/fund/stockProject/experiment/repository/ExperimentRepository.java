@@ -100,4 +100,21 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
         + "GROUP BY sub.buy_date "
         + "ORDER BY sub.buy_date ", nativeQuery = true)
     List<Object[]> findExperimentGroupByBuyAt();
+
+    @Query(value = "SELECT "
+        + "    sub.buy_date, "
+        + "    ROUND(AVG(sub.roi), 1) AS avg_roi, "
+        + "    ROUND(AVG(sub.score), 0) AS avg_score "
+        + "FROM ( "
+        + "    SELECT "
+        + "        DATE(e.buy_at) AS buy_date, "
+        + "        e.roi, "
+        + "        e.score "
+        + "    FROM experiment e "
+        + "    JOIN user u ON e.user_id = u.id "
+        + "    WHERE u.email = :email "
+        + ") AS sub "
+        + "GROUP BY sub.buy_date "
+        + "ORDER BY sub.buy_date ", nativeQuery = true)
+    List<Object[]> findExperimentGroupByBuyAtByUser(@Param("email") String email);
 }

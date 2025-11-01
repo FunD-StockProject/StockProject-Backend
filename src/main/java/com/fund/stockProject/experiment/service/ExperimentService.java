@@ -736,8 +736,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("70-80점").avg(u_70_79).median(medianByRange.apply(new int[]{70,79})).build());
         scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("80점 이상").avg(u_80_100).median(medianByRange.apply(new int[]{80,100})).build());
 
-        // 패턴 그래프용 히스토리 포인트 (score, roi, buyAt → x,y,label)
-        final List<Object[]> experimentGroupByBuyAt = experimentRepository.findExperimentGroupByBuyAt();
+        // 패턴 그래프용 히스토리 포인트 (score, roi, buyAt → x,y,label) - 사용자별 필터링
+        final List<Object[]> experimentGroupByBuyAt = experimentRepository.findExperimentGroupByBuyAtByUser(email);
         List<PortfolioResultResponse.HistoryPoint> history = experimentGroupByBuyAt.stream().map(row -> {
                 java.time.LocalDate buyDate = ((java.sql.Date) row[0]).toLocalDate();
                 Double avgRoi = (Double) row[1];
