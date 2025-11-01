@@ -827,34 +827,29 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .sameGradeUserRate(sameGradeUserRate)
             .build();
 
-        // InvestmentPattern: 완료된 실험들을 사분면 기준으로 분류하여 가장 많이 속한 패턴 결정
-        // 사분면 기준:
-        // - 상단-좌측 (수익률 > 0, 점수 낮음): 가치 선점형
-        // - 상단-우측 (수익률 > 0, 점수 높음): 트렌드 선점형
-        // - 하단-좌측 (수익률 < 0, 점수 낮음): 역행 투자형
-        // - 하단-우측 (수익률 < 0, 점수 높음): 후행 추종형
+        // InvestmentPattern: 차트에 표시되는 히스토리 데이터(날짜별 평균)를 기준으로 사분면 분류
+        // 차트의 점 위치와 패턴 타입이 일치하도록 히스토리 데이터를 기준으로 계산
         String patternType = "보수 추세형"; // 기본값
         String patternDesc = "중간 점수대에서 안정적 추세를 선호"; // 기본값
         Double avgScore = 50.0; // 기본값: 50점
         
-        if (!completed.isEmpty()) {
-            // 사용자 평균 점수 계산 (사분면 분류 기준)
-            avgScore = completed.stream()
-                .mapToInt(Experiment::getScore)
+        // 히스토리 데이터를 기준으로 패턴 계산 (차트에 표시되는 점들과 동일한 데이터)
+        if (!history.isEmpty()) {
+            // 히스토리 포인트들의 평균 점수 계산 (사분면 분류 기준)
+            avgScore = history.stream()
+                .mapToInt(PortfolioResultResponse.HistoryPoint::getX)
                 .average()
-                .orElse(50.0); // 평균 점수가 없으면 50점 기준
+                .orElse(50.0);
             
-            // 각 사분면별 카운트
+            // 각 사분면별 카운트 (히스토리 포인트 기준)
             int topLeftCount = 0;    // 가치 선점형: ROI > 0, Score < avgScore
             int topRightCount = 0;   // 트렌드 선점형: ROI > 0, Score >= avgScore
             int bottomLeftCount = 0;  // 역행 투자형: ROI <= 0, Score < avgScore
             int bottomRightCount = 0; // 후행 추종형: ROI <= 0, Score >= avgScore
             
-            for (Experiment e : completed) {
-                if (e.getRoi() == null) continue;
-                
-                double roi = e.getRoi();
-                int score = e.getScore();
+            for (PortfolioResultResponse.HistoryPoint point : history) {
+                double roi = point.getY();
+                int score = point.getX();
                 
                 if (roi > 0 && score < avgScore) {
                     topLeftCount++; // 가치 선점형
