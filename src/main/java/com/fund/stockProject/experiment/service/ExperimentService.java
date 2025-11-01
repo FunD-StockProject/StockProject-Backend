@@ -251,16 +251,22 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         final DayOfWeek dayOfWeek = now.getDayOfWeek(); // 요일
         Double price = 0.0d;
 
-        // Score 조회 및 검증
-        final Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(stockId, LocalDate.now());
+        // Score 조회 및 검증 - 오늘 날짜 우선, 없으면 최신 점수 사용
+        Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(stockId, LocalDate.now());
         if (scoreOptional.isEmpty()) {
-            log.warn("Score not found for stock - stockId: {}, date: {}", stockId, LocalDate.now());
-            return Mono.just(ExperimentSimpleResponse.builder()
-                .message("점수 정보를 찾을 수 없습니다")
-                .success(false)
-                .price(0.0d)
-                .build()
-            );
+            log.warn("Today's score not found for stock - stockId: {}, trying latest score", stockId);
+            // 오늘 날짜 점수가 없으면 최신 점수 조회 시도
+            scoreOptional = scoreRepository.findTopByStockIdOrderByDateDesc(stockId);
+            if (scoreOptional.isEmpty()) {
+                log.error("No score found for stock - stockId: {}", stockId);
+                return Mono.just(ExperimentSimpleResponse.builder()
+                    .message("점수 정보를 찾을 수 없습니다")
+                    .success(false)
+                    .price(0.0d)
+                    .build()
+                );
+            }
+            log.info("Using latest score instead of today's score for stockId: {}", stockId);
         }
         final Score findByStockIdAndDate = scoreOptional.get();
         int score = 9999;
