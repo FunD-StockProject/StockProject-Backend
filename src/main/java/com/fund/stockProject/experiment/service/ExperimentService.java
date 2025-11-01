@@ -646,8 +646,13 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         for (final Object[] row : experimentGroupByBuyAt) {
             // Object[]에서 데이터 추출: [buy_date, avg_roi, avg_score]
             LocalDate buyDate = ((java.sql.Date) row[0]).toLocalDate();
-            Double avgRoi = (Double) row[1];
-            Double avgScore = (Double) row[2];
+            // ROUND() 함수는 BigDecimal을 반환하므로 doubleValue()로 변환
+            Double avgRoi = row[1] instanceof java.math.BigDecimal 
+                ? ((java.math.BigDecimal) row[1]).doubleValue() 
+                : (Double) row[1];
+            Double avgScore = row[2] instanceof java.math.BigDecimal 
+                ? ((java.math.BigDecimal) row[2]).doubleValue() 
+                : (Double) row[2];
             
             reportPatternDtos.add(
                 ReportPatternDto.builder()
