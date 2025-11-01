@@ -247,3 +247,8 @@ gen
 # 외부 저장소 (별도 관리)
 StockProject-Frontend/
 open-trading-api/
+
+# 문서 및 스크립트 파일 (로컬 개발용)
+*.md
+!README.md
+*.sh
