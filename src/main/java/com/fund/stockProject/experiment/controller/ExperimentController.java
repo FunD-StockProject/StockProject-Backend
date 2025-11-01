@@ -113,4 +113,21 @@ public class ExperimentController {
             return ResponseEntity.internalServerError().body("에러: " + e.getMessage());
         }
     }
+
+    @PostMapping("/test/create-complete/{roiPercent}")
+    @Operation(summary = "[테스트] 완료된 실험 데이터 생성", description = "완료된 상태의 테스트 실험 데이터를 생성합니다 (ROI 지정)")
+    public ResponseEntity<String> createCompleteTestExperiment(
+        @AuthenticationPrincipal CustomUserDetails customUserDetails,
+        @PathVariable("roiPercent") Double roiPercent
+    ) {
+        try {
+            if (roiPercent < -100 || roiPercent > 1000) {
+                return ResponseEntity.badRequest().body("roiPercent은 -100~1000 사이여야 합니다.");
+            }
+            String result = experimentService.createCompleteTestExperiment(customUserDetails, roiPercent);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("에러: " + e.getMessage());
+        }
+    }
 }

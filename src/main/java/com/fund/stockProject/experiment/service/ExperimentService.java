@@ -1380,9 +1380,15 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             }
             final Score score = scoreOptional.get();
             COUNTRY country = getCountryFromExchangeNum(stock.getExchangeNum());
-            int testScore = country == COUNTRY.KOREA 
+            int baseScore = country == COUNTRY.KOREA 
                 ? score.getScoreKorea() 
                 : score.getScoreOversea();
+            
+            // 테스트를 위해 점수 변동 추가 (랜덤 -10 ~ +10)
+            // daysRemaining에 따라 다른 점수 생성 (테스트 다양성)
+            java.util.Random random = new java.util.Random();
+            int scoreVariation = (int)(random.nextDouble() * 21) - 10; // -10 ~ +10
+            int testScore = Math.max(0, Math.min(100, baseScore + scoreVariation));
 
             // 주가 정보 가져오기 (매수일 기준으로 과거 가격 사용)
             final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea(
@@ -1426,7 +1432,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
             experimentRepository.save(experiment);
 
-            // ExperimentTradeItem 생성
+            // ExperimentTradeItem 생성 (매수 시점)
             final ExperimentTradeItem experimentTradeItem = ExperimentTradeItem.builder()
                 .experiment(experiment)
                 .price(buyPrice)
@@ -1436,6 +1442,25 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 .build();
 
             experimentTradeItemRepository.save(experimentTradeItem);
+            
+            // 현재 시점의 ExperimentTradeItem도 생성 (점수가 변동했음을 보여주기 위해)
+            // 현재 점수는 매수일 점수와 다르게 설정
+            int currentScoreVariation = (int)(random.nextDouble() * 21) - 10; // -10 ~ +10
+            int currentScore = Math.max(0, Math.min(100, baseScore + currentScoreVariation));
+            // 현재 가격도 약간 변동
+            double priceVariationPercent = (random.nextDouble() * 10) - 5; // -5% ~ +5%
+            double currentPrice = buyPrice * (1 + priceVariationPercent / 100);
+            
+            LocalDateTime now = LocalDateTime.now();
+            ExperimentTradeItem currentTradeItem = ExperimentTradeItem.builder()
+                .experiment(experiment)
+                .price(currentPrice)
+                .roi(((currentPrice - buyPrice) / buyPrice) * 100)
+                .score(currentScore)
+                .tradeAt(now)
+                .build();
+            
+            experimentTradeItemRepository.save(currentTradeItem);
 
             // 남은 영업일 계산 확인
             LocalDate today = LocalDate.now();
@@ -1473,6 +1498,130 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             );
         } catch (Exception e) {
             log.error("테스트 실험 데이터 생성 실패", e);
+            return "에러: " + e.getMessage();
+        }
+    }
+
+    /**
+     * 테스트용: 완료된 실험 데이터 생성
+     * @param roiPercent 목표 ROI 퍼센트 (양수=수익, 음수=손실)
+     */
+    @Transactional
+    public String createCompleteTestExperiment(CustomUserDetails customUserDetails, double roiPercent) {
+        try {
+            // User 조회
+            final Optional<User> userById = userRepository.findByEmail(customUserDetails.getEmail());
+            if (userById.isEmpty()) {
+                return "사용자 정보를 찾을 수 없습니다.";
+            }
+            final User user = userById.get();
+
+            // 테스트용 주식 찾기
+            List<Stock> testStocks = stockRepository.findTop20ByOrderByCreatedAtDesc();
+            if (testStocks.isEmpty()) {
+                return "테스트용 주식을 찾을 수 없습니다. 먼저 주식 데이터를 추가해주세요.";
+            }
+            final Stock stock = testStocks.get(0);
+
+            // 5영업일 전 날짜 계산 (완료된 실험이므로)
+            LocalDate targetBuyDate = calculatePreviousBusinessDate(LocalDate.now());
+            LocalDateTime buyAt = targetBuyDate.atTime(10, 0);
+            LocalDateTime sellAt = LocalDateTime.now();
+
+            // Score 조회
+            Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(stock.getId(), targetBuyDate);
+            if (scoreOptional.isEmpty()) {
+                scoreOptional = scoreRepository.findTopByStockIdOrderByDateDesc(stock.getId());
+                if (scoreOptional.isEmpty()) {
+                    return "점수 정보를 찾을 수 없습니다.";
+                }
+            }
+            final Score score = scoreOptional.get();
+            COUNTRY country = getCountryFromExchangeNum(stock.getExchangeNum());
+            int baseScore = country == COUNTRY.KOREA 
+                ? score.getScoreKorea() 
+                : score.getScoreOversea();
+            
+            // 매수 시점 점수 (랜덤 변동)
+            java.util.Random random = new java.util.Random();
+            int buyScoreVariation = (int)(random.nextDouble() * 21) - 10;
+            int buyScore = Math.max(0, Math.min(100, baseScore + buyScoreVariation));
+            
+            // 현재 점수 (매수 시점과 다르게)
+            int currentScoreVariation = (int)(random.nextDouble() * 21) - 10;
+            int currentScore = Math.max(0, Math.min(100, baseScore + currentScoreVariation));
+
+            // 매수가 설정
+            Double buyPrice = 50000.0 + (random.nextDouble() * 100000); // 5만원 ~ 15만원 랜덤
+            
+            // ROI에 따라 매도가 계산
+            Double sellPrice = buyPrice * (1 + roiPercent / 100);
+            Double roi = roiPercent;
+
+            // 완료된 실험 데이터 생성
+            final Experiment experiment = Experiment.builder()
+                .user(user)
+                .stock(stock)
+                .status("COMPLETE")
+                .buyAt(buyAt)
+                .sellAt(sellAt)
+                .buyPrice(buyPrice)
+                .sellPrice(sellPrice)
+                .roi(roi)
+                .score(buyScore)
+                .build();
+
+            experimentRepository.save(experiment);
+
+            // ExperimentTradeItem 생성 (매수 시점)
+            final ExperimentTradeItem buyTradeItem = ExperimentTradeItem.builder()
+                .experiment(experiment)
+                .price(buyPrice)
+                .roi(0.0d)
+                .score(buyScore)
+                .tradeAt(buyAt)
+                .build();
+
+            experimentTradeItemRepository.save(buyTradeItem);
+            
+            // ExperimentTradeItem 생성 (매도 시점)
+            final ExperimentTradeItem sellTradeItem = ExperimentTradeItem.builder()
+                .experiment(experiment)
+                .price(sellPrice)
+                .roi(roi)
+                .score(currentScore)
+                .tradeAt(sellAt)
+                .build();
+
+            experimentTradeItemRepository.save(sellTradeItem);
+
+            return String.format(
+                "✅ 완료된 테스트 실험 데이터 생성 완료!\n\n" +
+                "실험 ID: %d\n" +
+                "종목: %s (%s)\n" +
+                "매수일: %s\n" +
+                "매도일: %s\n" +
+                "매수가: %.0f원\n" +
+                "매도가: %.0f원\n" +
+                "매수 시점 점수: %d점\n" +
+                "매도 시점 점수: %d점\n" +
+                "ROI: %.2f%%\n" +
+                "상태: %s\n\n" +
+                "프론트엔드에서 실험 목록을 확인해보세요!",
+                experiment.getId(),
+                stock.getSymbolName(),
+                stock.getSymbol(),
+                targetBuyDate,
+                LocalDate.now(),
+                buyPrice,
+                sellPrice,
+                buyScore,
+                currentScore,
+                roi,
+                experiment.getStatus()
+            );
+        } catch (Exception e) {
+            log.error("완료된 테스트 실험 데이터 생성 실패", e);
             return "에러: " + e.getMessage();
         }
     }
