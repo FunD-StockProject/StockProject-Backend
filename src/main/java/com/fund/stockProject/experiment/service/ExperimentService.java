@@ -689,6 +689,16 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         long purchasedCountAll = totalCompleted + totalProgress; // 전체 진행(완료+진행)
         long profitCount = completed.stream().filter(e -> e.getRoi() != null && e.getRoi() > 0).count();
 
+        // 이번 주 매수한 실험 수 계산
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfWeek = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            .toLocalDate()
+            .atStartOfDay();
+        LocalDateTime endOfWeek = now.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY))
+            .toLocalDate()
+            .atTime(LocalTime.MAX);
+        final int weeklyExperimentCount = experimentRepository.countExperimentsForWeekByUser(email, startOfWeek, endOfWeek);
+
         // 성공률(%) 및 구간 라벨 생성
         double successRateVal = totalCompleted == 0 ? 0.0 : (profitCount * 100.0 / totalCompleted);
         String successRateLabel;
@@ -805,7 +815,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .build();
 
         PortfolioResultResponse.ExperimentSummary summary = PortfolioResultResponse.ExperimentSummary.builder()
-            .totalExperiments(purchasedCountAll)
+            .totalExperiments(weeklyExperimentCount > 0 ? weeklyExperimentCount : purchasedCountAll) // 이번 주 실험 수, 없으면 전체
             .highestProfit(highest)
             .lowestProfit(lowest)
             .build();

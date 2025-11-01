@@ -113,8 +113,13 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
         + "    FROM experiment e "
         + "    JOIN users u ON e.user_id = u.id "
         + "    WHERE u.email = :email "
+        + "    AND e.status = 'COMPLETE' "
+        + "    AND e.roi IS NOT NULL "
         + ") AS sub "
         + "GROUP BY sub.buy_date "
         + "ORDER BY sub.buy_date ", nativeQuery = true)
     List<Object[]> findExperimentGroupByBuyAtByUser(@Param("email") String email);
+    
+    @Query("SELECT count(e) FROM Experiment e JOIN e.user u WHERE u.email = :email AND e.buyAt BETWEEN :startOfWeek and :endOfWeek")
+    int countExperimentsForWeekByUser(@Param("email") String email, @Param("startOfWeek") LocalDateTime startOfWeek, @Param("endOfWeek") LocalDateTime endOfWeek);
 }
