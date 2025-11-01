@@ -96,4 +96,21 @@ public class ExperimentController {
             return ResponseEntity.internalServerError().body("에러: " + e.getMessage());
         }
     }
+
+    @PostMapping("/test/create/{daysRemaining}")
+    @Operation(summary = "[테스트] D-day 테스트 데이터 생성", description = "지정된 남은 일수의 테스트 실험 데이터를 생성합니다")
+    public ResponseEntity<String> createTestExperiment(
+        @AuthenticationPrincipal CustomUserDetails customUserDetails,
+        @PathVariable("daysRemaining") Integer daysRemaining
+    ) {
+        try {
+            if (daysRemaining < 0 || daysRemaining > 5) {
+                return ResponseEntity.badRequest().body("daysRemaining은 0~5 사이여야 합니다. (0=D-5, 1=D-4, 2=D-3, 3=D-2, 4=D-1)");
+            }
+            String result = experimentService.createTestExperiment(customUserDetails, daysRemaining);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("에러: " + e.getMessage());
+        }
+    }
 }

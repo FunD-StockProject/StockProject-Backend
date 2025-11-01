@@ -1332,4 +1332,148 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
         return result.toString();
     }
+
+    /**
+     * 테스트용: D-day 상태의 테스트 실험 데이터 생성
+     * @param daysRemaining 남은 영업일 수 (0=D-5, 1=D-4, 2=D-3, 3=D-2, 4=D-1)
+     */
+    @Transactional
+    public String createTestExperiment(CustomUserDetails customUserDetails, int daysRemaining) {
+        try {
+            // User 조회
+            final Optional<User> userById = userRepository.findByEmail(customUserDetails.getEmail());
+            if (userById.isEmpty()) {
+                return "사용자 정보를 찾을 수 없습니다.";
+            }
+            final User user = userById.get();
+
+            // 테스트용 주식 찾기 (첫 번째 주식 또는 삼성전자 같은 종목)
+            List<Stock> testStocks = stockRepository.findTop20ByOrderByCreatedAtDesc();
+            if (testStocks.isEmpty()) {
+                return "테스트용 주식을 찾을 수 없습니다. 먼저 주식 데이터를 추가해주세요.";
+            }
+            final Stock stock = testStocks.get(0);
+
+            // 현재 날짜에서 daysRemaining만큼 과거로 이동 (영업일 기준)
+            LocalDate targetBuyDate = LocalDate.now();
+            int businessDaysToGoBack = daysRemaining;
+            
+            // 영업일 기준으로 과거 날짜 계산
+            while (businessDaysToGoBack > 0) {
+                targetBuyDate = targetBuyDate.minusDays(1);
+                DayOfWeek day = targetBuyDate.getDayOfWeek();
+                if (day != DayOfWeek.SATURDAY && day != DayOfWeek.SUNDAY) {
+                    businessDaysToGoBack--;
+                }
+            }
+
+            LocalDateTime buyAt = targetBuyDate.atTime(10, 0); // 오전 10시로 설정
+
+            // Score 조회 (매수일 기준)
+            Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(stock.getId(), targetBuyDate);
+            if (scoreOptional.isEmpty()) {
+                // 매수일 점수가 없으면 최신 점수 사용
+                scoreOptional = scoreRepository.findTopByStockIdOrderByDateDesc(stock.getId());
+                if (scoreOptional.isEmpty()) {
+                    return "점수 정보를 찾을 수 없습니다.";
+                }
+            }
+            final Score score = scoreOptional.get();
+            COUNTRY country = getCountryFromExchangeNum(stock.getExchangeNum());
+            int testScore = country == COUNTRY.KOREA 
+                ? score.getScoreKorea() 
+                : score.getScoreOversea();
+
+            // 주가 정보 가져오기 (매수일 기준으로 과거 가격 사용)
+            final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea(
+                stock.getId(),
+                stock.getSymbolName(),
+                stock.getSecurityName(),
+                stock.getSymbol(),
+                stock.getExchangeNum(),
+                getCountryFromExchangeNum(stock.getExchangeNum())
+            );
+
+            Double buyPrice;
+            try {
+                StockInfoResponse stockInfoResponse = securityStockInfoKorea.block();
+                if (stockInfoResponse == null) {
+                    // API 실패 시 기본값 사용
+                    buyPrice = 50000.0;
+                    log.warn("주가 정보를 가져올 수 없어 기본값 사용: {}", buyPrice);
+                } else {
+                    buyPrice = stockInfoResponse.getPrice() != null 
+                        ? stockInfoResponse.getPrice() 
+                        : (stockInfoResponse.getYesterdayPrice() != null 
+                            ? stockInfoResponse.getYesterdayPrice() 
+                            : 50000.0);
+                }
+            } catch (Exception e) {
+                log.warn("주가 정보 조회 실패, 기본값 사용: {}", e.getMessage());
+                buyPrice = 50000.0;
+            }
+
+            // 테스트 실험 데이터 생성
+            final Experiment experiment = Experiment.builder()
+                .user(user)
+                .stock(stock)
+                .status("PROGRESS")
+                .buyAt(buyAt)
+                .buyPrice(buyPrice)
+                .roi(0.0d)
+                .score(testScore)
+                .build();
+
+            experimentRepository.save(experiment);
+
+            // ExperimentTradeItem 생성
+            final ExperimentTradeItem experimentTradeItem = ExperimentTradeItem.builder()
+                .experiment(experiment)
+                .price(buyPrice)
+                .roi(0.0d)
+                .score(testScore)
+                .tradeAt(buyAt)
+                .build();
+
+            experimentTradeItemRepository.save(experimentTradeItem);
+
+            // 남은 영업일 계산 확인
+            LocalDate today = LocalDate.now();
+            int actualBusinessDays = 0;
+            LocalDate checkDate = targetBuyDate;
+            while (!checkDate.isAfter(today)) {
+                DayOfWeek day = checkDate.getDayOfWeek();
+                if (day != DayOfWeek.SATURDAY && day != DayOfWeek.SUNDAY) {
+                    actualBusinessDays++;
+                }
+                checkDate = checkDate.plusDays(1);
+            }
+            int calculatedDaysRemaining = Math.max(0, 5 - (actualBusinessDays - 1)); // 매수일 제외
+
+            return String.format(
+                "✅ 테스트 실험 데이터 생성 완료!\n\n" +
+                "실험 ID: %d\n" +
+                "종목: %s (%s)\n" +
+                "매수일: %s (%s)\n" +
+                "매수가: %.0f원\n" +
+                "점수: %d점\n" +
+                "상태: %s\n" +
+                "계산된 남은 영업일: %d일 (D-%d)\n\n" +
+                "프론트엔드에서 실험 목록을 확인해보세요!",
+                experiment.getId(),
+                stock.getSymbolName(),
+                stock.getSymbol(),
+                targetBuyDate,
+                targetBuyDate.getDayOfWeek(),
+                buyPrice,
+                testScore,
+                experiment.getStatus(),
+                calculatedDaysRemaining,
+                5 - calculatedDaysRemaining
+            );
+        } catch (Exception e) {
+            log.error("테스트 실험 데이터 생성 실패", e);
+            return "에러: " + e.getMessage();
+        }
+    }
 }
