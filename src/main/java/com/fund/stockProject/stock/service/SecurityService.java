@@ -45,12 +45,12 @@ public class SecurityService {
         if (country == COUNTRY.KOREA) {
             return webClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/quotations/inquire-price-2")
-                    .queryParam("fid_cond_mrkt_div_code", "J")
-                    .queryParam("fid_input_iscd", symbol)
+                    .queryParam("FID_COND_MRKT_DIV_CODE", "J")  // 레퍼런스에 따라 대문자로 수정
+                    .queryParam("FID_INPUT_ISCD", symbol)  // 레퍼런스에 따라 대문자로 수정
                     .build())
                 .headers(httpHeaders -> {
                     HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
-                    headers.set("tr_id", "FHKST01010100"); // 추가 헤더 설정
+                    headers.set("tr_id", "FHPST01010000"); // 레퍼런스에 따라 inquire-price-2는 FHPST01010000 사용
                     httpHeaders.addAll(headers);
                 })
                 .retrieve()
@@ -132,12 +132,12 @@ public class SecurityService {
         if (country == COUNTRY.KOREA) {
             return webClient.get()
                             .uri(uriBuilder -> uriBuilder.path("/uapi/domestic-stock/v1/quotations/inquire-price")
-                                                         .queryParam("FID_COND_MRKT_DIV_CODE", "J")
-                                                         .queryParam("FID_INPUT_ISCD", symbol)
+                                                         .queryParam("FID_COND_MRKT_DIV_CODE", "J")  // 레퍼런스에 따라 대문자 유지
+                                                         .queryParam("FID_INPUT_ISCD", symbol)  // 레퍼런스에 따라 대문자 유지
                                                          .build())
                             .headers(httpHeaders -> {
                                 HttpHeaders headers = securityHttpConfig.createSecurityHeaders(); // 항상 최신 헤더 가져오기
-                                headers.set("tr_id", "FHKST01010100"); // 추가 헤더 설정
+                                headers.set("tr_id", "FHKST01010100"); // 레퍼런스에 따라 inquire-price는 FHKST01010100 사용
                                 httpHeaders.addAll(headers);
                             })
                             .retrieve()
