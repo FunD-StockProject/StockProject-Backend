@@ -280,10 +280,14 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             getCountryFromExchangeNum(stock.getExchangeNum())
         );
 
-        // StockInfo 조회 및 검증
-        final Optional<StockInfoResponse> stockInfoOptional = securityStockInfoKorea.blockOptional();
-        if (stockInfoOptional.isEmpty()) {
-            log.warn("StockInfo not found for stock - stockId: {}", stockId);
+        // StockInfo 조회 및 검증 - 에러 시 null 반환하도록 처리
+        StockInfoResponse stockInfoResponse;
+        try {
+            stockInfoResponse = securityStockInfoKorea
+                .onErrorReturn(null)  // 에러 발생 시 null 반환
+                .block();
+        } catch (Exception e) {
+            log.warn("Failed to get StockInfo for stock - stockId: {}, error: {}", stockId, e.getMessage());
             return Mono.just(ExperimentSimpleResponse.builder()
                 .message("주가 정보를 가져올 수 없습니다")
                 .success(false)
@@ -291,8 +295,16 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 .build()
             );
         }
-
-        final StockInfoResponse stockInfoResponse = stockInfoOptional.get();
+        
+        if (stockInfoResponse == null) {
+            log.warn("StockInfo is null for stock - stockId: {}", stockId);
+            return Mono.just(ExperimentSimpleResponse.builder()
+                .message("주가 정보를 가져올 수 없습니다")
+                .success(false)
+                .price(0.0d)
+                .build()
+            );
+        }
 
         if (stockInfoResponse.getCountry().equals(COUNTRY.KOREA)) {
             score = findByStockIdAndDate.getScoreKorea();
