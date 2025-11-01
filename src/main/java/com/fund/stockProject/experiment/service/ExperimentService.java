@@ -282,28 +282,12 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             getCountryFromExchangeNum(stock.getExchangeNum())
         );
 
-        // StockInfo 조회 및 검증 - 에러 시 null 반환하도록 처리
+        // StockInfo 조회 - 차트와 동일한 방식으로 .block() 사용
         StockInfoResponse stockInfoResponse;
         try {
-            stockInfoResponse = securityStockInfoKorea
-                .onErrorResume(error -> {
-                    log.warn("Failed to get StockInfo for stock - stockId: {}, error: {}", stockId, error.getMessage());
-                    return Mono.empty();  // 에러 발생 시 빈 Mono 반환
-                })
-                .blockOptional()
-                .orElse(null);  // Optional이 비어있으면 null 반환
+            stockInfoResponse = securityStockInfoKorea.block();
         } catch (Exception e) {
             log.warn("Failed to get StockInfo for stock - stockId: {}, error: {}", stockId, e.getMessage());
-            return Mono.just(ExperimentSimpleResponse.builder()
-                .message("주가 정보를 가져올 수 없습니다")
-                .success(false)
-                .price(0.0d)
-                .build()
-            );
-        }
-        
-        if (stockInfoResponse == null) {
-            log.warn("StockInfo is null for stock - stockId: {}", stockId);
             return Mono.just(ExperimentSimpleResponse.builder()
                 .message("주가 정보를 가져올 수 없습니다")
                 .success(false)
