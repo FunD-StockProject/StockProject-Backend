@@ -84,19 +84,35 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             final Optional<Stock> bySymbol = stockRepository.findBySymbol(experiment.getStock().getSymbol());
 
             if (bySymbol.isEmpty()) {
-                throw new NoSuchElementException("No Stock Found");
+                log.warn("Stock not found for symbol: {}, experimentId: {}", 
+                    experiment.getStock().getSymbol(), experiment.getId());
+                continue; // 해당 실험을 건너뛰고 다음 실험 처리
             }
 
             final Stock stock = bySymbol.get();
 
-            StockInfoResponse stockInfoKorea = securityService.getSecurityStockInfoKorea(
-                stock.getId(),
-                stock.getSymbolName(),
-                stock.getSecurityName(),
-                stock.getSymbol(),
-                stock.getExchangeNum(),
-                getCountryFromExchangeNum(stock.getExchangeNum())
-            ).block();
+            // StockInfo 조회 시 타임아웃이나 에러 처리
+            StockInfoResponse stockInfoKorea;
+            try {
+                stockInfoKorea = securityService.getSecurityStockInfoKorea(
+                    stock.getId(),
+                    stock.getSymbolName(),
+                    stock.getSecurityName(),
+                    stock.getSymbol(),
+                    stock.getExchangeNum(),
+                    getCountryFromExchangeNum(stock.getExchangeNum())
+                ).block();
+                
+                if (stockInfoKorea == null) {
+                    log.warn("StockInfo is null for stockId: {}, experimentId: {}", 
+                        stock.getId(), experiment.getId());
+                    continue; // 해당 실험을 건너뛰고 다음 실험 처리
+                }
+            } catch (Exception e) {
+                log.error("Failed to get StockInfo for stockId: {}, experimentId: {}", 
+                    stock.getId(), experiment.getId(), e);
+                continue; // 해당 실험을 건너뛰고 다음 실험 처리
+            }
 
             if (experiment.getStatus().equals("PROGRESS")) {
                 progressExperimentsInfo.add(ExperimentInfoResponse.builder()
@@ -150,9 +166,27 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
      * */
     public Mono<ExperimentStatusDetailResponse> getExperimentStatusDetail(final Integer experimentId) {
         // 자세히 보기 선택한 실험 데이터 조회
-        final Experiment experiment = experimentRepository.findExperimentByExperimentId(experimentId).get();
+        final Optional<Experiment> experimentOptional = experimentRepository.findExperimentByExperimentId(experimentId);
+        if (experimentOptional.isEmpty()) {
+            log.warn("Experiment not found - experimentId: {}", experimentId);
+            return Mono.error(new NoSuchElementException("실험을 찾을 수 없습니다"));
+        }
+        final Experiment experiment = experimentOptional.get();
+        
         // 실험 데이터에 해당하는 자동 모의 실험 내역 조회
         final List<ExperimentTradeItem> experimentTradeItems = experimentTradeItemRepository.findExperimentTradeItemsByExperimentId(experimentId);
+        
+        // experimentTradeItems가 비어있을 수 있음
+        if (experimentTradeItems.isEmpty()) {
+            log.warn("No trade items found for experimentId: {}", experimentId);
+            return Mono.just(ExperimentStatusDetailResponse.builder()
+                .tradeInfos(new ArrayList<>())
+                .roi(0.0)
+                .status(experiment.getStatus())
+                .symbolName(experiment.getStock().getSymbolName())
+                .build());
+        }
+        
         // 가장 최근 수익률 조회
         final ExperimentTradeItem recentExperimentTradeItem = experimentTradeItems.get(experimentTradeItems.size() - 1);
 
