@@ -56,4 +56,30 @@ public interface ScoreRepository extends JpaRepository<Score, Integer> {
      * stock_id로 최신 날짜의 Score 데이터 단건 조회
      */
     Optional<Score> findTopByStockIdOrderByDateDesc(Integer stockId);
+
+    /**
+     * 각 stock별 최신 Score 데이터를 조회 (해외 종목용)
+     * s.scoreKorea = 9999 조건으로 해외 종목만 필터링
+     */
+    @Query("""
+        SELECT s 
+        FROM Score s 
+        WHERE s.scoreKorea = 9999 
+        AND s.date = (SELECT MAX(s2.date) FROM Score s2 WHERE s2.stockId = s.stockId AND s2.scoreKorea = 9999)
+        ORDER BY s.date DESC, s.diff DESC
+    """)
+    List<Score> findLatestScoresByCountryOversea();
+
+    /**
+     * 각 stock별 최신 Score 데이터를 조회 (국내 종목용)
+     * s.scoreOversea = 9999 조건으로 국내 종목만 필터링
+     */
+    @Query("""
+        SELECT s 
+        FROM Score s 
+        WHERE s.scoreOversea = 9999 
+        AND s.date = (SELECT MAX(s2.date) FROM Score s2 WHERE s2.stockId = s.stockId AND s2.scoreOversea = 9999)
+        ORDER BY s.date DESC, s.diff DESC
+    """)
+    List<Score> findLatestScoresByCountryKorea();
 }
