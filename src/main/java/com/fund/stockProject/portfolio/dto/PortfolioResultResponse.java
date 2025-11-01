@@ -61,6 +61,7 @@ public class PortfolioResultResponse {
         private String maintainRate; // 미정: null
         private long purchasedCount;
         private long profitCount;
+        private Long sameGradeUserRate; // 전체 유저 중 동일 등급 유저 비율 (%)
     }
 
     @Getter

@@ -708,6 +708,28 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         else if (successRateVal <= 80) successRateLabel = "61~80%";
         else successRateLabel = "81~100%";
 
+        // 동일 등급 전체 유저 비율 계산
+        int startRange = 0;
+        int endRange;
+        if (successRateVal <= 20) {
+            endRange = 20;
+        } else if (successRateVal <= 40) {
+            startRange = 21;
+            endRange = 40;
+        } else if (successRateVal <= 60) {
+            startRange = 41;
+            endRange = 60;
+        } else if (successRateVal <= 80) {
+            startRange = 61;
+            endRange = 80;
+        } else {
+            startRange = 81;
+            endRange = 100;
+        }
+        final int countSameGradeUser = experimentRepository.countSameGradeUser(startRange, endRange);
+        final long userCount = userRepository.count();
+        long sameGradeUserRate = userCount == 0 ? 0L : (countSameGradeUser * 100L / userCount);
+
         // 최고/최저 수익률 기준 점수 및 구간명 산출
         PortfolioResultResponse.ProfitBound highest = null;
         PortfolioResultResponse.ProfitBound lowest = null;
@@ -802,6 +824,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .maintainRate(maintainRate)
             .purchasedCount(purchasedCountAll)
             .profitCount(profitCount)
+            .sameGradeUserRate(sameGradeUserRate)
             .build();
 
         // InvestmentPattern: 사용자 평균 수익률이 가장 높은 구간 레이블 기반으로 간단 추론
