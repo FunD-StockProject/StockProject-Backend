@@ -79,23 +79,49 @@ public class SecurityService {
     private Mono<StockInfoResponse> parseFStockInfoKorea2(String response, Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum, COUNTRY country) {
         try {
             JsonNode rootNode = objectMapper.readTree(response);
+            
+            // 에러 코드 확인
+            String resultCode = rootNode.path("rt_cd").asText("");
+            String messageCode = rootNode.path("msg_cd").asText("");
+            String message = rootNode.path("msg1").asText("");
+            
+            // 응답이 에러인 경우 처리
+            if (!resultCode.isEmpty() && !resultCode.equals("0")) {
+                log.warn("API returned error - rt_cd: {}, msg_cd: {}, msg1: {}, response: {}", 
+                    resultCode, messageCode, message, response);
+                return Mono.error(new UnsupportedOperationException("국내 종목 정보 조회 실패: " + message));
+            }
+            
             JsonNode outputNode = rootNode.get("output");
             StockInfoResponse stockInfoResponse = new StockInfoResponse();
 
-            if (outputNode != null) {
+            if (outputNode != null && !outputNode.isNull()) {
                 stockInfoResponse.setStockId(id);
                 stockInfoResponse.setSymbolName(symbolName);
                 stockInfoResponse.setSecurityName(securityName);
                 stockInfoResponse.setSymbol(symbol);
                 stockInfoResponse.setExchangeNum(exchangenum);
                 stockInfoResponse.setCountry(country);
-                stockInfoResponse.setYesterdayPrice(outputNode.get("stck_prdy_clpr").asDouble()); // 전일 종가
-                stockInfoResponse.setPrice(outputNode.get("stck_prpr").asDouble()); // 현재가
+                
+                // 안전하게 필드 파싱
+                JsonNode yesterdayPriceNode = outputNode.get("stck_prdy_clpr");
+                if (yesterdayPriceNode != null && !yesterdayPriceNode.isNull()) {
+                    stockInfoResponse.setYesterdayPrice(yesterdayPriceNode.asDouble());
+                }
+                
+                JsonNode currentPriceNode = outputNode.get("stck_prpr");
+                if (currentPriceNode != null && !currentPriceNode.isNull()) {
+                    stockInfoResponse.setPrice(currentPriceNode.asDouble());
+                }
+            } else {
+                log.warn("output node is null or missing - response: {}", response);
+                return Mono.error(new UnsupportedOperationException("국내 종목 정보가 없습니다"));
             }
 
             return Mono.just(stockInfoResponse);
         } catch (Exception e) {
-            return Mono.error(new UnsupportedOperationException("국내 종목 정보가 없습니다"));
+            log.error("Failed to parse StockInfo response - response: {}, error: {}", response, e.getMessage(), e);
+            return Mono.error(new UnsupportedOperationException("국내 종목 정보가 없습니다: " + e.getMessage()));
         }
     }
 
