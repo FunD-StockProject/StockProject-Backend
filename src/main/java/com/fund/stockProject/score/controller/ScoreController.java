@@ -23,7 +23,7 @@ public class ScoreController {
     private final ScoreService scoreService;
 
     @Operation(summary = "종목페이지 - 인간지표 점수 조회", description = "종목페이지 - 인간지표 점수 조회")
-    @GetMapping("{id}/score/{country}")
+    @GetMapping("/{id}/score/{country}")
     public ResponseEntity<ScoreResponse> getScore(@PathVariable("id") Integer id, final @PathVariable("country") COUNTRY country) {
         return ResponseEntity.ok(scoreService.getScoreById(id, country));
     }
@@ -40,7 +40,7 @@ public class ScoreController {
         return ResponseEntity.ok(keywords);
     }
 
-    @GetMapping("score/index")
+    @GetMapping("/score/index")
     public ResponseEntity<ScoreIndexResponse> getIndexScore() {
         return ResponseEntity.ok(scoreService.getIndexScore());
     }
