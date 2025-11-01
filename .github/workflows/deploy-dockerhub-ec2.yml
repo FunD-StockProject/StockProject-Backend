@@ -70,6 +70,8 @@ jobs:
           # GitHub 시크릿에서 .env 파일 생성
           if [ -n "${JASYPT_ENCRYPTOR_PASSWORD:-}" ]; then
             printf "JASYPT_ENCRYPTOR_PASSWORD=%s\n" "$JASYPT_ENCRYPTOR_PASSWORD" | ssh -o StrictHostKeyChecking=no "$EC2_HOST" "cat > $DEPLOY_DIR/config/.env && chmod 600 $DEPLOY_DIR/config/.env"
+            # .env 파일 생성 확인
+            ssh -o StrictHostKeyChecking=no "$EC2_HOST" "ls -la $DEPLOY_DIR/config/.env && echo '파일 내용 확인 (비밀번호 제외):' && cat $DEPLOY_DIR/config/.env | sed 's/=.*/=***/'"
             echo "✅ .env 파일 생성 완료"
           else
             echo "⚠️ JASYPT_ENCRYPTOR_PASSWORD 시크릿이 설정되지 않았습니다"
@@ -102,6 +104,17 @@ jobs:
             echo '=== 최신 이미지 Pull ==='
             # 최신 이미지 pull
             docker compose pull
+            
+            echo '=== 환경 변수 확인 ==='
+            # .env 파일 존재 확인
+            if [ -f config/.env ]; then
+              echo '✅ config/.env 파일 존재'
+              echo '환경 변수 확인 (비밀번호 제외):'
+              cat config/.env | sed 's/=.*/=***/'
+            else
+              echo '❌ config/.env 파일이 존재하지 않습니다!'
+              exit 1
+            fi
             
             echo '=== 컨테이너 시작 ==='
             # 컨테이너 시작
