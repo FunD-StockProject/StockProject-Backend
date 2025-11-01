@@ -114,6 +114,49 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 continue; // 해당 실험을 건너뛰고 다음 실험 처리
             }
 
+            // 매수 시점 점수
+            final int buyScore = experiment.getScore();
+            
+            // 현재 시점 점수 조회: 최근 ExperimentTradeItem이 있으면 그것의 score 사용, 없으면 Score 테이블에서 최신 점수 조회
+            int currentScore = buyScore; // 기본값은 매수 시점 점수
+            final List<ExperimentTradeItem> tradeItems = experimentTradeItemRepository.findExperimentTradeItemsByExperimentId(experiment.getId());
+            if (!tradeItems.isEmpty()) {
+                // 가장 최근 trade item의 score 사용
+                currentScore = tradeItems.get(tradeItems.size() - 1).getScore();
+            } else {
+                // trade item이 없으면 Score 테이블에서 최신 점수 조회
+                try {
+                    final Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(stock.getId(), LocalDate.now());
+                    if (scoreOptional.isEmpty()) {
+                        final Optional<Score> latestScoreOptional = scoreRepository.findTopByStockIdOrderByDateDesc(stock.getId());
+                        if (latestScoreOptional.isPresent()) {
+                            final Score latestScore = latestScoreOptional.get();
+                            if (stockInfoKorea.getCountry().equals(COUNTRY.KOREA)) {
+                                currentScore = latestScore.getScoreKorea();
+                            } else {
+                                currentScore = latestScore.getScoreOversea();
+                            }
+                        }
+                    } else {
+                        final Score todayScore = scoreOptional.get();
+                        if (stockInfoKorea.getCountry().equals(COUNTRY.KOREA)) {
+                            currentScore = todayScore.getScoreKorea();
+                        } else {
+                            currentScore = todayScore.getScoreOversea();
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to get current score for stockId: {}, experimentId: {}", 
+                        stock.getId(), experiment.getId(), e);
+                    // currentScore는 buyScore로 유지
+                }
+            }
+            
+            // 현재 가격
+            final Integer currentPrice = stockInfoKorea.getPrice() != null 
+                ? stockInfoKorea.getPrice().intValue() 
+                : experiment.getBuyPrice().intValue();
+
             if (experiment.getStatus().equals("PROGRESS")) {
                 progressExperimentsInfo.add(ExperimentInfoResponse.builder()
                     .experimentId(experiment.getId())
@@ -123,6 +166,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                     .symbolName(stock.getSymbolName())
                     .status(experiment.getStatus())
                     .country(stockInfoKorea.getCountry())
+                    .buyScore(buyScore)
+                    .currentScore(currentScore)
+                    .currentPrice(currentPrice)
+                    .stockId(stock.getId())
                     .build());
 
                 continue;
@@ -136,6 +183,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 .symbolName(stock.getSymbolName())
                 .status(experiment.getStatus())
                 .country(stockInfoKorea.getCountry())
+                .buyScore(buyScore)
+                .currentScore(currentScore)
+                .currentPrice(currentPrice)
+                .stockId(stock.getId())
                 .build());
         }
 
@@ -177,22 +228,89 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         // 실험 데이터에 해당하는 자동 모의 실험 내역 조회
         final List<ExperimentTradeItem> experimentTradeItems = experimentTradeItemRepository.findExperimentTradeItemsByExperimentId(experimentId);
         
+        // 매수 시점 점수
+        final int buyScore = experiment.getScore();
+        
+        // 현재 시점 점수와 현재 가격 조회
+        int currentScore = buyScore;
+        Integer currentPrice = experiment.getBuyPrice().intValue();
+        
+        // StockInfo 조회
+        final Stock stock = experiment.getStock();
+        StockInfoResponse stockInfo = null;
+        try {
+            stockInfo = securityService.getSecurityStockInfoKorea(
+                stock.getId(),
+                stock.getSymbolName(),
+                stock.getSecurityName(),
+                stock.getSymbol(),
+                stock.getExchangeNum(),
+                getCountryFromExchangeNum(stock.getExchangeNum())
+            ).block();
+            
+            if (stockInfo != null && stockInfo.getPrice() != null) {
+                currentPrice = stockInfo.getPrice().intValue();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to get StockInfo for experimentId: {}", experimentId, e);
+        }
+        
         // experimentTradeItems가 비어있을 수 있음
         if (experimentTradeItems.isEmpty()) {
             log.warn("No trade items found for experimentId: {}", experimentId);
+            
+            // trade item이 없으면 Score 테이블에서 최신 점수 조회
+            try {
+                final Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(stock.getId(), LocalDate.now());
+                if (scoreOptional.isEmpty()) {
+                    final Optional<Score> latestScoreOptional = scoreRepository.findTopByStockIdOrderByDateDesc(stock.getId());
+                    if (latestScoreOptional.isPresent()) {
+                        final Score latestScore = latestScoreOptional.get();
+                        final COUNTRY country = stockInfo != null ? stockInfo.getCountry() : getCountryFromExchangeNum(stock.getExchangeNum());
+                        if (country.equals(COUNTRY.KOREA)) {
+                            currentScore = latestScore.getScoreKorea();
+                        } else {
+                            currentScore = latestScore.getScoreOversea();
+                        }
+                    }
+                } else {
+                    final Score todayScore = scoreOptional.get();
+                    final COUNTRY country = stockInfo != null ? stockInfo.getCountry() : getCountryFromExchangeNum(stock.getExchangeNum());
+                    if (country.equals(COUNTRY.KOREA)) {
+                        currentScore = todayScore.getScoreKorea();
+                    } else {
+                        currentScore = todayScore.getScoreOversea();
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to get current score for experimentId: {}", experimentId, e);
+            }
+            
+            // 최종 수익률 계산: 현재 가격 기준
+            double roi = ((currentPrice - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
+            
             return Mono.just(ExperimentStatusDetailResponse.builder()
                 .tradeInfos(new ArrayList<>())
-                .roi(0.0)
+                .roi(roi)
                 .status(experiment.getStatus())
                 .symbolName(experiment.getStock().getSymbolName())
+                .buyScore(buyScore)
+                .currentScore(currentScore)
+                .buyPrice(experiment.getBuyPrice().intValue())
+                .currentPrice(currentPrice)
+                .buyAt(experiment.getBuyAt())
                 .build());
         }
         
         // 가장 최근 수익률 조회
         final ExperimentTradeItem recentExperimentTradeItem = experimentTradeItems.get(experimentTradeItems.size() - 1);
+        currentScore = recentExperimentTradeItem.getScore();
+        if (recentExperimentTradeItem.getPrice() != null) {
+            currentPrice = recentExperimentTradeItem.getPrice().intValue();
+        }
 
-        // 최종 수익률 계산:  ((판매가 - 매수가) / 매수가) * 100
-        double roi = ((recentExperimentTradeItem.getPrice() - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
+        // 최종 수익률 계산:  ((현재가 - 매수가) / 매수가) * 100
+        double roi = ((currentPrice - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
 
         final List<TradeInfo> tradeInfos = new ArrayList<>();
 
@@ -211,6 +329,11 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .roi(roi)
             .status(experiment.getStatus())
             .symbolName(experiment.getStock().getSymbolName())
+            .buyScore(buyScore)
+            .currentScore(currentScore)
+            .buyPrice(experiment.getBuyPrice().intValue())
+            .currentPrice(currentPrice)
+            .buyAt(experiment.getBuyAt())
             .build());
     }
 

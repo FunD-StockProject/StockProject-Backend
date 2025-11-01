@@ -22,4 +22,12 @@ public class ExperimentInfoResponse {
     private String status;
 
     private COUNTRY country;
+    
+    private Integer buyScore; // 매수 시점 점수
+    
+    private Integer currentScore; // 현재 시점 점수
+    
+    private Integer currentPrice; // 현재 가격
+    
+    private Integer stockId; // 종목 ID
 }
