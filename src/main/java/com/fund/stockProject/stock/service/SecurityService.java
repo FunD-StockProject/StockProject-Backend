@@ -78,6 +78,7 @@ public class SecurityService {
 
     private Mono<StockInfoResponse> parseFStockInfoKorea2(String response, Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum, COUNTRY country) {
         try {
+            log.debug("Parsing StockInfo response - symbol: {}, response: {}", symbol, response);
             JsonNode rootNode = objectMapper.readTree(response);
             
             // 에러 코드 확인
@@ -87,41 +88,59 @@ public class SecurityService {
             
             // 응답이 에러인 경우 처리
             if (!resultCode.isEmpty() && !resultCode.equals("0")) {
-                log.warn("API returned error - rt_cd: {}, msg_cd: {}, msg1: {}, response: {}", 
-                    resultCode, messageCode, message, response);
-                return Mono.error(new UnsupportedOperationException("국내 종목 정보 조회 실패: " + message));
+                log.error("API returned error - symbol: {}, rt_cd: {}, msg_cd: {}, msg1: {}, full response: {}", 
+                    symbol, resultCode, messageCode, message, response);
+                return Mono.error(new UnsupportedOperationException("국내 종목 정보 조회 실패: " + message + " (rt_cd: " + resultCode + ")"));
             }
             
             JsonNode outputNode = rootNode.get("output");
             StockInfoResponse stockInfoResponse = new StockInfoResponse();
+            
+            // 기본 정보 설정 (output이 없어도)
+            stockInfoResponse.setStockId(id);
+            stockInfoResponse.setSymbolName(symbolName);
+            stockInfoResponse.setSecurityName(securityName);
+            stockInfoResponse.setSymbol(symbol);
+            stockInfoResponse.setExchangeNum(exchangenum);
+            stockInfoResponse.setCountry(country);
 
-            if (outputNode != null && !outputNode.isNull()) {
-                stockInfoResponse.setStockId(id);
-                stockInfoResponse.setSymbolName(symbolName);
-                stockInfoResponse.setSecurityName(securityName);
-                stockInfoResponse.setSymbol(symbol);
-                stockInfoResponse.setExchangeNum(exchangenum);
-                stockInfoResponse.setCountry(country);
-                
+            if (outputNode != null && !outputNode.isNull() && !outputNode.isEmpty()) {
                 // 안전하게 필드 파싱
                 JsonNode yesterdayPriceNode = outputNode.get("stck_prdy_clpr");
-                if (yesterdayPriceNode != null && !yesterdayPriceNode.isNull()) {
-                    stockInfoResponse.setYesterdayPrice(yesterdayPriceNode.asDouble());
+                if (yesterdayPriceNode != null && !yesterdayPriceNode.isNull() && yesterdayPriceNode.canConvertToLong()) {
+                    try {
+                        stockInfoResponse.setYesterdayPrice(yesterdayPriceNode.asDouble());
+                    } catch (Exception e) {
+                        log.warn("Failed to parse yesterdayPrice for symbol: {}, value: {}", symbol, yesterdayPriceNode.asText());
+                    }
                 }
                 
                 JsonNode currentPriceNode = outputNode.get("stck_prpr");
-                if (currentPriceNode != null && !currentPriceNode.isNull()) {
-                    stockInfoResponse.setPrice(currentPriceNode.asDouble());
+                if (currentPriceNode != null && !currentPriceNode.isNull() && currentPriceNode.canConvertToLong()) {
+                    try {
+                        stockInfoResponse.setPrice(currentPriceNode.asDouble());
+                    } catch (Exception e) {
+                        log.warn("Failed to parse currentPrice for symbol: {}, value: {}", symbol, currentPriceNode.asText());
+                    }
+                }
+                
+                // 가격 정보가 하나도 없는 경우 에러
+                if (stockInfoResponse.getPrice() == null && stockInfoResponse.getYesterdayPrice() == null) {
+                    log.error("Both price and yesterdayPrice are missing - symbol: {}, output: {}", symbol, outputNode.toString());
+                    return Mono.error(new UnsupportedOperationException("주가 정보가 없습니다 (symbol: " + symbol + ")"));
                 }
             } else {
-                log.warn("output node is null or missing - response: {}", response);
-                return Mono.error(new UnsupportedOperationException("국내 종목 정보가 없습니다"));
+                log.error("output node is null, missing or empty - symbol: {}, full response: {}", symbol, response);
+                return Mono.error(new UnsupportedOperationException("주가 정보가 없습니다 (output node missing, symbol: " + symbol + ")"));
             }
 
+            log.debug("Successfully parsed StockInfo - symbol: {}, price: {}, yesterdayPrice: {}", 
+                symbol, stockInfoResponse.getPrice(), stockInfoResponse.getYesterdayPrice());
             return Mono.just(stockInfoResponse);
         } catch (Exception e) {
-            log.error("Failed to parse StockInfo response - response: {}, error: {}", response, e.getMessage(), e);
-            return Mono.error(new UnsupportedOperationException("국내 종목 정보가 없습니다: " + e.getMessage()));
+            log.error("Failed to parse StockInfo response - symbol: {}, response: {}, error: {}", 
+                symbol, response, e.getMessage(), e);
+            return Mono.error(new UnsupportedOperationException("국내 종목 정보 파싱 실패: " + e.getMessage()));
         }
     }
 
