@@ -271,7 +271,9 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         final Score findByStockIdAndDate = scoreOptional.get();
         int score = 9999;
 
-        final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea2(
+        // 차트에서 이미 작동하는 getSecurityStockInfoKorea 사용 (inquire-price API)
+        // inquire-price-2는 작동하지 않으므로 inquire-price로 변경
+        final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea(
             stock.getId(),
             stock.getSymbolName(),
             stock.getSecurityName(),
