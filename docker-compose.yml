@@ -16,6 +16,5 @@ services:
       # - SPRING_APPLICATION_JSON={"server":{"port":8080,"ssl":{"enabled":false}}}
     volumes:
       - ./logs:/app/logs
-      # keystore 필요 없으므로 config 마운트는 빼도 됨(남겨도 무방)
-      # - ./config:/app/config
+      - ./config:/app/config  # FCM credentials 및 기타 설정 파일 마운트
     restart: unless-stopped
