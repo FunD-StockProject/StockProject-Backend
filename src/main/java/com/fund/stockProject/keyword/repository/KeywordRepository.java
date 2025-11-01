@@ -31,6 +31,18 @@ public interface KeywordRepository extends JpaRepository<Keyword, Integer> {
         "ORDER BY k.frequency DESC")
     List<Keyword> findKeywordsByStockId(@Param("stockId") Integer stockId, Pageable pageable);
 
+    /**
+     * 여러 stockId에 대한 Keyword를 한 번에 조회 (배치 조회로 N+1 문제 해결)
+     * @param stockIds 조회할 stockId 목록
+     * @return StockKeyword 리스트 (stockId와 keyword 정보 포함)
+     */
+    @Query("SELECT sk FROM StockKeyword sk " +
+        "JOIN FETCH sk.keyword k " +
+        "JOIN FETCH sk.stock s " +
+        "WHERE sk.stock.id IN :stockIds " +
+        "ORDER BY sk.stock.id, k.frequency DESC")
+    List<com.fund.stockProject.keyword.entity.StockKeyword> findKeywordsByStockIds(@Param("stockIds") List<Integer> stockIds);
+
     @Query("SELECT k " +
            "FROM Keyword k " +
            "WHERE k.lastUsedAt = :today " +

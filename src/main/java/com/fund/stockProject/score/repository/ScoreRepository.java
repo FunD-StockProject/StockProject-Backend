@@ -43,10 +43,10 @@ public interface ScoreRepository extends JpaRepository<Score, Integer> {
 """)
     List<Score> findScoresWithoutTodayData(@Param("yesterday") LocalDate yesterday, @Param("today") LocalDate today);
 
-    @Query("SELECT s FROM Score s WHERE s.date IN (:today, :yesterday) AND s.scoreKorea = 9999")
+    @Query("SELECT s FROM Score s JOIN FETCH s.stock WHERE s.date IN (:today, :yesterday) AND s.scoreKorea = 9999")
     List<Score> findScoresByDatesOversea(@Param("today") LocalDate today, @Param("yesterday") LocalDate yesterday);
 
-    @Query("SELECT s FROM Score s WHERE s.date IN (:today, :yesterday) AND s.scoreOversea = 9999")
+    @Query("SELECT s FROM Score s JOIN FETCH s.stock WHERE s.date IN (:today, :yesterday) AND s.scoreOversea = 9999")
     List<Score> findScoresByDatesKorea(@Param("today") LocalDate today, @Param("yesterday") LocalDate yesterday);
 
     @Query("SELECT s FROM Score s WHERE s.date IN (:today) AND s.scoreOversea = 9999")
@@ -64,6 +64,7 @@ public interface ScoreRepository extends JpaRepository<Score, Integer> {
     @Query("""
         SELECT s 
         FROM Score s 
+        JOIN FETCH s.stock
         WHERE s.scoreKorea = 9999 
         AND s.date = (SELECT MAX(s2.date) FROM Score s2 WHERE s2.stockId = s.stockId AND s2.scoreKorea = 9999)
         ORDER BY s.date DESC, s.diff DESC
@@ -77,6 +78,7 @@ public interface ScoreRepository extends JpaRepository<Score, Integer> {
     @Query("""
         SELECT s 
         FROM Score s 
+        JOIN FETCH s.stock
         WHERE s.scoreOversea = 9999 
         AND s.date = (SELECT MAX(s2.date) FROM Score s2 WHERE s2.stockId = s.stockId AND s2.scoreOversea = 9999)
         ORDER BY s.date DESC, s.diff DESC
