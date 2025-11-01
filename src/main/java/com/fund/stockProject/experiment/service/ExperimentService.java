@@ -829,8 +829,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
         // InvestmentPattern: 차트에 표시되는 히스토리 데이터(날짜별 평균)를 기준으로 사분면 분류
         // 차트의 점 위치와 패턴 타입이 일치하도록 히스토리 데이터를 기준으로 계산
-        String patternType = "보수 추세형"; // 기본값
-        String patternDesc = "중간 점수대에서 안정적 추세를 선호"; // 기본값
+        String patternType = null; // 기본값: null
+        String patternDesc = null; // 기본값: null
         Double avgScore = 50.0; // 기본값: 50점
         
         // 히스토리 데이터를 기준으로 패턴 계산 (차트에 표시되는 점들과 동일한 데이터)
