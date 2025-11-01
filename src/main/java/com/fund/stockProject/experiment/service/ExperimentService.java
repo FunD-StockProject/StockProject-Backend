@@ -776,11 +776,22 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .average().orElse(Double.NaN));
 
         String userType;
-        if (successRateVal <= 20) userType = "초심자형";
-        else if (successRateVal <= 40) userType = "보수형";
-        else if (successRateVal <= 60) userType = "균형형";
-        else if (successRateVal <= 80) userType = "공격형";
-        else userType = "고수형";
+        // 성공률에 따른 인간지표 유형 결정
+        if (totalCompleted == 0) {
+            userType = "인간 아님"; // 실험이 완료되지 않은 경우
+        } else if (successRateVal == 0) {
+            userType = "완전 인간 아님"; // 성공률 0%
+        } else if (successRateVal <= 20) {
+            userType = "인간 아님"; // 성공률 0~20%
+        } else if (successRateVal <= 40) {
+            userType = "평범 인간"; // 성공률 21~40%
+        } else if (successRateVal <= 60) {
+            userType = "인간 맞음"; // 성공률 41~60%
+        } else if (successRateVal <= 80) {
+            userType = "인간 맞음"; // 성공률 61~80%
+        } else {
+            userType = "인간 완전 맞음"; // 성공률 81~100%
+        }
 
         String maintainRate = purchasedCountAll == 0 ? "0%" : Math.round(totalProgress * 100.0 / purchasedCountAll) + "%";
 
