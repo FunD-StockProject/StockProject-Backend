@@ -711,8 +711,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .filter(e -> e.getRoi() != null && e.getRoi() > 0)
             .count();
 
-        // 성공률(%) 및 구간 라벨 생성 (이번 주 완료된 실험 기준)
-        double successRateVal = weeklyCompletedCount == 0 ? 0.0 : (weeklyProfitCount * 100.0 / weeklyCompletedCount);
+        // 성공률(%) 및 구간 라벨 생성 (전체 완료된 실험 기준)
+        double successRateVal = totalCompleted == 0 ? 0.0 : (profitCount * 100.0 / totalCompleted);
         String successRateLabel;
         if (successRateVal == 0) successRateLabel = "0%";
         else if (successRateVal > 0 && successRateVal <= 20) successRateLabel = "0~20%";
@@ -815,21 +815,22 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .average().orElse(Double.NaN));
 
         String userType;
-        // 성공률에 따른 인간지표 유형 결정 (이번 주 완료된 실험 기준)
-        if (weeklyCompletedCount == 0) {
-            userType = "인간 아님"; // 이번 주 완료된 실험이 없는 경우
-        } else if (successRateVal == 0) {
-            userType = "완전 인간 아님"; // 성공률 0%
-        } else if (successRateVal <= 20) {
-            userType = "인간 아님"; // 성공률 0~20%
-        } else if (successRateVal <= 40) {
-            userType = "평범 인간"; // 성공률 21~40%
-        } else if (successRateVal <= 60) {
-            userType = "인간 맞음"; // 성공률 41~60%
-        } else if (successRateVal <= 80) {
-            userType = "인간 맞음"; // 성공률 61~80%
+        // 성공률에 따른 인간지표 유형 결정 (전체 완료된 실험 기준)
+        // 프론트엔드 정의와 일치: 완전 인간 아님(0~20%), 인간 아님(20~40%), 평범 인간(40~60%), 인간 맞음(60~80%), 인간 완전 맞음(80~100%)
+        if (totalCompleted == 0) {
+            userType = "인간 아님"; // 실험이 완료되지 않은 경우
+        } else if (successRateVal > 0 && successRateVal <= 20) {
+            userType = "완전 인간 아님"; // 성공률 0~20%
+        } else if (successRateVal > 20 && successRateVal <= 40) {
+            userType = "인간 아님"; // 성공률 20~40%
+        } else if (successRateVal > 40 && successRateVal <= 60) {
+            userType = "평범 인간"; // 성공률 40~60%
+        } else if (successRateVal > 60 && successRateVal <= 80) {
+            userType = "인간 맞음"; // 성공률 60~80%
+        } else if (successRateVal > 80) {
+            userType = "인간 완전 맞음"; // 성공률 80~100%
         } else {
-            userType = "인간 완전 맞음"; // 성공률 81~100%
+            userType = "완전 인간 아님"; // successRateVal == 0인 경우
         }
 
         String maintainRate = purchasedCountAll == 0 ? "0%" : Math.round(totalProgress * 100.0 / purchasedCountAll) + "%";
@@ -907,7 +908,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .build();
 
         PortfolioResultResponse.ExperimentSummary summary = PortfolioResultResponse.ExperimentSummary.builder()
-            .totalExperiments(weeklyExperimentCount) // 이번 주에 매수한 실험 수만 표시
+            .totalExperiments(weeklyCompletedCount) // 이번 주에 완료된 실험 수만 표시
             .highestProfit(highest)
             .lowestProfit(lowest)
             .build();

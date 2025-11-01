@@ -73,6 +73,7 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
         + "    JOIN users u ON e.user_id = u.id "
         + "    WHERE e.status = 'COMPLETE' "
         + "    GROUP BY u.email "
+        + "    HAVING COUNT(e.id) > 0 "
         + "   ) AS total "
         + " LEFT JOIN "
         + "  ( "
@@ -83,6 +84,7 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
         + "    GROUP BY u.email "
         + "  ) AS profitable "
         + " ON total.email = profitable.email "
+        + "  WHERE total.cnt > 0 "
         + ") a "
         + "WHERE a.ratio BETWEEN :startRange AND :endRange", nativeQuery = true)
     int countSameGradeUser(@Param("startRange") int startRange, @Param("endRange") int endRange);
