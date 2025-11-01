@@ -111,7 +111,7 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
         + "        e.roi, "
         + "        e.score "
         + "    FROM experiment e "
-        + "    JOIN user u ON e.user_id = u.id "
+        + "    JOIN users u ON e.user_id = u.id "
         + "    WHERE u.email = :email "
         + ") AS sub "
         + "GROUP BY sub.buy_date "
