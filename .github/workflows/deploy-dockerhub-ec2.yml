@@ -82,49 +82,17 @@ jobs:
             cd $DEPLOY_DIR
             
             echo '=== 기존 컨테이너 정리 중 ==='
+            # restart: unless-stopped를 우회하기 위해 먼저 명시적으로 정지
+            docker compose stop || true
             # 기존 컨테이너 중지 및 제거 (orphan 포함)
             docker compose down --remove-orphans || true
             
-            echo '=== 443 포트 사용 중인 컨테이너 확인 및 종료 ==='
-            # 모든 실행 중인 컨테이너 확인
-            docker ps --format '{{.ID}}\t{{.Names}}\t{{.Ports}}' | grep -E '0\.0\.0\.0:443|443->443|:443' || true
-            
-            # 포트 매핑으로 호스트의 443 포트를 사용하는 컨테이너 찾기 및 종료
-            docker ps --format '{{.ID}}' | while read container_id; do
-              port_mapping=\$(docker port \"\$container_id\" 2>/dev/null || echo '')
-              if echo \"\$port_mapping\" | grep -qE ':443|443/tcp'; then
-                container_name=\$(docker ps --format '{{.Names}}' --filter \"id=\$container_id\")
-                echo \"443 포트를 사용하는 컨테이너 발견: \$container_id (\$container_name)\"
-                docker stop \"\$container_id\" || true
-                docker rm \"\$container_id\" || true
-              fi
+            # 남아있는 stockproject 컨테이너 강제 제거
+            docker ps -a --filter 'name=stockproject' --format '{{.ID}}' | while read container_id; do
+              [ -n \"\$container_id\" ] && docker rm -f \"\$container_id\" 2>/dev/null || true
             done || true
             
-            # docker inspect를 사용하여 포트 바인딩 확인 (더 정확함)
-            docker ps -a --format '{{.ID}}' | while read container_id; do
-              port_bindings=\$(docker inspect \"\$container_id\" --format '{{range \$p, \$conf := .HostConfig.PortBindings}}{{\$p}} {{end}}' 2>/dev/null || echo '')
-              host_ports=\$(docker inspect \"\$container_id\" --format '{{range \$p, \$conf := .HostConfig.PortBindings}}{{range \$conf}}{{.HostPort}} {{end}}{{end}}' 2>/dev/null || echo '')
-              if echo \"\$host_ports\" | grep -qE '^443 | 443 |443$'; then
-                container_name=\$(docker inspect \"\$container_id\" --format '{{.Name}}' 2>/dev/null || echo '')
-                echo \"443 포트를 사용하는 컨테이너 발견 (inspect): \$container_id (\$container_name)\"
-                docker stop \"\$container_id\" 2>/dev/null || true
-                docker rm \"\$container_id\" 2>/dev/null || true
-              fi
-            done || true
-            
-            # 남아있는 모든 stockproject 관련 컨테이너 강제 종료
-            docker ps -a --filter \"name=stockproject\" --format '{{.ID}}' | while read container_id; do
-              [ -n \"\$container_id\" ] && docker rm -f \"\$container_id\" || true
-            done || true
-            
-            echo '=== 443 포트 사용 중인 시스템 프로세스 확인 ==='
-            # 443 포트를 사용하는 시스템 프로세스 확인 (권한 필요하지만 정보만 출력)
-            sudo lsof -ti:443 2>/dev/null | head -5 | while read pid; do
-              echo \"포트 443을 사용하는 프로세스 발견 (PID: \$pid)\"
-              ps -p \"\$pid\" -o pid,cmd || true
-            done || echo 'lsof를 사용할 수 없거나 포트를 사용하는 프로세스가 없습니다'
-            
-            # 잠시 대기 (포트 해제 시간 확보)
+            # 포트 해제를 위한 짧은 대기
             sleep 2
             
             echo '=== 최신 이미지 Pull ==='
