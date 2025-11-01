@@ -139,22 +139,23 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 .build());
         }
 
-        final int countByStatusCompleted = experimentRepository.countExperimentsByStatus("PROGRESS"); // 진행중인 실험 수
+        // 진행중인 실험 수는 progressExperimentsInfo의 크기로 계산 (사용자별)
+        final int countByStatusProgress = progressExperimentsInfo.size(); // 진행중인 실험 수
 
         final double averageRoi = experimentsByUserId.stream()
             .mapToDouble(Experiment::getRoi) // 각 ROI 값을 double로 추출
             .average()                            // OptionalDouble 반환
             .orElse(0.0);
 
-        final long count = experimentsByUserId.stream().filter(p -> p.getSellPrice() - p.getBuyPrice() > 0).count(); // 모의투자에 성공한 종목 개수
-        double successRate = ((double) count / experimentsByUserId.size()) * 100;
+        final long count = experimentsByUserId.stream().filter(p -> p.getSellPrice() != null && p.getSellPrice() - p.getBuyPrice() > 0).count(); // 모의투자에 성공한 종목 개수
+        double successRate = experimentsByUserId.size() > 0 ? ((double) count / experimentsByUserId.size()) * 100 : 0.0;
 
         final ExperimentStatusResponse experimentStatusResponse = ExperimentStatusResponse.builder()
             .progressExperiments(progressExperimentsInfo) // 진행중인 실험 정보
             .completeExperiments(completeExperimentsInfo) // 완료된 실험 정보
             .avgRoi(averageRoi) // 평균 수익률
             .totalTradeCount(experimentsByUserId.size()) // 총 실험 수 (전체 모의투자 개수)
-            .progressTradeCount(countByStatusCompleted) // 진행중인 실험 수 (진행중인 모의투자 개수)
+            .progressTradeCount(countByStatusProgress) // 진행중인 실험 수 (사용자별 진행중인 모의투자 개수)
             .successRate(successRate) // 성공률
             .build();
 
