@@ -502,8 +502,9 @@ public class StockService {
 
     /**
      * 지정된 조건에 따라 상위 9개의 Score 데이터를 조회합니다.
+     * 오늘/어제 데이터가 없을 경우 최신 데이터를 사용합니다.
      *
-     * @return 상위 3개의 Score 데이터
+     * @return 상위 9개의 Score 데이터
      */
     private List<Score> getTopScores(COUNTRY country) {
         LocalDate today = LocalDate.now();
@@ -515,6 +516,15 @@ public class StockService {
             allScores = scoreRepository.findScoresByDatesKorea(today, yesterday);
         } else {
             allScores = scoreRepository.findScoresByDatesOversea(today, yesterday);
+        }
+
+        // 오늘/어제 데이터가 없거나 부족한 경우 최신 데이터를 조회
+        if (allScores.isEmpty()) {
+            if (country == COUNTRY.KOREA) {
+                allScores = scoreRepository.findLatestScoresByCountryKorea();
+            } else {
+                allScores = scoreRepository.findLatestScoresByCountryOversea();
+            }
         }
 
         // 오늘 데이터와 어제 데이터를 구분
@@ -532,6 +542,7 @@ public class StockService {
                     return true; // 오늘 데이터는 무조건 포함
                 }
                 // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
+                // 최신 데이터도 오늘/어제 데이터에 없는 경우 포함
                 return !todayIdSet.contains(score.getStockId());
             })
             .forEach(topScores::add);
@@ -544,8 +555,9 @@ public class StockService {
 
     /**
      * 지정된 조건에 따라 하위 9개의 Score 데이터를 조회합니다.
+     * 오늘/어제 데이터가 없을 경우 최신 데이터를 사용합니다.
      *
-     * @return 하위 3개의 Score 데이터
+     * @return 하위 9개의 Score 데이터
      */
     private List<Score> getBottomScores(COUNTRY country) {
         LocalDate today = LocalDate.now();
@@ -557,6 +569,15 @@ public class StockService {
             allScores = scoreRepository.findScoresByDatesKorea(today, yesterday);
         } else {
             allScores = scoreRepository.findScoresByDatesOversea(today, yesterday);
+        }
+
+        // 오늘/어제 데이터가 없거나 부족한 경우 최신 데이터를 조회
+        if (allScores.isEmpty()) {
+            if (country == COUNTRY.KOREA) {
+                allScores = scoreRepository.findLatestScoresByCountryKorea();
+            } else {
+                allScores = scoreRepository.findLatestScoresByCountryOversea();
+            }
         }
 
         // 오늘 데이터와 어제 데이터를 구분
@@ -574,11 +595,12 @@ public class StockService {
                     return true; // 오늘 데이터는 무조건 포함
                 }
                 // 어제 데이터는 오늘 데이터에 없는 경우에만 포함
+                // 최신 데이터도 오늘/어제 데이터에 없는 경우 포함
                 return !todayIdSet.contains(score.getStockId());
             })
             .forEach(topScores::add);
 
-        // 상위 9개만 반환
+        // 하위 9개만 반환
         return topScores.stream()
             .limit(LIMITS)
             .toList();
