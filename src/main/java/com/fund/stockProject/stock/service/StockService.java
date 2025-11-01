@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.global.config.SecurityHttpConfig;
 import com.fund.stockProject.keyword.entity.Keyword;
+import com.fund.stockProject.keyword.entity.StockKeyword;
 import com.fund.stockProject.keyword.repository.KeywordRepository;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
@@ -616,21 +617,45 @@ public class StockService {
         COUNTRY country) {
         final List<StockDiffResponse> stockDiffResponses = new ArrayList<>();
 
+        // 모든 stockId를 수집하여 배치 조회로 N+1 문제 해결
+        List<Integer> stockIds = scores.stream()
+            .map(score -> score.getStock().getId())
+            .distinct()
+            .toList();
+
+        // 배치 조회로 모든 Keyword를 한 번에 가져오기
+        List<StockKeyword> stockKeywords = keywordRepository.findKeywordsByStockIds(stockIds);
+
+        // stockId별로 그룹화
+        java.util.Map<Integer, List<StockKeyword>> stockKeywordsByStockId = 
+            stockKeywords.stream()
+                .collect(Collectors.groupingBy(sk -> sk.getStock().getId()));
+
+        // SymbolName을 미리 Map으로 만들어서 효율적으로 접근
+        java.util.Map<Integer, String> symbolNameMap = scores.stream()
+            .collect(Collectors.toMap(
+                score -> score.getStock().getId(),
+                score -> score.getStock().getSymbolName(),
+                (existing, replacement) -> existing
+            ));
+
+        // Score별로 응답 생성
         for (final Score score : scores) {
-            final List<String> uniqueKeywords = keywordRepository.findKeywordsByStockId(
-                    score.getStock().getId(), PageRequest.of(0, 10))
+            Integer stockId = score.getStock().getId();
+            String symbolName = symbolNameMap.get(stockId);
+            
+            // 배치 조회 결과에서 키워드 가져오기 (stockId별로 그룹화된 결과 사용)
+            List<String> uniqueKeywords = stockKeywordsByStockId.getOrDefault(stockId, List.of())
                 .stream()
-                .map(Keyword::getName)
-                .filter(
-                    keyword -> (!keyword.equals(score.getStock().getSymbolName()) && isValidKeyword(
-                        keyword))) // symbolName과 일치하는 키워드 제거
+                .map(sk -> sk.getKeyword().getName())
+                .filter(keyword -> !keyword.equals(symbolName) && isValidKeyword(keyword))
                 .distinct()
                 .limit(2)
                 .toList();
 
             stockDiffResponses.add(StockDiffResponse.builder()
-                .stockId(score.getStock().getId())
-                .symbolName(score.getStock().getSymbolName())
+                .stockId(stockId)
+                .symbolName(symbolName)
                 .score(country == COUNTRY.KOREA ? score.getScoreKorea() : score.getScoreOversea())
                 .diff(score.getDiff())
                 .keywords(uniqueKeywords)
