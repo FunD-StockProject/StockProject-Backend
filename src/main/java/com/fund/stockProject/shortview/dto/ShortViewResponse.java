@@ -1,5 +1,7 @@
 package com.fund.stockProject.shortview.dto;
 
+import com.fund.stockProject.stock.domain.COUNTRY;
+import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockInfoResponse;
 import com.fund.stockProject.stock.entity.Stock;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -47,11 +49,14 @@ public class ShortViewResponse {
 
     @Schema(description = "추천 관련 키워드 최대 3개", example = "[\"AI\", \"반도체\", \"전기차\"]")
     private final List<String> keywords;
+    
+    @Schema(description = "종목 국가 정보 (KOREA 또는 OVERSEA)", example = "KOREA")
+    private final COUNTRY country;
 
     @Builder
     private ShortViewResponse(Integer stockId, String imageUrl, String stockName,
                               Double price, Double priceDiff, Double priceDiffPerCent,
-                              Integer score, Integer diff, List<String> keywords) {
+                              Integer score, Integer diff, List<String> keywords, COUNTRY country) {
         this.stockId = stockId;
         this.imageUrl = imageUrl;
         this.stockName = stockName;
@@ -61,6 +66,7 @@ public class ShortViewResponse {
         this.score = score;
         this.diff = diff;
         this.keywords = keywords;
+        this.country = country;
     }
 
     /**
@@ -82,6 +88,8 @@ public class ShortViewResponse {
                 .limit(3)
                 .collect(Collectors.toList());
 
+        COUNTRY country = getCountryFromExchangeNum(stock.getExchangeNum());
+        
         return ShortViewResponse.builder()
                 .stockId(stock.getId())
                 .imageUrl(stock.getImageUrl())
@@ -92,6 +100,7 @@ public class ShortViewResponse {
                 .score(score)
                 .diff(scoreDiff)
                 .keywords(keywordList)
+                .country(country)
                 .build();
     }
 
@@ -114,6 +123,8 @@ public class ShortViewResponse {
                 .limit(3)
                 .collect(Collectors.toList());
 
+        COUNTRY country = getCountryFromExchangeNum(stock.getExchangeNum());
+        
         return ShortViewResponse.builder()
                 .stockId(stock.getId())
                 .imageUrl(stock.getImageUrl())
@@ -124,6 +135,7 @@ public class ShortViewResponse {
                 .score(score)
                 .diff(scoreDiff)
                 .keywords(keywordList)
+                .country(country)
                 .build();
     }
 
@@ -131,5 +143,13 @@ public class ShortViewResponse {
         if (stock.getExchangeNum() == null) return true;
         String exch = stock.getExchangeNum().name();
         return exch.contains("KOSPI") || exch.contains("KOSDAQ") || exch.contains("코스피") || exch.contains("코스닥");
+    }
+    
+    private static COUNTRY getCountryFromExchangeNum(EXCHANGENUM exchangeNum) {
+        if (exchangeNum == null) {
+            return COUNTRY.KOREA; // 기본값
+        }
+        return List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF)
+            .contains(exchangeNum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
     }
 }

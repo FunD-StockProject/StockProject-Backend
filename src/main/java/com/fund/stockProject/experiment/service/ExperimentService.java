@@ -184,10 +184,30 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
     }
 
     public Mono<ExperimentSimpleResponse> buyExperiment(final CustomUserDetails customUserDetails, final Integer stockId, String country) {
+        // Stock 조회 및 검증
         final Optional<Stock> stockById = stockRepository.findStockById(stockId);
-        final Optional<User> userById = userRepository.findByEmail(customUserDetails.getEmail());
-
+        if (stockById.isEmpty()) {
+            log.warn("Stock not found - stockId: {}", stockId);
+            return Mono.just(ExperimentSimpleResponse.builder()
+                .message("종목을 찾을 수 없습니다")
+                .success(false)
+                .price(0.0d)
+                .build()
+            );
+        }
         final Stock stock = stockById.get();
+
+        // User 조회 및 검증
+        final Optional<User> userById = userRepository.findByEmail(customUserDetails.getEmail());
+        if (userById.isEmpty()) {
+            log.warn("User not found - email: {}", customUserDetails.getEmail());
+            return Mono.just(ExperimentSimpleResponse.builder()
+                .message("사용자 정보를 찾을 수 없습니다")
+                .success(false)
+                .price(0.0d)
+                .build()
+            );
+        }
         final User user = userById.get();
 
         final LocalDateTime now = LocalDateTime.now(); // 현재 날짜와 시간
@@ -197,7 +217,18 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         final DayOfWeek dayOfWeek = now.getDayOfWeek(); // 요일
         Double price = 0.0d;
 
-        final Score findByStockIdAndDate = scoreRepository.findByStockIdAndDate(stockId, LocalDate.now()).get();
+        // Score 조회 및 검증
+        final Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(stockId, LocalDate.now());
+        if (scoreOptional.isEmpty()) {
+            log.warn("Score not found for stock - stockId: {}, date: {}", stockId, LocalDate.now());
+            return Mono.just(ExperimentSimpleResponse.builder()
+                .message("점수 정보를 찾을 수 없습니다")
+                .success(false)
+                .price(0.0d)
+                .build()
+            );
+        }
+        final Score findByStockIdAndDate = scoreOptional.get();
         int score = 9999;
 
         final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea2(
@@ -209,11 +240,19 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             getCountryFromExchangeNum(stock.getExchangeNum())
         );
 
-        if (securityStockInfoKorea.blockOptional().isEmpty()) {
-            return Mono.empty();
+        // StockInfo 조회 및 검증
+        final Optional<StockInfoResponse> stockInfoOptional = securityStockInfoKorea.blockOptional();
+        if (stockInfoOptional.isEmpty()) {
+            log.warn("StockInfo not found for stock - stockId: {}", stockId);
+            return Mono.just(ExperimentSimpleResponse.builder()
+                .message("주가 정보를 가져올 수 없습니다")
+                .success(false)
+                .price(0.0d)
+                .build()
+            );
         }
 
-        final StockInfoResponse stockInfoResponse = securityStockInfoKorea.block();
+        final StockInfoResponse stockInfoResponse = stockInfoOptional.get();
 
         if (stockInfoResponse.getCountry().equals(COUNTRY.KOREA)) {
             score = findByStockIdAndDate.getScoreKorea();

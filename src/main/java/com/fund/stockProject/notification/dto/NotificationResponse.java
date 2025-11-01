@@ -2,11 +2,14 @@ package com.fund.stockProject.notification.dto;
 
 import com.fund.stockProject.notification.domain.NotificationType;
 import com.fund.stockProject.notification.entity.Notification;
+import com.fund.stockProject.stock.domain.COUNTRY;
+import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.time.Instant;
+import java.util.List;
 
 @Getter
 @Builder
@@ -32,8 +35,16 @@ public class NotificationResponse {
     private Boolean isRead;
     @Schema(description = "알림 생성 시각 (UTC ISO-8601)", example = "2025-08-24T12:34:56Z", type = "string", format = "date-time")
     private Instant createdAt;
+    
+    @Schema(description = "종목 국가 정보 (KOREA 또는 OVERSEA)", example = "KOREA")
+    private COUNTRY country;
 
     public static NotificationResponse fromEntity(Notification notification) {
+        COUNTRY country = null;
+        if (notification.getStock() != null && notification.getStock().getExchangeNum() != null) {
+            country = getCountryFromExchangeNum(notification.getStock().getExchangeNum());
+        }
+        
         return NotificationResponse.builder()
                 .id(notification.getId())
                 .stockName(notification.getStock() != null ? notification.getStock().getSymbolName() : null)
@@ -45,6 +56,12 @@ public class NotificationResponse {
                 .body(notification.getBody())
                 .isRead(notification.getIsRead())
                 .createdAt(notification.getCreatedAt())
+                .country(country)
                 .build();
+    }
+    
+    private static COUNTRY getCountryFromExchangeNum(EXCHANGENUM exchangeNum) {
+        return List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF)
+            .contains(exchangeNum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
     }
 }
