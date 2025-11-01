@@ -37,6 +37,15 @@ COPY scripts/*.py /app/
 
 COPY --from=build /app/build/libs/*.jar /app/app.jar
 
+# 로그 디렉토리 생성 (볼륨 마운트를 위한 준비)
+RUN mkdir -p /app/logs && chmod 777 /app/logs
+
 ENV TZ=Asia/Seoul
+ENV LOG_PATH=/app/logs
+
+# 로그 디렉토리를 볼륨으로 마운트 가능하도록 설정
+# docker run 시 -v $(pwd)/logs:/app/logs 옵션으로 호스트의 logs 디렉토리에 마운트 가능
+VOLUME ["/app/logs"]
+
 EXPOSE 8080
 ENTRYPOINT ["java","-jar","/app/app.jar","--server.port=8080"]

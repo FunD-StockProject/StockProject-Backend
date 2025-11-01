@@ -14,6 +14,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import com.fund.stockProject.global.dto.request.AccessTokenRequest;
 import com.fund.stockProject.global.dto.response.AccessTokenResponse;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Configuration
 public class SecurityHttpConfig {
 
@@ -45,6 +48,7 @@ public class SecurityHttpConfig {
     }
 
     private String fetchAccessTokenFromApi() {
+        log.info("Fetching access token from Korea Investment API");
         WebClient webClient = WebClient.create();
         AccessTokenRequest request = new AccessTokenRequest("client_credentials", appkey, appSecret);
 
@@ -60,12 +64,15 @@ public class SecurityHttpConfig {
             if (response != null) {
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
                 expiredDateTime = LocalDateTime.parse(response.getAccessTokenExpired(), formatter);
+                log.info("Access token fetched successfully - expires at: {}", expiredDateTime);
                 return response.getAccessToken();
             } else {
+                log.error("Failed to fetch access token: Response is null");
                 throw new RuntimeException("Failed to fetch access token: Response is null");
             }
 
         } catch (Exception e) {
+            log.error("Failed to fetch access token from Korea Investment API", e);
             throw new RuntimeException("Failed to fetch access token", e);
         }
     }
@@ -75,10 +82,9 @@ public class SecurityHttpConfig {
             synchronized (this) {
                 if (accessToken == null || LocalDateTime.now().isAfter(expiredDateTime)) {
                     String oldToken = accessToken;
+                    log.info("Token expired or null - refreshing. Expired at: {}, Old token: {}", expiredDateTime, oldToken != null ? "exists" : "null");
                     accessToken = fetchAccessTokenFromApi();
-                    System.out.println("토큰 기간 만료: " + expiredDateTime);
-                    System.out.println("이전 AccessToken: " + oldToken);
-                    System.out.println("새로운 AccessToken: " + accessToken);
+                    log.info("Token refreshed successfully");
                 }
             }
         }

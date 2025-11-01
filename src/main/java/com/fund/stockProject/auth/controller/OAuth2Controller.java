@@ -3,6 +3,7 @@ package com.fund.stockProject.auth.controller;
 import com.fund.stockProject.auth.dto.LoginResponse;
 import com.fund.stockProject.auth.service.OAuth2Service;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +19,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.Parameter;
 
+@Slf4j
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -36,14 +38,18 @@ public class OAuth2Controller {
             @Parameter(description = "인가 코드(Authorization Code)", example = "SplxlOBeZQQYbYS6WxSbIA") @RequestParam String code,
             @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/kakao") @RequestParam String state) {
         try {
+            log.info("Kakao login attempt - state: {}", state);
             LoginResponse response = oAuth2Service.kakaoLogin(code, state);
 
             if ("NEED_REGISTER".equals(response.getState())) {
+                log.info("Kakao login - registration required");
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response); // 404
             }
 
+            log.info("Kakao login successful");
             return ResponseEntity.ok(response); // 200 OK (로그인 성공)
         } catch (Exception e) {
+            log.error("Kakao login failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -59,14 +65,18 @@ public class OAuth2Controller {
             @Parameter(description = "인가 코드", example = "SplxlOBeZQQYbYS6WxSbIA") @RequestParam String code,
             @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/naver") @RequestParam String state) {
         try {
+            log.info("Naver login attempt - state: {}", state);
             LoginResponse response = oAuth2Service.naverLogin(code, state);
 
             if ("NEED_REGISTER".equals(response.getState())) {
+                log.info("Naver login - registration required");
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response); // 404
             }
 
+            log.info("Naver login successful");
             return ResponseEntity.ok(response); // 200 OK
         } catch (Exception e) {
+            log.error("Naver login failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(); // 500 Internal Server Error
         }
     }
@@ -82,14 +92,18 @@ public class OAuth2Controller {
             @Parameter(description = "인가 코드", example = "4/0AY0e-g7...") @RequestParam String code,
             @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/google") @RequestParam String state) {
         try {
+            log.info("Google login attempt - state: {}", state);
             LoginResponse response = oAuth2Service.googleLogin(code, state);
 
             if ("NEED_REGISTER".equals(response.getState())) {
+                log.info("Google login - registration required");
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response); // 404
             }
 
+            log.info("Google login successful");
             return ResponseEntity.ok(response); // 200 OK
         } catch (Exception e) {
+            log.error("Google login failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(); // 500 Internal Server Error
         }
     }
@@ -105,14 +119,18 @@ public class OAuth2Controller {
             @Parameter(description = "인가 코드", example = "c1d2e3f4...") @RequestParam String code,
             @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/apple") @RequestParam String state) {
         try {
+            log.info("Apple login attempt - state: {}", state);
             LoginResponse response = oAuth2Service.appleLogin(code, state);
 
             if ("NEED_REGISTER".equals(response.getState())) {
+                log.info("Apple login - registration required");
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response); // 404
             }
 
+            log.info("Apple login successful");
             return ResponseEntity.ok(response); // 200 OK
         } catch (Exception e) {
+            log.error("Apple login failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(); // 500 Internal Server Error
         }
     }

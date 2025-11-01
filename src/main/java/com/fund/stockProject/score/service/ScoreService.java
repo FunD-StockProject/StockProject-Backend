@@ -32,7 +32,9 @@ import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ScoreService {
@@ -66,6 +68,7 @@ public class ScoreService {
 
     public List<StockWordResponse> getWordCloud(final String symbol, final COUNTRY country) {
         try {
+            log.info("Starting word cloud generation - symbol: {}, country: {}", symbol, country);
             String scriptPath = "wc.py";
 
             ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol,
@@ -86,15 +89,18 @@ public class ScoreService {
                 output = outputFuture.get(65, TimeUnit.SECONDS);
             } catch (Exception ex) {
                 process.destroyForcibly();
+                log.error("Word cloud Python script timed out - symbol: {}, country: {}", symbol, country, ex);
                 throw new RuntimeException("Python script timed out", ex);
             }
 
             if (!process.waitFor(5, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
+                log.error("Word cloud Python process did not terminate in time - symbol: {}, country: {}", symbol, country);
                 throw new RuntimeException("Python process did not terminate in time");
             }
             int exitCode = process.exitValue();
             if (exitCode != 0) {
+                log.error("Word cloud Python script execution failed - symbol: {}, country: {}, exitCode: {}", symbol, country, exitCode);
                 throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
             }
 
@@ -110,9 +116,11 @@ public class ScoreService {
                 wordCloud.add(new StockWordResponse(word, freq));
             }
 
+            log.info("Word cloud generation completed successfully - symbol: {}, country: {}, wordCount: {}", symbol, country, wordCloud.size());
             return wordCloud;
 
         } catch (Exception e) {
+            log.error("Failed to execute word cloud Python script - symbol: {}, country: {}", symbol, country, e);
             throw new RuntimeException("Failed to execute Python script", e);
         } finally {
             if (pythonProcessSemaphore.availablePermits() < 2) {
@@ -299,6 +307,7 @@ public class ScoreService {
 
     private int executeScoreAI(String symbol, COUNTRY country) {
         try {
+            log.info("Starting score AI execution - symbol: {}, country: {}", symbol, country);
             // Python 스크립트 경로
             String scriptPath = "score.py";
 
@@ -321,24 +330,30 @@ public class ScoreService {
                 output = outputFuture.get(65, TimeUnit.SECONDS);
             } catch (Exception ex) {
                 process.destroyForcibly();
+                log.error("Score AI Python script timed out - symbol: {}, country: {}", symbol, country, ex);
                 throw new RuntimeException("Python script timed out", ex);
             }
 
             if (!process.waitFor(5, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
+                log.error("Score AI Python process did not terminate in time - symbol: {}, country: {}", symbol, country);
                 throw new RuntimeException("Python process did not terminate in time");
             }
             int exitCode = process.exitValue();
             if (exitCode != 0) {
+                log.error("Score AI Python script execution failed - symbol: {}, country: {}, exitCode: {}", symbol, country, exitCode);
                 throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
             }
 
             // Python 스크립트에서 출력된 JSON 파싱
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode jsonNode = objectMapper.readTree(output);
-            return jsonNode.get("final_score").asInt();
+            int finalScore = jsonNode.get("final_score").asInt();
+            log.info("Score AI execution completed successfully - symbol: {}, country: {}, score: {}", symbol, country, finalScore);
+            return finalScore;
 
         } catch (Exception e) {
+            log.error("Failed to execute score AI Python script - symbol: {}, country: {}", symbol, country, e);
             throw new RuntimeException("Failed to execute Python script", e);
         } finally {
             if (pythonProcessSemaphore.availablePermits() < 2) {
@@ -349,6 +364,7 @@ public class ScoreService {
 
     private ScoreKeywordResponse executeUpdateAI(String symbol, COUNTRY country) {
         try {
+            log.info("Starting update AI execution - symbol: {}, country: {}", symbol, country);
             // Python 스크립트 경로
             String scriptPath = "update.py";
 
@@ -369,15 +385,18 @@ public class ScoreService {
                 output = outputFuture.get(65, TimeUnit.SECONDS);
             } catch (Exception ex) {
                 process.destroyForcibly();
+                log.error("Update AI Python script timed out - symbol: {}, country: {}", symbol, country, ex);
                 throw new RuntimeException("Python script timed out", ex);
             }
 
             if (!process.waitFor(5, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
+                log.error("Update AI Python process did not terminate in time - symbol: {}, country: {}", symbol, country);
                 throw new RuntimeException("Python process did not terminate in time");
             }
             int exitCode = process.exitValue();
             if (exitCode != 0) {
+                log.error("Update AI Python script execution failed - symbol: {}, country: {}, exitCode: {}", symbol, country, exitCode);
                 throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
             }
 
@@ -393,9 +412,11 @@ public class ScoreService {
                 topKeywords.add(new KeywordDto(word, freq));
             }
 
+            log.info("Update AI execution completed successfully - symbol: {}, country: {}, score: {}, keywordCount: {}", symbol, country, finalScore, topKeywords.size());
             return new ScoreKeywordResponse(finalScore, topKeywords);
 
         } catch (Exception e) {
+            log.error("Failed to execute update AI Python script - symbol: {}, country: {}", symbol, country, e);
             throw new RuntimeException("Failed to execute Python script", e);
         } finally {
             if (pythonProcessSemaphore.availablePermits() < 2) {
