@@ -28,7 +28,7 @@ public class SwaggerConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("인간지표 Stock API")
-                        .description("인간지표 주식 투자 플랫폼 API")
+                        .description("인간지표 API")
                         .version("1.0.0")
                         .contact(new Contact()
                                 .name("인간지표 개발팀")
