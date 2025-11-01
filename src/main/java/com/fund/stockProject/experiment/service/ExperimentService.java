@@ -702,24 +702,29 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         // 성공률(%) 및 구간 라벨 생성
         double successRateVal = totalCompleted == 0 ? 0.0 : (profitCount * 100.0 / totalCompleted);
         String successRateLabel;
-        if (successRateVal <= 20) successRateLabel = "0~20%";
-        else if (successRateVal <= 40) successRateLabel = "21~40%";
-        else if (successRateVal <= 60) successRateLabel = "41~60%";
-        else if (successRateVal <= 80) successRateLabel = "61~80%";
+        if (successRateVal == 0) successRateLabel = "0%";
+        else if (successRateVal > 0 && successRateVal <= 20) successRateLabel = "0~20%";
+        else if (successRateVal > 20 && successRateVal <= 40) successRateLabel = "21~40%";
+        else if (successRateVal > 40 && successRateVal <= 60) successRateLabel = "41~60%";
+        else if (successRateVal > 60 && successRateVal <= 80) successRateLabel = "61~80%";
         else successRateLabel = "81~100%";
 
         // 동일 등급 전체 유저 비율 계산
         int startRange = 0;
         int endRange;
-        if (successRateVal <= 20) {
+        if (successRateVal == 0) {
+            startRange = 0;
+            endRange = 0;
+        } else if (successRateVal > 0 && successRateVal <= 20) {
+            startRange = 0;
             endRange = 20;
-        } else if (successRateVal <= 40) {
+        } else if (successRateVal > 20 && successRateVal <= 40) {
             startRange = 21;
             endRange = 40;
-        } else if (successRateVal <= 60) {
+        } else if (successRateVal > 40 && successRateVal <= 60) {
             startRange = 41;
             endRange = 60;
-        } else if (successRateVal <= 80) {
+        } else if (successRateVal > 60 && successRateVal <= 80) {
             startRange = 61;
             endRange = 80;
         } else {
@@ -890,7 +895,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .build();
 
         PortfolioResultResponse.ExperimentSummary summary = PortfolioResultResponse.ExperimentSummary.builder()
-            .totalExperiments(weeklyExperimentCount > 0 ? weeklyExperimentCount : purchasedCountAll) // 이번 주 실험 수, 없으면 전체
+            .totalExperiments(weeklyExperimentCount) // 이번 주에 매수한 실험 수만 표시
             .highestProfit(highest)
             .lowestProfit(lowest)
             .build();
