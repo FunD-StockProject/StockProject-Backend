@@ -252,3 +252,6 @@ open-trading-api/
 *.md
 !README.md
 *.sh
+
+# 외부 라이브러리 (별도 관리)
+lightweight-charts/
