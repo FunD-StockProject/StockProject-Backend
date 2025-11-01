@@ -3,19 +3,18 @@ services:
     image: muuigong/stock-app:latest
     container_name: stockproject-backend
     ports:
-      - "127.0.0.1:8443:443"   # Nginx만 접근 (백엔드가 내부 HTTPS:443로 뜬다는 전제)
-    env_file:
-      - ./config/.env  # config/.env 파일에서 환경 변수 로드 (JASYPT_ENCRYPTOR_PASSWORD 포함)
+      - "127.0.0.1:8080:8080"   # 내부 HTTP만 노출
     environment:
       - TZ=Asia/Seoul
       - LOG_PATH=/app/logs
+      - JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD}
+      # ← application.yml의 server.* 를 강제 덮어쓰기
+      - SERVER_PORT=8080
+      - SERVER_SSL_ENABLED=false
+      # (대안) SPRING_APPLICATION_JSON 써도 됨
+      # - SPRING_APPLICATION_JSON={"server":{"port":8080,"ssl":{"enabled":false}}}
     volumes:
       - ./logs:/app/logs
-      - ./config:/app/config
+      # keystore 필요 없으므로 config 마운트는 빼도 됨(남겨도 무방)
+      # - ./config:/app/config
     restart: unless-stopped
-    networks:
-      - stockproject-network
-
-networks:
-  stockproject-network:
-    driver: bridge
