@@ -71,6 +71,7 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
         + "  ( SELECT u.email, COUNT(e.id) AS cnt "
         + "    FROM experiment e "
         + "    JOIN users u ON e.user_id = u.id "
+        + "    WHERE e.status = 'COMPLETE' "
         + "    GROUP BY u.email "
         + "   ) AS total "
         + " LEFT JOIN "
@@ -78,7 +79,7 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
         + "    SELECT u.email, COUNT(e.id) AS cnt "
         + "    FROM experiment e "
         + "    JOIN users u ON e.user_id = u.id "
-        + "    WHERE e.roi > 0 "
+        + "    WHERE e.status = 'COMPLETE' AND e.roi > 0 "
         + "    GROUP BY u.email "
         + "  ) AS profitable "
         + " ON total.email = profitable.email "
@@ -122,4 +123,7 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
     
     @Query("SELECT count(e) FROM Experiment e JOIN e.user u WHERE u.email = :email AND e.buyAt BETWEEN :startOfWeek and :endOfWeek")
     int countExperimentsForWeekByUser(@Param("email") String email, @Param("startOfWeek") LocalDateTime startOfWeek, @Param("endOfWeek") LocalDateTime endOfWeek);
+    
+    @Query("SELECT count(e) FROM Experiment e JOIN e.user u WHERE u.email = :email AND e.status = 'COMPLETE' AND e.sellAt BETWEEN :startOfWeek and :endOfWeek")
+    int countCompletedExperimentsForWeekByUser(@Param("email") String email, @Param("startOfWeek") LocalDateTime startOfWeek, @Param("endOfWeek") LocalDateTime endOfWeek);
 }

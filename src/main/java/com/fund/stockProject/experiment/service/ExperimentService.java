@@ -698,9 +698,21 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .toLocalDate()
             .atTime(LocalTime.MAX);
         final int weeklyExperimentCount = experimentRepository.countExperimentsForWeekByUser(email, startOfWeek, endOfWeek);
+        
+        // 이번 주에 완료된 실험 수 계산 (sellAt 기준)
+        final int weeklyCompletedCount = experimentRepository.countCompletedExperimentsForWeekByUser(email, startOfWeek, endOfWeek);
+        // 이번 주에 완료된 실험 중 수익이 난 실험 수 계산
+        final List<Experiment> weeklyCompleted = completed.stream()
+            .filter(e -> e.getSellAt() != null && 
+                e.getSellAt().isAfter(startOfWeek.minusNanos(1)) && 
+                e.getSellAt().isBefore(endOfWeek.plusNanos(1)))
+            .collect(java.util.stream.Collectors.toList());
+        final long weeklyProfitCount = weeklyCompleted.stream()
+            .filter(e -> e.getRoi() != null && e.getRoi() > 0)
+            .count();
 
-        // 성공률(%) 및 구간 라벨 생성
-        double successRateVal = totalCompleted == 0 ? 0.0 : (profitCount * 100.0 / totalCompleted);
+        // 성공률(%) 및 구간 라벨 생성 (이번 주 완료된 실험 기준)
+        double successRateVal = weeklyCompletedCount == 0 ? 0.0 : (weeklyProfitCount * 100.0 / weeklyCompletedCount);
         String successRateLabel;
         if (successRateVal == 0) successRateLabel = "0%";
         else if (successRateVal > 0 && successRateVal <= 20) successRateLabel = "0~20%";
@@ -714,7 +726,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         int endRange;
         if (successRateVal == 0) {
             startRange = 0;
-            endRange = 0;
+            endRange = 0; // 정확히 0%인 경우
         } else if (successRateVal > 0 && successRateVal <= 20) {
             startRange = 0;
             endRange = 20;
@@ -803,9 +815,9 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .average().orElse(Double.NaN));
 
         String userType;
-        // 성공률에 따른 인간지표 유형 결정
-        if (totalCompleted == 0) {
-            userType = "인간 아님"; // 실험이 완료되지 않은 경우
+        // 성공률에 따른 인간지표 유형 결정 (이번 주 완료된 실험 기준)
+        if (weeklyCompletedCount == 0) {
+            userType = "인간 아님"; // 이번 주 완료된 실험이 없는 경우
         } else if (successRateVal == 0) {
             userType = "완전 인간 아님"; // 성공률 0%
         } else if (successRateVal <= 20) {
@@ -827,8 +839,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .userType(userType)
             .successRate(successRateLabel)
             .maintainRate(maintainRate)
-            .purchasedCount(purchasedCountAll)
-            .profitCount(profitCount)
+            .purchasedCount(weeklyCompletedCount) // 이번 주에 완료된 실험 수
+            .profitCount(weeklyProfitCount) // 이번 주에 완료된 실험 중 수익이 난 실험 수
             .sameGradeUserRate(sameGradeUserRate)
             .build();
 
