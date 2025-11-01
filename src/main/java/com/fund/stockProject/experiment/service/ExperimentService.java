@@ -774,19 +774,20 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("80점 이상").avg(u_80_100).median(medianByRange.apply(new int[]{80,100})).build());
 
         // 패턴 그래프용 히스토리 포인트 (score, roi, buyAt → x,y,label) - 사용자별 필터링
+        // 각 실험마다 개별 포인트 생성 (날짜별 그룹화 제거)
         final List<Object[]> experimentGroupByBuyAt = experimentRepository.findExperimentGroupByBuyAtByUser(email);
         List<PortfolioResultResponse.HistoryPoint> history = experimentGroupByBuyAt.stream().map(row -> {
                 java.time.LocalDate buyDate = ((java.sql.Date) row[0]).toLocalDate();
-                // ROUND() 함수는 BigDecimal을 반환하므로 doubleValue()로 변환
-                Double avgRoi = row[1] instanceof java.math.BigDecimal 
+                // ROI와 점수를 직접 사용 (평균 계산 제거)
+                Double roi = row[1] instanceof java.math.BigDecimal 
                     ? ((java.math.BigDecimal) row[1]).doubleValue() 
                     : (Double) row[1];
-                Double avgScore = row[2] instanceof java.math.BigDecimal 
-                    ? ((java.math.BigDecimal) row[2]).doubleValue() 
-                    : (Double) row[2];
+                Integer score = row[2] instanceof java.math.BigDecimal 
+                    ? ((java.math.BigDecimal) row[2]).intValue() 
+                    : ((Number) row[2]).intValue();
                 return PortfolioResultResponse.HistoryPoint.builder()
-                    .x(avgScore.intValue())
-                    .y(avgRoi)
+                    .x(score)
+                    .y(roi)
                     .label(PortfolioResultResponse.HistoryPoint.toLabel(buyDate.atStartOfDay()))
                     .build();
             })

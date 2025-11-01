@@ -102,22 +102,15 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
     List<Object[]> findExperimentGroupByBuyAt();
 
     @Query(value = "SELECT "
-        + "    sub.buy_date, "
-        + "    ROUND(AVG(sub.roi), 1) AS avg_roi, "
-        + "    ROUND(AVG(sub.score), 0) AS avg_score "
-        + "FROM ( "
-        + "    SELECT "
-        + "        DATE(e.buy_at) AS buy_date, "
-        + "        e.roi, "
-        + "        e.score "
-        + "    FROM experiment e "
-        + "    JOIN users u ON e.user_id = u.id "
-        + "    WHERE u.email = :email "
-        + "    AND e.status = 'COMPLETE' "
-        + "    AND e.roi IS NOT NULL "
-        + ") AS sub "
-        + "GROUP BY sub.buy_date "
-        + "ORDER BY sub.buy_date ", nativeQuery = true)
+        + "    DATE(e.buy_at) AS buy_date, "
+        + "    e.roi, "
+        + "    e.score "
+        + "FROM experiment e "
+        + "JOIN users u ON e.user_id = u.id "
+        + "WHERE u.email = :email "
+        + "AND e.status = 'COMPLETE' "
+        + "AND e.roi IS NOT NULL "
+        + "ORDER BY e.buy_at", nativeQuery = true)
     List<Object[]> findExperimentGroupByBuyAtByUser(@Param("email") String email);
     
     @Query("SELECT count(e) FROM Experiment e JOIN e.user u WHERE u.email = :email AND e.buyAt BETWEEN :startOfWeek and :endOfWeek")
