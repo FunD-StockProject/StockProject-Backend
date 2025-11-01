@@ -328,11 +328,24 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
             LocalTime koreaEndTime = LocalTime.of(17, 0);
 
-            // 종가 결정
+            // 종가 결정 - null 체크 추가
             if (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY) {
-                price = stockInfoResponse.getYesterdayPrice();
+                price = stockInfoResponse.getYesterdayPrice() != null ? stockInfoResponse.getYesterdayPrice() : stockInfoResponse.getPrice();
             } else {
-                price = current.isBefore(koreaEndTime) ? stockInfoResponse.getYesterdayPrice() : stockInfoResponse.getPrice();
+                Double selectedPrice = current.isBefore(koreaEndTime) ? stockInfoResponse.getYesterdayPrice() : stockInfoResponse.getPrice();
+                price = selectedPrice != null ? selectedPrice : (stockInfoResponse.getPrice() != null ? stockInfoResponse.getPrice() : stockInfoResponse.getYesterdayPrice());
+            }
+            
+            // 최종적으로도 null이면 에러
+            if (price == null) {
+                log.error("Price is null for stock - stockId: {}, stockInfo: price={}, yesterdayPrice={}", 
+                    stockId, stockInfoResponse.getPrice(), stockInfoResponse.getYesterdayPrice());
+                return Mono.just(ExperimentSimpleResponse.builder()
+                    .message("주가 정보를 가져올 수 없습니다")
+                    .success(false)
+                    .price(0.0d)
+                    .build()
+                );
             }
         } else {
             // 해외 주식 로직
@@ -351,14 +364,25 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             }
 
             LocalTime overseasEndTime = LocalTime.of(6, 0);
-            // 종가 결정
-            price = current.isBefore(overseasEndTime) ? stockInfoResponse.getYesterdayPrice() : stockInfoResponse.getPrice();
-
-            // 종가 결정
+            
+            // 종가 결정 - null 체크 추가
             if (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY) {
-                price = stockInfoResponse.getYesterdayPrice();
+                price = stockInfoResponse.getYesterdayPrice() != null ? stockInfoResponse.getYesterdayPrice() : stockInfoResponse.getPrice();
             } else {
-                price = current.isBefore(overseasEndTime) ? stockInfoResponse.getYesterdayPrice() : stockInfoResponse.getPrice();
+                Double selectedPrice = current.isBefore(overseasEndTime) ? stockInfoResponse.getYesterdayPrice() : stockInfoResponse.getPrice();
+                price = selectedPrice != null ? selectedPrice : (stockInfoResponse.getPrice() != null ? stockInfoResponse.getPrice() : stockInfoResponse.getYesterdayPrice());
+            }
+            
+            // 최종적으로도 null이면 에러
+            if (price == null) {
+                log.error("Price is null for overseas stock - stockId: {}, stockInfo: price={}, yesterdayPrice={}", 
+                    stockId, stockInfoResponse.getPrice(), stockInfoResponse.getYesterdayPrice());
+                return Mono.just(ExperimentSimpleResponse.builder()
+                    .message("주가 정보를 가져올 수 없습니다")
+                    .success(false)
+                    .price(0.0d)
+                    .build()
+                );
             }
         }
 
