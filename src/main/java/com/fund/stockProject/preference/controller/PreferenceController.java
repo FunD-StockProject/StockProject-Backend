@@ -1,6 +1,7 @@
 package com.fund.stockProject.preference.controller;
 
 import com.fund.stockProject.preference.dto.BookmarkInfoResponse;
+import com.fund.stockProject.preference.dto.StockPreferenceResponse;
 import com.fund.stockProject.preference.service.PreferenceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -159,5 +160,18 @@ public class PreferenceController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "Failed to toggle notification: " + e.getMessage()));
         }
+    }
+
+    @GetMapping("/stock/{stockId}")
+    @Operation(summary = "종목 관심/알림 여부 조회", description = "주어진 종목 ID에 대한 사용자의 관심 종목(북마크) 여부와 알림 활성화 여부를 반환합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(schema = @Schema(implementation = StockPreferenceResponse.class))),
+            @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content)
+    })
+    public ResponseEntity<StockPreferenceResponse> getStockPreference(
+            @Parameter(description = "조회할 종목 ID", example = "123", required = true)
+            @PathVariable Integer stockId) {
+        StockPreferenceResponse response = preferenceService.getStockPreference(stockId);
+        return ResponseEntity.ok(response);
     }
 }
