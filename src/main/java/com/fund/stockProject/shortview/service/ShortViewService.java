@@ -43,38 +43,64 @@ public class ShortViewService {
      * 사용자에게 추천할 주식 엔티티를 반환하는 메인 메서드입니다.
      * 점수와 sector 기반 가중치 랜덤 추천을 사용합니다.
      * "다시 보지 않음"으로 설정된 종목은 추천에서 제외합니다.
+     * 
+     * 성능 최적화: N+1 문제 해결을 위해 배치 조회 사용
      * @param user 현재 로그인한 사용자
      * @return 추천된 주식(Stock) 엔티티
      */
     public Stock getRecommendedStock(User user) {
         log.info("사용자(id:{})에게 가중치 기반 주식 추천을 시작합니다.", user.getId());
         
-        // 사용자가 "다시 보지 않음"으로 설정한 종목 ID 목록 조회
-        List<Integer> hiddenStockIds = preferenceRepository.findByUserIdAndPreferenceType(user.getId(), PreferenceType.NEVER_SHOW)
-                .stream()
-                .map(preference -> preference.getStock().getId())
-                .collect(Collectors.toList());
+        // 사용자가 "다시 보지 않음"으로 설정한 종목 ID 목록 조회 (성능 최적화: stockId만 직접 조회)
+        Set<Integer> hiddenStockIds = new HashSet<>(
+                preferenceRepository.findStockIdsByUserIdAndPreferenceType(user.getId(), PreferenceType.NEVER_SHOW)
+        );
         
         log.info("사용자(id:{})가 숨긴 종목 개수: {}", user.getId(), hiddenStockIds.size());
         
         LocalDate today = LocalDate.now();
         
-        // valid = true이고 점수가 있는 주식만 조회 (숨긴 종목 제외)
-        List<Stock> validStocks = stockRepository.findAll().stream()
-                .filter(stock -> stock.getValid() != null && stock.getValid()) // valid = true만
-                .filter(stock -> !hiddenStockIds.contains(stock.getId())) // 숨긴 종목 제외
-                .filter(stock -> hasScore(stock, today)) // 점수가 있는 주식만
+        // valid = true인 주식만 조회 (성능 최적화: DB에서 필터링)
+        List<Stock> validStocks = stockRepository.findAllValidStocks();
+        
+        // 숨긴 종목 제외
+        List<Stock> candidateStocks = validStocks.stream()
+                .filter(stock -> !hiddenStockIds.contains(stock.getId()))
                 .collect(Collectors.toList());
         
-        if (validStocks.isEmpty()) {
+        if (candidateStocks.isEmpty()) {
+            log.warn("사용자(id:{})에게 추천할 수 있는 종목이 없습니다. (valid=true인 종목 없음)", user.getId());
+            return null;
+        }
+        
+        // 배치로 점수 조회 (N+1 문제 해결)
+        List<Integer> candidateStockIds = candidateStocks.stream()
+                .map(Stock::getId)
+                .collect(Collectors.toList());
+        
+        // 오늘 날짜 점수와 최신 점수를 배치로 조회
+        List<Score> todayScores = scoreRepository.findTodayScoresByStockIds(candidateStockIds, today);
+        List<Score> latestScores = scoreRepository.findLatestScoresByStockIds(candidateStockIds);
+        
+        // stockId -> Score 맵 생성 (오늘 점수 우선, 없으면 최신 점수)
+        Map<Integer, Score> scoreMap = new HashMap<>();
+        todayScores.forEach(score -> scoreMap.put(score.getStockId(), score));
+        latestScores.forEach(score -> scoreMap.putIfAbsent(score.getStockId(), score));
+        
+        // 점수가 있는 주식만 필터링
+        List<Stock> stocksWithScore = candidateStocks.stream()
+                .filter(stock -> scoreMap.containsKey(stock.getId()))
+                .collect(Collectors.toList());
+        
+        if (stocksWithScore.isEmpty()) {
             log.warn("사용자(id:{})에게 추천할 수 있는 종목이 없습니다. (valid=true이고 점수가 있는 종목 없음)", user.getId());
             return null;
         }
         
-        log.info("추천 대상 주식 개수: {}개 (valid=true, 점수 있음)", validStocks.size());
+        log.info("추천 대상 주식 개수: {}개 (valid=true, 점수 있음)", stocksWithScore.size());
         
-        // 각 주식의 가중치 계산
-        List<StockWithWeight> stocksWithWeight = calculateWeights(validStocks, today);
+        // 각 주식의 가중치 계산 (점수 맵을 전달하여 메모리에서 조회)
+        List<StockWithWeight> stocksWithWeight = calculateWeights(stocksWithScore, scoreMap);
         
         // 가중치 기반 랜덤 선택
         Random random = new Random(System.currentTimeMillis() + user.getId());
@@ -87,25 +113,12 @@ public class ShortViewService {
     }
 
     /**
-     * 주식에 점수가 있는지 확인합니다.
-     */
-    private boolean hasScore(Stock stock, LocalDate today) {
-        // 오늘 날짜 점수 우선 확인
-        Optional<Score> todayScore = scoreRepository.findByStockIdAndDate(stock.getId(), today);
-        if (todayScore.isPresent()) {
-            return true;
-        }
-        
-        // 없으면 최신 점수 확인
-        Optional<Score> latestScore = scoreRepository.findTopByStockIdOrderByDateDesc(stock.getId());
-        return latestScore.isPresent();
-    }
-
-    /**
      * 각 주식의 가중치를 계산합니다.
      * 점수 기반 가중치와 sector 다양성 가중치를 결합합니다.
+     * 
+     * 성능 최적화: 점수 맵을 파라미터로 받아 메모리에서 조회 (DB 쿼리 없음)
      */
-    private List<StockWithWeight> calculateWeights(List<Stock> stocks, LocalDate today) {
+    private List<StockWithWeight> calculateWeights(List<Stock> stocks, Map<Integer, Score> scoreMap) {
         // Sector별 분포 계산 (다양성 확보를 위해)
         Map<SECTOR, Long> sectorCounts = stocks.stream()
                 .collect(Collectors.groupingBy(
@@ -119,8 +132,12 @@ public class ShortViewService {
                 .map(stock -> {
                     // 1. 점수 기반 가중치 (0-100점을 1-11 가중치로 변환, 부드러운 곡선)
                     // 이미 필터링되었으므로 점수가 반드시 존재함
-                    int score = getLatestScore(stock, today);
-                    double scoreWeight = calculateScoreWeight(score);
+                    Score score = scoreMap.get(stock.getId());
+                    if (score == null) {
+                        throw new IllegalStateException("주식(id:" + stock.getId() + ")에 점수가 없습니다.");
+                    }
+                    int scoreValue = getScoreByCountry(score, stock.getExchangeNum());
+                    double scoreWeight = calculateScoreWeight(scoreValue);
                     
                     // 2. Sector 다양성 가중치 (적게 나온 sector에 더 높은 가중치)
                     SECTOR sector = stock.getSector() != null ? stock.getSector() : SECTOR.UNKNOWN;
@@ -133,27 +150,6 @@ public class ShortViewService {
                     return new StockWithWeight(stock, totalWeight);
                 })
                 .collect(Collectors.toList());
-    }
-
-    /**
-     * 주식의 최신 점수를 조회합니다.
-     * 점수가 반드시 존재한다고 가정합니다. (필터링 후 호출되므로)
-     */
-    private int getLatestScore(Stock stock, LocalDate today) {
-        // 오늘 날짜 점수 우선 조회
-        Optional<Score> todayScore = scoreRepository.findByStockIdAndDate(stock.getId(), today);
-        if (todayScore.isPresent()) {
-            return getScoreByCountry(todayScore.get(), stock.getExchangeNum());
-        }
-        
-        // 없으면 최신 점수 조회 (반드시 존재함)
-        Optional<Score> latestScore = scoreRepository.findTopByStockIdOrderByDateDesc(stock.getId());
-        if (latestScore.isPresent()) {
-            return getScoreByCountry(latestScore.get(), stock.getExchangeNum());
-        }
-        
-        // 점수가 없으면 예외 발생 (이 경우는 발생하지 않아야 함)
-        throw new IllegalStateException("주식(id:" + stock.getId() + ")에 점수가 없습니다. valid=true 필터링 후에는 점수가 반드시 있어야 합니다.");
     }
 
     /**

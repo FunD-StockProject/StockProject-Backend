@@ -84,4 +84,22 @@ public interface ScoreRepository extends JpaRepository<Score, Integer> {
         ORDER BY s.date DESC, s.diff DESC
     """)
     List<Score> findLatestScoresByCountryKorea();
+
+    /**
+     * 여러 stockId에 대한 오늘 날짜 점수를 배치로 조회
+     */
+    @Query("SELECT s FROM Score s WHERE s.stockId IN :stockIds AND s.date = :today")
+    List<Score> findTodayScoresByStockIds(@Param("stockIds") List<Integer> stockIds, @Param("today") LocalDate today);
+
+    /**
+     * 여러 stockId에 대한 최신 점수를 배치로 조회
+     * 각 stockId별로 가장 최근 날짜의 점수만 조회
+     */
+    @Query("""
+        SELECT s 
+        FROM Score s 
+        WHERE s.stockId IN :stockIds 
+        AND s.date = (SELECT MAX(s2.date) FROM Score s2 WHERE s2.stockId = s.stockId)
+    """)
+    List<Score> findLatestScoresByStockIds(@Param("stockIds") List<Integer> stockIds);
 }

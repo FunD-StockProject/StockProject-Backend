@@ -32,4 +32,10 @@ public interface PreferenceRepository extends JpaRepository<Preference, Preferen
     @Transactional
     @Query("DELETE FROM Preference p WHERE p.user.id = :userId")
     void deleteByUserId(@Param("userId") Integer userId);
+
+    /**
+     * 사용자의 특정 타입 Preference의 stockId만 조회 (성능 최적화: N+1 문제 해결)
+     */
+    @Query("SELECT p.stock.id FROM Preference p WHERE p.user.id = :userId AND p.preferenceType = :preferenceType")
+    List<Integer> findStockIdsByUserIdAndPreferenceType(@Param("userId") Integer userId, @Param("preferenceType") PreferenceType preferenceType);
 }
