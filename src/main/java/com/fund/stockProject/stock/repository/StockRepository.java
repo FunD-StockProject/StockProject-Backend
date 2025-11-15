@@ -39,4 +39,10 @@ public interface StockRepository extends JpaRepository<Stock, Integer> {
 
     @Query("SELECT s.id FROM Stock s WHERE s.exchangeNum IN :exchangeNums AND s.valid = true")
     List<Integer> findIdsByExchangeNumIn(@Param("exchangeNums") List<EXCHANGENUM> exchangeNums);
+
+    /**
+     * valid=true인 주식만 조회 (성능 최적화)
+     */
+    @Query("SELECT s FROM Stock s WHERE s.valid = true")
+    List<Stock> findAllValidStocks();
 }
