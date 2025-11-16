@@ -932,19 +932,20 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         return "80점 이상";
     }
 
-    // 영업일 기준 실험 진행한 기간이 5일째인 실험 데이터 조회
+    // 영업일 기준 실험 진행한 기간이 5일 이상 지난 실험 데이터 조회
     @Transactional(readOnly = true)
     public List<Experiment> findExperimentsAfter5BusinessDays() {
         LocalDate fiveBusinessDaysAgo = calculatePreviousBusinessDate(LocalDate.now());
-        LocalDateTime start = fiveBusinessDaysAgo.atStartOfDay();
-        LocalDateTime end = fiveBusinessDaysAgo.atTime(LocalTime.MAX);
+        // 5영업일 전 날짜의 마지막 시간까지의 실험을 모두 조회 (5영업일 이상 지난 모든 실험)
+        LocalDateTime endDate = fiveBusinessDaysAgo.atTime(LocalTime.MAX);
 
-        final List<Experiment> ExperimentsAfter5BusinessDays = experimentRepository.findExperimentsAfterFiveDays(start, end);
+        final List<Experiment> ExperimentsAfter5BusinessDays = experimentRepository.findExperimentsAfterFiveDays(endDate);
 
         if (ExperimentsAfter5BusinessDays.isEmpty()) {
             return new ArrayList<>();
         }
 
+        log.info("Found {} experiments that have passed 5 business days", ExperimentsAfter5BusinessDays.size());
         return ExperimentsAfter5BusinessDays;
     }
 
@@ -972,6 +973,13 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
     // 자동판매 - 실험 데이터 수정
     public void updateExperiment(Experiment experiment) {
         try {
+            // 이미 완료된 실험은 스킵
+            if (!"PROGRESS".equals(experiment.getStatus())) {
+                log.info("Skipping already completed experiment - experimentId: {}, status: {}", 
+                        experiment.getId(), experiment.getStatus());
+                return;
+            }
+            
             log.info("Starting auto-sell update for experiment - experimentId: {}, stockId: {}, symbol: {}", 
                     experiment.getId(), experiment.getStock().getId(), experiment.getStock().getSymbol());
             final Stock stock = experiment.getStock();
@@ -992,6 +1000,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 final Double roi = ((price - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
 
                 experiment.updateExperiment(price, "COMPLETE", LocalDateTime.now(), roi);
+                // 변경사항 저장
+                experimentRepository.save(experiment);
                 log.info("Auto-sell completed successfully - experimentId: {}, price: {}, roi: {}", 
                         experiment.getId(), price, roi);
             } else {
