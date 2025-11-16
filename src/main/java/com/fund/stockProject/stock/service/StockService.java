@@ -13,6 +13,7 @@ import com.fund.stockProject.score.service.ScoreService;
 import com.fund.stockProject.stock.domain.CATEGORY;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
+import com.fund.stockProject.stock.domain.SECTOR;
 import com.fund.stockProject.stock.dto.response.*;
 import com.fund.stockProject.stock.dto.response.StockChartResponse.PriceInfo;
 import com.fund.stockProject.stock.entity.Stock;
@@ -25,9 +26,12 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -890,6 +894,138 @@ public class StockService {
                 .priceInfos(priceInfos)
                 .build()
         );
+    }
+
+    /**
+     * 특정 SECTOR의 주식을 추천합니다.
+     * 점수 기반 가중치 랜덤 추천을 사용합니다.
+     * 
+     * @param sector 추천할 섹터
+     * @return 추천된 주식(Stock) 엔티티, 없으면 null
+     */
+    public Stock getRecommendedStockBySector(SECTOR sector) {
+        LocalDate today = LocalDate.now();
+        
+        // 해당 SECTOR의 valid=true인 주식만 조회
+        List<Stock> validStocks = stockRepository.findValidStocksBySector(sector);
+        
+        if (validStocks.isEmpty()) {
+            return null;
+        }
+        
+        // 배치로 점수 조회 (N+1 문제 해결)
+        List<Integer> candidateStockIds = validStocks.stream()
+                .map(Stock::getId)
+                .collect(Collectors.toList());
+        
+        // 오늘 날짜 점수와 최신 점수를 배치로 조회
+        List<Score> todayScores = scoreRepository.findTodayScoresByStockIds(candidateStockIds, today);
+        List<Score> latestScores = scoreRepository.findLatestScoresByStockIds(candidateStockIds);
+        
+        // stockId -> Score 맵 생성 (오늘 점수 우선, 없으면 최신 점수)
+        Map<Integer, Score> scoreMap = new HashMap<>();
+        todayScores.forEach(score -> scoreMap.put(score.getStockId(), score));
+        latestScores.forEach(score -> scoreMap.putIfAbsent(score.getStockId(), score));
+        
+        // 점수가 있는 주식만 필터링
+        List<Stock> stocksWithScore = validStocks.stream()
+                .filter(stock -> scoreMap.containsKey(stock.getId()))
+                .collect(Collectors.toList());
+        
+        if (stocksWithScore.isEmpty()) {
+            return null;
+        }
+        
+        // 각 주식의 가중치 계산 (점수 맵을 전달하여 메모리에서 조회)
+        List<StockWithWeight> stocksWithWeight = calculateWeightsForSector(stocksWithScore, scoreMap);
+        
+        // 가중치 기반 랜덤 선택
+        Random random = new Random(System.currentTimeMillis());
+        return selectWeightedRandom(stocksWithWeight, random);
+    }
+
+    /**
+     * 각 주식의 가중치를 계산합니다.
+     * 점수 기반 가중치를 사용합니다.
+     */
+    private List<StockWithWeight> calculateWeightsForSector(List<Stock> stocks, Map<Integer, Score> scoreMap) {
+        return stocks.stream()
+                .map(stock -> {
+                    Score score = scoreMap.get(stock.getId());
+                    if (score == null) {
+                        throw new IllegalStateException("주식(id:" + stock.getId() + ")에 점수가 없습니다.");
+                    }
+                    int scoreValue = getScoreByCountry(score, stock.getExchangeNum());
+                    double scoreWeight = calculateScoreWeight(scoreValue);
+                    
+                    return new StockWithWeight(stock, scoreWeight);
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 국가별 점수를 반환합니다.
+     */
+    private int getScoreByCountry(Score score, EXCHANGENUM exchangeNum) {
+        boolean isKorea = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF)
+                .contains(exchangeNum);
+        return isKorea ? score.getScoreKorea() : score.getScoreOversea();
+    }
+
+    /**
+     * 점수 기반 가중치를 계산합니다.
+     * 점수가 높을수록 선택 확률이 증가하지만, 너무 극단적이지 않도록 부드러운 곡선 적용.
+     * 0점: 1.0, 50점: 6.0, 100점: 11.0 (제곱근 곡선 사용)
+     */
+    private double calculateScoreWeight(int score) {
+        // 점수를 0-100 범위로 제한
+        score = Math.max(0, Math.min(100, score));
+        
+        // 제곱근 곡선: sqrt(score/100) * 10 + 1
+        // 0점 -> 1.0, 50점 -> 8.07, 100점 -> 11.0
+        return Math.sqrt(score / 100.0) * 10.0 + 1.0;
+    }
+
+    /**
+     * 가중치 기반 랜덤 선택을 수행합니다.
+     */
+    private Stock selectWeightedRandom(List<StockWithWeight> stocksWithWeight, Random random) {
+        if (stocksWithWeight.isEmpty()) {
+            throw new IllegalStateException("추천할 주식이 없습니다.");
+        }
+        
+        // 총 가중치 계산
+        double totalWeight = stocksWithWeight.stream()
+                .mapToDouble(sw -> sw.weight)
+                .sum();
+        
+        // 랜덤 값 생성 (0 ~ totalWeight)
+        double randomValue = random.nextDouble() * totalWeight;
+        
+        // 누적 가중치를 따라 선택
+        double cumulativeWeight = 0.0;
+        for (StockWithWeight sw : stocksWithWeight) {
+            cumulativeWeight += sw.weight;
+            if (randomValue <= cumulativeWeight) {
+                return sw.stock;
+            }
+        }
+        
+        // 마지막 주식 반환 (반올림 오차 대비)
+        return stocksWithWeight.get(stocksWithWeight.size() - 1).stock;
+    }
+
+    /**
+     * 주식과 가중치를 함께 담는 내부 클래스
+     */
+    private static class StockWithWeight {
+        final Stock stock;
+        final double weight;
+
+        StockWithWeight(Stock stock, double weight) {
+            this.stock = stock;
+            this.weight = weight;
+        }
     }
 
 }
