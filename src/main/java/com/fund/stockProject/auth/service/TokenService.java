@@ -10,12 +10,14 @@ import com.fund.stockProject.security.util.JwtUtil;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import static com.fund.stockProject.security.util.JwtUtil.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TokenService {
@@ -70,16 +72,16 @@ public class TokenService {
         }
 
         try {
-            // 1. 토큰 카테고리 확인
+            // 1. DB에서 해당 refresh token 존재 여부 확인 (토큰 탈취 대비)
+            // DB 조회를 먼저 하여 유효한 토큰인지 확인 (만료된 토큰도 DB에 남아있을 수 있으므로)
+            RefreshToken storedToken = refreshTokenRepository.findByRefreshToken(oldRefreshToken)
+                    .orElseThrow(() -> new JwtException("Refresh token not found in database"));
+
+            // 2. 토큰 카테고리 확인 (DB 조회 후 수행)
             String category = jwtUtil.getCategory(oldRefreshToken);
             if (!JWT_CATEGORY_REFRESH.equals(category)) {
                 throw new JwtException("Invalid token type. Required: refresh");
             }
-
-            // 2. DB에서 해당 refresh token 존재 여부 확인 (토큰 탈취 대비)
-            // 이 과정에서 만료된 토큰이면 어차피 아래로 못 내려옵니다.
-            RefreshToken storedToken = refreshTokenRepository.findByRefreshToken(oldRefreshToken)
-                    .orElseThrow(() -> new JwtException("Refresh token not found in database"));
 
             // 3. 토큰 정보 추출 (DB 조회 후 수행하여 DB 부하 감소)
             String email = jwtUtil.getEmail(oldRefreshToken);
@@ -108,11 +110,21 @@ public class TokenService {
 
         } catch (ExpiredJwtException e) {
             // 만료된 경우, DB에 토큰이 남아있다면 삭제해주는 것이 보안상 좋습니다.
-            refreshTokenRepository.findByRefreshToken(oldRefreshToken)
-                    .ifPresent(refreshTokenRepository::delete);
+            // ExpiredJwtException은 JwtException의 하위 클래스이므로 먼저 처리해야 합니다.
+            try {
+                refreshTokenRepository.findByRefreshToken(oldRefreshToken)
+                        .ifPresent(refreshTokenRepository::delete);
+            } catch (Exception deleteException) {
+                log.warn("Failed to delete expired refresh token from database", deleteException);
+            }
             throw new JwtException("Refresh token has expired. Please log in again.");
         } catch (JwtException e) {
             // 그 외 JWT 관련 예외 (서명 오류, 형식 오류 등)
+            // ExpiredJwtException이 아닌 다른 JwtException인 경우
+            throw new JwtException("Invalid refresh token: " + e.getMessage());
+        } catch (Exception e) {
+            // 예상치 못한 예외 (예: IllegalArgumentException from ROLE.valueOf)
+            log.error("Unexpected error during token reissue", e);
             throw new JwtException("Invalid refresh token: " + e.getMessage());
         }
     }
