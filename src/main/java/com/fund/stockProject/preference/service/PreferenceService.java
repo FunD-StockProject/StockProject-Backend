@@ -6,6 +6,7 @@ import com.fund.stockProject.user.repository.UserRepository;
 import com.fund.stockProject.auth.service.AuthService;
 import com.fund.stockProject.preference.domain.PreferenceType;
 import com.fund.stockProject.preference.dto.BookmarkInfoResponse;
+import com.fund.stockProject.preference.dto.StockPreferenceResponse;
 import com.fund.stockProject.preference.entity.Preference;
 import com.fund.stockProject.preference.repository.PreferenceRepository;
 import com.fund.stockProject.stock.domain.COUNTRY;
@@ -173,6 +174,36 @@ public class PreferenceService {
         Integer currentUserId = getCurrentUserId();
         return (int) preferenceRepository.countByUserIdAndPreferenceTypeAndNotificationEnabled(
             currentUserId, PreferenceType.BOOKMARK, true);
+    }
+
+    /**
+     * 특정 종목의 관심/알림 여부를 조회합니다.
+     * @param stockId 조회할 종목 ID
+     * @return StockPreferenceResponse (isBookmarked, isNotificationEnabled)
+     */
+    @Transactional(readOnly = true)
+    public StockPreferenceResponse getStockPreference(Integer stockId) {
+        Integer currentUserId = getCurrentUserId();
+        
+        // 해당 종목의 Preference 조회
+        Optional<Preference> preferenceOptional = preferenceRepository.findByUserIdAndStockId(currentUserId, stockId);
+        
+        boolean isBookmarked = false;
+        boolean isNotificationEnabled = false;
+        
+        if (preferenceOptional.isPresent()) {
+            Preference preference = preferenceOptional.get();
+            // BOOKMARK 타입인 경우에만 관심 종목으로 간주
+            isBookmarked = preference.getPreferenceType() == PreferenceType.BOOKMARK;
+            // 북마크인 경우에만 알림 여부 반환 (북마크가 아니면 알림은 false)
+            isNotificationEnabled = isBookmarked && preference.getNotificationEnabled();
+        }
+        
+        return StockPreferenceResponse.builder()
+                .stockId(stockId)
+                .isBookmarked(isBookmarked)
+                .isNotificationEnabled(isNotificationEnabled)
+                .build();
     }
 
     private User getUserOrThrow(Integer userId) {

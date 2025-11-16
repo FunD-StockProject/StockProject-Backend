@@ -2,8 +2,12 @@ package com.fund.stockProject.stock.controller;
 
 import com.fund.stockProject.stock.domain.CATEGORY;
 import com.fund.stockProject.stock.domain.COUNTRY;
+import com.fund.stockProject.stock.domain.SECTOR;
 import com.fund.stockProject.stock.dto.response.*;
+import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.service.StockService;
+import com.fund.stockProject.stock.service.SecurityService;
+import com.fund.stockProject.shortview.dto.ShortViewResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,8 +23,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Mono;
 
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/stock")
@@ -28,6 +35,7 @@ import reactor.core.publisher.Mono;
 public class StockController {
 
     private final StockService stockService;
+    private final SecurityService securityService;
 
     @GetMapping("/search/{searchKeyword}/{country}")
     @Operation(summary = "주식 종목 검색 API", description = "주식 종목 및 인간지표 데이터 검색")
@@ -101,5 +109,45 @@ public class StockController {
     @Operation(summary = "종목 요약 api", description = "종목 요약 api")
     ResponseEntity<Mono<List<String>>> getSummarys(@PathVariable("symbol") String symbol, @PathVariable("country") COUNTRY country) {
         return ResponseEntity.ok().body(stockService.getSummarys(symbol, country));
+    }
+
+    @GetMapping("/sector/{sector}/recommend")
+    @Operation(summary = "SECTOR별 주식 추천", description = "특정 섹터의 주식을 점수 기반으로 추천합니다. 실시간 시세 조회 실패 시 가격 필드는 null로 반환됩니다.")
+    public ResponseEntity<ShortViewResponse> getRecommendationBySector(
+            @io.swagger.v3.oas.annotations.Parameter(description = "추천할 섹터", example = "INFORMATION_TECHNOLOGY", required = true)
+            @PathVariable String sector
+    ) {
+        try {
+            // SECTOR enum으로 변환
+            SECTOR sectorEnum;
+            try {
+                sectorEnum = SECTOR.valueOf(sector.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("잘못된 SECTOR 값: {}", sector);
+                return ResponseEntity.badRequest().build();
+            }
+
+            log.info("SECTOR({})별 추천을 요청했습니다.", sectorEnum);
+
+            Stock recommendedStock = stockService.getRecommendedStockBySector(sectorEnum);
+            if (recommendedStock != null) {
+                log.info("SECTOR({})에서 주식({})을 추천했습니다.", sectorEnum, recommendedStock.getSymbolName());
+                
+                // 실시간 가격 정보를 동기적으로 가져오기
+                try {
+                    var stockInfo = securityService.getRealTimeStockPrice(recommendedStock).block();
+                    return ResponseEntity.ok(ShortViewResponse.fromEntityWithPrice(recommendedStock, stockInfo));
+                } catch (Exception e) {
+                    log.warn("실시간 가격 조회 실패, 기본 정보로 응답합니다. stock_id: {}, error: {}", 
+                            recommendedStock.getId(), e.getMessage());
+                    return ResponseEntity.ok(ShortViewResponse.fromEntity(recommendedStock));
+                }
+            } else {
+                return ResponseEntity.noContent().build();
+            }
+        } catch (Exception e) {
+            log.error("SECTOR별 추천 중 오류 발생: {}", sector, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }

@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
  * - 높은 인간지표 점수일수록 선택 확률 증가
  * - Sector 다양성을 고려한 추천
  * - "다시 보지 않음"으로 설정된 종목은 추천에서 제외합니다.
+ * - 이전 추천과의 중복을 완전히 방지합니다.
  */
 @Slf4j
 @Service
@@ -38,6 +40,11 @@ public class ShortViewService {
     private final SecurityService securityService;
     private final PreferenceRepository preferenceRepository;
     private final ScoreRepository scoreRepository;
+    
+    // 사용자별 최근 본 추천 종목 ID 저장 (메모리 캐시)
+    // userId -> Set<stockId> (최근 50개까지 저장)
+    private static final Map<Integer, Set<Integer>> recentRecommendations = new ConcurrentHashMap<>();
+    private static final int MAX_RECENT_RECOMMENDATIONS = 50; // 최근 50개까지만 저장
 
     /**
      * 사용자에게 추천할 주식 엔티티를 반환하는 메인 메서드입니다.
@@ -220,6 +227,39 @@ public class ShortViewService {
     }
 
     /**
+     * 가중치 기반 랜덤 선택을 여러 번 수행하여 중복 없이 여러 개를 선택합니다.
+     * 선택된 주식은 후보 목록에서 제거하여 중복을 방지합니다.
+     */
+    private List<Stock> selectMultipleWeightedRandom(List<StockWithWeight> stocksWithWeight, Random random, int count) {
+        if (stocksWithWeight.isEmpty()) {
+            return Collections.emptyList();
+        }
+        
+        // 요청 개수가 후보 개수보다 많으면 후보 개수만큼만 반환
+        int actualCount = Math.min(count, stocksWithWeight.size());
+        
+        // 후보 목록을 복사하여 사용 (원본 보존)
+        List<StockWithWeight> remainingCandidates = new ArrayList<>(stocksWithWeight);
+        List<Stock> selectedStocks = new ArrayList<>();
+        
+        // 중복 없이 여러 개 선택
+        for (int i = 0; i < actualCount; i++) {
+            if (remainingCandidates.isEmpty()) {
+                break;
+            }
+            
+            // 가중치 기반 랜덤 선택
+            Stock selected = selectWeightedRandom(remainingCandidates, random);
+            selectedStocks.add(selected);
+            
+            // 선택된 주식은 후보 목록에서 제거 (중복 방지)
+            remainingCandidates.removeIf(sw -> sw.stock.getId().equals(selected.getId()));
+        }
+        
+        return selectedStocks;
+    }
+
+    /**
      * 주식과 가중치를 함께 담는 내부 클래스
      */
     private static class StockWithWeight {
@@ -229,6 +269,118 @@ public class ShortViewService {
         StockWithWeight(Stock stock, double weight) {
             this.stock = stock;
             this.weight = weight;
+        }
+    }
+
+    /**
+     * 사용자에게 추천할 주식들을 5개 반환합니다.
+     * 가중치 기반 랜덤 선택을 사용하여 다양성을 확보하고, 중복을 방지합니다.
+     * 이전 추천과의 중복을 완전히 방지합니다.
+     * 
+     * @param user 현재 로그인한 사용자
+     * @return 추천된 주식(Stock) 엔티티 리스트 (최대 5개)
+     */
+    public List<Stock> getRecommendedStocks(User user) {
+        final int RECOMMEND_COUNT = 5;
+        log.info("사용자(id:{})에게 가중치 기반 주식 추천을 시작합니다. (추천 개수: {})", user.getId(), RECOMMEND_COUNT);
+        
+        // 사용자가 "다시 보지 않음"으로 설정한 종목 ID 목록 조회 (성능 최적화: stockId만 직접 조회)
+        Set<Integer> hiddenStockIds = new HashSet<>(
+                preferenceRepository.findStockIdsByUserIdAndPreferenceType(user.getId(), PreferenceType.NEVER_SHOW)
+        );
+        
+        // 이전에 추천한 종목 ID 목록 조회 (중복 방지)
+        Set<Integer> recentStockIds = recentRecommendations.getOrDefault(user.getId(), new HashSet<>());
+        
+        log.info("사용자(id:{})가 숨긴 종목 개수: {}, 이전 추천 종목 개수: {}", 
+                user.getId(), hiddenStockIds.size(), recentStockIds.size());
+        
+        LocalDate today = LocalDate.now();
+        
+        // valid = true인 주식만 조회 (성능 최적화: DB에서 필터링)
+        List<Stock> validStocks = stockRepository.findAllValidStocks();
+        
+        // 숨긴 종목과 이전 추천 종목 제외
+        List<Stock> candidateStocks = validStocks.stream()
+                .filter(stock -> !hiddenStockIds.contains(stock.getId()))
+                .filter(stock -> !recentStockIds.contains(stock.getId()))
+                .collect(Collectors.toList());
+        
+        if (candidateStocks.isEmpty()) {
+            log.warn("사용자(id:{})에게 추천할 수 있는 종목이 없습니다. (valid=true인 종목 없음 또는 모두 이전에 추천함)", user.getId());
+            // 이전 추천 기록을 초기화하여 새로운 추천 가능하도록 함
+            recentRecommendations.remove(user.getId());
+            // 다시 시도 (이번엔 이전 추천 제외 없이)
+            candidateStocks = validStocks.stream()
+                    .filter(stock -> !hiddenStockIds.contains(stock.getId()))
+                    .collect(Collectors.toList());
+            if (candidateStocks.isEmpty()) {
+                return Collections.emptyList();
+            }
+        }
+        
+        // 배치로 점수 조회 (N+1 문제 해결)
+        List<Integer> candidateStockIds = candidateStocks.stream()
+                .map(Stock::getId)
+                .collect(Collectors.toList());
+        
+        // 오늘 날짜 점수와 최신 점수를 배치로 조회
+        List<Score> todayScores = scoreRepository.findTodayScoresByStockIds(candidateStockIds, today);
+        List<Score> latestScores = scoreRepository.findLatestScoresByStockIds(candidateStockIds);
+        
+        // stockId -> Score 맵 생성 (오늘 점수 우선, 없으면 최신 점수)
+        Map<Integer, Score> scoreMap = new HashMap<>();
+        todayScores.forEach(score -> scoreMap.put(score.getStockId(), score));
+        latestScores.forEach(score -> scoreMap.putIfAbsent(score.getStockId(), score));
+        
+        // 점수가 있는 주식만 필터링
+        List<Stock> stocksWithScore = candidateStocks.stream()
+                .filter(stock -> scoreMap.containsKey(stock.getId()))
+                .collect(Collectors.toList());
+        
+        if (stocksWithScore.isEmpty()) {
+            log.warn("사용자(id:{})에게 추천할 수 있는 종목이 없습니다. (valid=true이고 점수가 있는 종목 없음)", user.getId());
+            return Collections.emptyList();
+        }
+        
+        log.info("추천 대상 주식 개수: {}개 (valid=true, 점수 있음, 이전 추천 제외)", stocksWithScore.size());
+        
+        // 각 주식의 가중치 계산 (점수 맵을 전달하여 메모리에서 조회)
+        List<StockWithWeight> stocksWithWeight = calculateWeights(stocksWithScore, scoreMap);
+        
+        // 가중치 기반 랜덤 선택으로 중복 없이 여러 개 선택
+        Random random = new Random(System.currentTimeMillis() + user.getId());
+        List<Stock> recommendedStocks = selectMultipleWeightedRandom(stocksWithWeight, random, RECOMMEND_COUNT);
+        
+        // 추천한 종목을 메모리 캐시에 저장 (이전 추천과 중복 방지)
+        saveRecentRecommendations(user.getId(), recommendedStocks);
+        
+        log.info("사용자(id:{})에게 주식 {}개 가중치 기반 추천 완료", user.getId(), recommendedStocks.size());
+        
+        return recommendedStocks;
+    }
+    
+    /**
+     * 사용자의 최근 추천 종목을 메모리 캐시에 저장합니다.
+     * 최대 개수를 초과하면 일부 항목을 제거합니다.
+     */
+    private void saveRecentRecommendations(Integer userId, List<Stock> recommendedStocks) {
+        Set<Integer> recentStocks = recentRecommendations.computeIfAbsent(userId, k -> new HashSet<>());
+        
+        // 새로 추천한 종목 추가
+        for (Stock stock : recommendedStocks) {
+            recentStocks.add(stock.getId());
+        }
+        
+        // 최대 개수 초과 시 오래된 항목 일부 제거 (간단한 처리)
+        if (recentStocks.size() > MAX_RECENT_RECOMMENDATIONS) {
+            // 최대 개수의 80%만 유지 (오래된 20% 제거)
+            int targetSize = (int) (MAX_RECENT_RECOMMENDATIONS * 0.8);
+            List<Integer> stockIdList = new ArrayList<>(recentStocks);
+            // 앞쪽 일부만 제거 (간단한 FIFO 방식)
+            List<Integer> toKeep = stockIdList.subList(stockIdList.size() - targetSize, stockIdList.size());
+            recentStocks.clear();
+            recentStocks.addAll(toKeep);
         }
     }
 
