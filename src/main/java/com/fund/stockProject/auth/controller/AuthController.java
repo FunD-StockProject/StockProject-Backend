@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 
 import java.util.Map;
@@ -63,30 +64,49 @@ public class AuthController {
             @ApiResponse(responseCode = "500", description = "서버 내부 오류", content = @Content)
     })
     public ResponseEntity<Map<String, String>> registerLocal(
-            @Parameter(description = "일반 회원가입 요청 DTO", required = true)
-            @ModelAttribute LocalRegisterRequest request) {
+            @Parameter(description = "사용자 이메일", required = true) @RequestParam String email,
+            @Parameter(description = "비밀번호", required = true) @RequestParam String password,
+            @Parameter(description = "사용자 닉네임", required = true) @RequestParam String nickname,
+            @Parameter(description = "생년월일 (yyyy-MM-dd)") @RequestParam(required = false) String birthDate,
+            @Parameter(description = "마케팅 정보 수신 동의 여부") @RequestParam(required = false) Boolean marketingAgreement,
+            @Parameter(description = "프로필 이미지 파일") @RequestPart(required = false) MultipartFile image) {
         try {
-            // Validation 수동 처리 (MultipartFile 변환 문제 방지)
-            if (request.getEmail() == null || request.getEmail().isBlank()) {
+            // Validation
+            if (email == null || email.isBlank()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(Map.of("message", "이메일은 필수입니다"));
             }
-            if (!request.getEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(Map.of("message", "유효한 이메일 형식이 아닙니다"));
             }
-            if (request.getPassword() == null || request.getPassword().isBlank()) {
+            if (password == null || password.isBlank()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(Map.of("message", "비밀번호는 필수입니다"));
             }
-            if (request.getPassword().length() < 8) {
+            if (password.length() < 8) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(Map.of("message", "비밀번호는 최소 8자 이상이어야 합니다"));
             }
-            if (request.getNickname() == null || request.getNickname().isBlank()) {
+            if (nickname == null || nickname.isBlank()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(Map.of("message", "닉네임은 필수입니다"));
             }
+
+            // LocalRegisterRequest 생성
+            LocalRegisterRequest request = new LocalRegisterRequest();
+            request.setEmail(email);
+            request.setPassword(password);
+            request.setNickname(nickname);
+            if (birthDate != null && !birthDate.isBlank()) {
+                try {
+                    request.setBirthDate(java.time.LocalDate.parse(birthDate));
+                } catch (Exception e) {
+                    // 날짜 파싱 실패 시 무시
+                }
+            }
+            request.setMarketingAgreement(marketingAgreement);
+            request.setImage(image);
             
             String imageUrl = authService.registerLocal(request);
             return ResponseEntity.ok(Map.of(
