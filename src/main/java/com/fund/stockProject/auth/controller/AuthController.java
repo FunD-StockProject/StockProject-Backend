@@ -64,8 +64,30 @@ public class AuthController {
     })
     public ResponseEntity<Map<String, String>> registerLocal(
             @Parameter(description = "일반 회원가입 요청 DTO", required = true)
-            @Valid @ModelAttribute LocalRegisterRequest request) {
+            @ModelAttribute LocalRegisterRequest request) {
         try {
+            // Validation 수동 처리 (MultipartFile 변환 문제 방지)
+            if (request.getEmail() == null || request.getEmail().isBlank()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("message", "이메일은 필수입니다"));
+            }
+            if (!request.getEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("message", "유효한 이메일 형식이 아닙니다"));
+            }
+            if (request.getPassword() == null || request.getPassword().isBlank()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("message", "비밀번호는 필수입니다"));
+            }
+            if (request.getPassword().length() < 8) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("message", "비밀번호는 최소 8자 이상이어야 합니다"));
+            }
+            if (request.getNickname() == null || request.getNickname().isBlank()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("message", "닉네임은 필수입니다"));
+            }
+            
             String imageUrl = authService.registerLocal(request);
             return ResponseEntity.ok(Map.of(
                     "message", "User registered successfully",
