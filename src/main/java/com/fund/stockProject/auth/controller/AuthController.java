@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.Map;
 
@@ -50,6 +51,55 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "Failed to complete social registration: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping(value = "/register/local", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "일반 회원가입", description = "이메일과 비밀번호로 신규 사용자를 등록하고 프로필 이미지를 업로드합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "회원가입 성공", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "400", description = "잘못된 입력 값", content = @Content),
+            @ApiResponse(responseCode = "409", description = "닉네임 또는 이메일 중복", content = @Content),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류", content = @Content)
+    })
+    public ResponseEntity<Map<String, String>> registerLocal(
+            @Parameter(description = "일반 회원가입 요청 DTO", required = true)
+            @Valid @ModelAttribute LocalRegisterRequest request) {
+        try {
+            String imageUrl = authService.registerLocal(request);
+            return ResponseEntity.ok(Map.of(
+                    "message", "User registered successfully",
+                    "profileImageUrl", imageUrl != null ? imageUrl : ""
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to complete registration: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/login/local")
+    @Operation(summary = "일반 로그인", description = "이메일과 비밀번호로 로그인합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그인 성공", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "401", description = "이메일 또는 비밀번호가 올바르지 않음", content = @Content),
+            @ApiResponse(responseCode = "400", description = "잘못된 입력 값", content = @Content),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류", content = @Content)
+    })
+    public ResponseEntity<LoginResponse> loginLocal(
+            @Parameter(description = "일반 로그인 요청 DTO", required = true)
+            @Valid @RequestBody LocalLoginRequest request) {
+        try {
+            LoginResponse response = authService.loginLocal(request);
+            return ResponseEntity.ok(response);
+        } catch (org.springframework.security.authentication.BadCredentialsException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new LoginResponse("FAILED", null, null, null, null));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new LoginResponse("FAILED", null, null, null, null));
         }
     }
 
