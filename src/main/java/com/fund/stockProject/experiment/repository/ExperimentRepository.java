@@ -5,9 +5,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface ExperimentRepository extends JpaRepository<Experiment, Integer> {
@@ -132,4 +134,10 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
     
     @Query("SELECT count(e) FROM Experiment e JOIN e.user u WHERE u.email = :email AND e.status = 'COMPLETE' AND e.sellAt BETWEEN :startOfWeek and :endOfWeek")
     int countCompletedExperimentsForWeekByUser(@Param("email") String email, @Param("startOfWeek") LocalDateTime startOfWeek, @Param("endOfWeek") LocalDateTime endOfWeek);
+    
+    // 사용자의 모든 실험 삭제
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Experiment e WHERE e.user.id = :userId")
+    void deleteByUserId(@Param("userId") Integer userId);
 }

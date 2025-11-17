@@ -18,6 +18,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.fund.stockProject.security.principle.CustomUserDetails;
+import java.util.Map;
 
 @Tag(name = "사용자 (User)", description = "사용자 프로필 관리 API")
 @RestController
@@ -73,6 +76,35 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update profile image: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/all")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "모든 사용자 데이터 삭제", description = "북마크, 알림, 실험, 포트폴리오 등 사용자의 모든 데이터를 삭제합니다. 회원 탈퇴와 달리 사용자 계정은 유지됩니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "삭제 성공", content = @Content),
+            @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
+            @ApiResponse(responseCode = "404", description = "사용자 없음", content = @Content),
+            @ApiResponse(responseCode = "500", description = "서버 오류", content = @Content)
+    })
+    public ResponseEntity<?> deleteAllUserData(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal CustomUserDetails customUserDetails) {
+        try {
+            if (customUserDetails == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Authentication required");
+            }
+            
+            userService.deleteAllUserData();
+            return ResponseEntity.ok(Map.of("message", "All user data deleted successfully"));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Authentication required");
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to delete user data: " + e.getMessage()));
         }
     }
 }
