@@ -140,4 +140,12 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
     @Transactional
     @Query("DELETE FROM Experiment e WHERE e.user.id = :userId")
     void deleteByUserId(@Param("userId") Integer userId);
+    
+    // 특정 종목이 실험에서 사용되었는지 확인
+    @Query("SELECT COUNT(e) > 0 FROM Experiment e WHERE e.stock.id = :stockId")
+    boolean existsByStockId(@Param("stockId") Integer stockId);
+    
+    // 여러 종목이 실험에서 사용되었는지 확인 (배치 조회)
+    @Query("SELECT DISTINCT e.stock.id FROM Experiment e WHERE e.stock.id IN :stockIds")
+    List<Integer> findStockIdsUsedInExperiments(@Param("stockIds") List<Integer> stockIds);
 }

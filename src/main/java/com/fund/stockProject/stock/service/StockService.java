@@ -900,10 +900,17 @@ public class StockService {
      * 특정 SECTOR의 주식을 추천합니다.
      * 점수 기반 가중치 랜덤 추천을 사용합니다.
      * 
+     * 금융 서비스이므로 UNKNOWN 섹터는 추천 대상에서 제외합니다.
+     * 
      * @param sector 추천할 섹터
      * @return 추천된 주식(Stock) 엔티티, 없으면 null
      */
     public Stock getRecommendedStockBySector(SECTOR sector) {
+        // UNKNOWN 섹터는 추천하지 않음 (부정확한 정보 제공 방지)
+        if (sector == SECTOR.UNKNOWN) {
+            return null;
+        }
+        
         LocalDate today = LocalDate.now();
         
         // 해당 SECTOR의 valid=true인 주식만 조회
