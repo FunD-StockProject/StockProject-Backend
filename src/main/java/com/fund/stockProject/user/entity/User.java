@@ -27,6 +27,8 @@ public class User extends Core {
     @Column(unique = true)
     private String nickname;
 
+    private String password; // 일반 회원가입용 비밀번호 (LOCAL provider일 때만 사용)
+
     private LocalDate birthDate;
 
     @Enumerated(EnumType.STRING)
@@ -53,10 +55,11 @@ public class User extends Core {
     private Boolean marketingAgreement = false;
 
     @Builder
-    public User(String email, String nickname, LocalDate birthDate, ROLE role, PROVIDER provider, String providerId,
+    public User(String email, String nickname, String password, LocalDate birthDate, ROLE role, PROVIDER provider, String providerId,
                 String profileImageUrl, Boolean isActive, Boolean marketingAgreement) {
         this.email = email;
         this.nickname = nickname;
+        this.password = password;
         this.birthDate = birthDate;
         this.role = role;
         this.provider = provider;
@@ -81,5 +84,9 @@ public class User extends Core {
 
     public void updateProfileImage(String imageUrl) {
         this.profileImageUrl = imageUrl;
+    }
+
+    public void updatePassword(String encodedPassword) {
+        this.password = encodedPassword;
     }
 }

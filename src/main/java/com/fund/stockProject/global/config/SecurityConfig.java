@@ -20,6 +20,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.task.DelegatingSecurityContextAsyncTaskExecutor;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.LogoutFilter;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration
 @EnableWebSecurity
@@ -42,12 +44,14 @@ public class SecurityConfig {
             "/error",
             "/favicon.ico",
             "/auth/register",
+            "/auth/register/local",
+            "/auth/login",
+            "/auth/login/local",
             "/auth/login/kakao",
             "/auth/login/naver",
             "/auth/login/google",
             "/auth/login/apple",
             "/auth/oauth2/register",
-            "/auth/login",
             "/auth/logout",
             "/auth/reissue",
             "/auth/find-email",
@@ -89,6 +93,11 @@ public class SecurityConfig {
         delegate.initialize();
         // 작업 실행 시 SecurityContext를 복사/복원
         return new DelegatingSecurityContextAsyncTaskExecutor(delegate);
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 
     @Bean

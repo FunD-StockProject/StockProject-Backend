@@ -9,10 +9,15 @@ import com.fund.stockProject.notification.repository.UserDeviceTokenRepository;
 import com.fund.stockProject.auth.repository.RefreshTokenRepository;
 import com.fund.stockProject.security.principle.CustomUserDetails;
 import com.fund.stockProject.global.service.S3Service;
+import com.fund.stockProject.auth.domain.PROVIDER;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,6 +33,9 @@ public class AuthService {
     private final UserDeviceTokenRepository userDeviceTokenRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final S3Service s3Service;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final TokenService tokenService;
 
     /**
      * 현재 사용자가 인증된 상태인지 확인합니다.
@@ -114,6 +122,76 @@ public class AuthService {
             System.err.println("회원가입 중 오류 발생: " + e.getMessage());
             e.printStackTrace();
             throw e;
+        }
+    }
+
+    /**
+     * 일반 회원가입
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public String registerLocal(LocalRegisterRequest request) {
+        // 이메일 중복 확인
+        if (isEmailDuplicate(request.getEmail())) {
+            throw new IllegalArgumentException("이미 사용 중인 이메일입니다: " + request.getEmail());
+        }
+
+        // 닉네임 중복 확인
+        if (isNicknameDuplicate(request.getNickname())) {
+            throw new IllegalArgumentException("이미 사용 중인 닉네임입니다: " + request.getNickname());
+        }
+
+        // 프로필 이미지 업로드
+        MultipartFile image = request.getImage();
+        String imageUrl = (image != null && !image.isEmpty()) ? s3Service.uploadUserImage(image, "users") : null;
+
+        // 비밀번호 암호화
+        String encodedPassword = passwordEncoder.encode(request.getPassword());
+
+        // 사용자 생성
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(encodedPassword)
+                .nickname(request.getNickname())
+                .birthDate(request.getBirthDate())
+                .provider(PROVIDER.LOCAL)
+                .role(ROLE_USER)
+                .isActive(true)
+                .marketingAgreement(request.getMarketingAgreement() != null ? request.getMarketingAgreement() : false)
+                .profileImageUrl(imageUrl)
+                .build();
+
+        userRepository.save(user);
+        return imageUrl;
+    }
+
+    /**
+     * 일반 로그인
+     */
+    @Transactional
+    public LoginResponse loginLocal(LocalLoginRequest request) {
+        try {
+            // 인증 시도
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(),
+                            request.getPassword()
+                    )
+            );
+
+            // 인증 성공 시 사용자 정보 가져오기
+            CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+            User user = userDetails.getUser();
+
+            // LOCAL provider가 아니면 예외 발생
+            if (user.getProvider() != PROVIDER.LOCAL) {
+                throw new BadCredentialsException("일반 로그인은 일반 회원가입 사용자만 가능합니다");
+            }
+
+            // 토큰 발급
+            return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
+
+        } catch (BadCredentialsException e) {
+            throw new BadCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다", e);
         }
     }
 }
