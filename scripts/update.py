@@ -171,6 +171,11 @@ def fetch_texts_from_crawler(symbol, country):
     texts_with_weights = []
     for item in formatted_posts:
         text = (item['title'] + " " + item['contents']).replace("<br>", "").strip()
+        
+        # 빈 텍스트는 제외
+        if not text or len(text.strip()) == 0:
+            continue
+            
         good_count = item.get('goodCount', 0)
         bad_count = item.get('badCount', 0)
         is_holding = item.get('isHolding', False)
@@ -254,6 +259,9 @@ def calculate_pattern_score(texts_with_weights, positive_patterns, negative_patt
     return min(100, max(0, (total_score / total_weight) * 50 + 50))
 
 def preprocess_text(text):
+    # HTML 태그 및 클래스명 제거
+    text = re.sub(r'<[^>]+>', '', text)  # HTML 태그 제거
+    text = re.sub(r'class\s*=\s*["\'][^"\']*["\']', '', text)  # class 속성 제거
     text = re.sub(r'[^가-힣a-zA-Z0-9\s]', '', text)  # 특수문자 제거
     text = re.sub(r'\s+', ' ', text)  # 연속된 공백 제거
     return text.strip().lower()  # 소문자 변환 및 양 끝 공백 제거
@@ -271,14 +279,14 @@ def calculate_word_frequencies(all_text, STOP_WORDS, filter_patterns):
 
 def extract_top_keywords(texts_with_weights, top_n=10):
     """상위 키워드 추출 (기존 로직과 동일)"""
-    # 불용어 리스트
+    # 불용어 리스트 (한글 중심)
     STOP_WORDS = [
         '하', '이거', '종목', '다시', '종토방', '그럼', '이런', '다들', '지금', '뉴스로배우는세상', '또', '주식', '세상', '대신', '죄', '우리', '뭐', '찢', '좀', '너무', '아', '더', '다', '이', '그', '것', '수', '들', '를', '은', '는', '에', '의', '가', '와', '과', '역시', '해', '당장', '현재',
         '한', '로', '으로', '을', '하고', '그리고', '그러나', '하지만', '해서', '및', '또한', '근데', '흠', '진짜', '이제',
         '그리고', '며', '이다', '에서', '에게', '와의', '하고', '에서의', '난', '왜', '잘', '오', '딱', '말', '할', '한다', '오늘', '어제', '내일', '통해', '경우', '관련', '지난해', '현물', '시장', '대한', '따르면'
     ]
     
-    # 필터링 패턴
+    # 필터링 패턴 (한글 중심)
     FILTER_PATTERNS = [
         r'[ㅋㅎ]+',           # ㅋ, ㅎ이 하나 이상 반복된 패턴 (예: ㅋ, ㅋㅋ, ㅎㅎ 등)
         r'[ㅜㅠ]+',           # ㅜ, ㅠ가 하나 이상 반복된 패턴 (예: ㅜㅜ, ㅠㅠ 등)
@@ -291,21 +299,31 @@ def extract_top_keywords(texts_with_weights, top_n=10):
         r'.*이$',             # ~이로 끝나는 단어
         r'.*가$',             # ~가로 끝나는 단어
         r'.*는$',             # ~는로 끝나는 단어
-        r'.*은$',             # ~은로 끝나는 단어
+        r'.*은$',             # ~은으로 끝나는 단어
         r'.*을$',             # ~을로 끝나는 단어
-        r'.*로$',             # ~로 끝나는 단어
+        r'.*로$',             # ~로로 끝나는 단어
         r'.*를$',             # ~를로 끝나는 단어
-        r'.*가$'             # ~가로 끝나는 단어
+        r'^class.*',         # class로 시작하는 단어 (HTML 클래스명)
+        r'^[a-z]+[a-z0-9]*$',  # 소문자로만 구성된 긴 단어 (일반적으로 HTML 클래스명이나 ID)
     ]
     
     all_text = ""
     for text, weight in texts_with_weights:
         # 텍스트 전처리
         processed_text = preprocess_text(text)
-        all_text += processed_text + " "
+        if processed_text and len(processed_text.strip()) > 0:
+            all_text += processed_text + " "
+    
+    # 빈 텍스트인 경우 빈 리스트 반환
+    if not all_text or len(all_text.strip()) == 0:
+        return []
     
     word_freq_list = calculate_word_frequencies(all_text.strip(), STOP_WORDS, FILTER_PATTERNS)
-    return word_freq_list[:top_n]
+    
+    # 최소 빈도수 2 이상인 키워드만 반환 (노이즈 제거)
+    filtered_keywords = [kw for kw in word_freq_list if kw['freq'] >= 2]
+    
+    return filtered_keywords[:top_n] if filtered_keywords else word_freq_list[:top_n]
 
 # Main Script
 if __name__ == "__main__":

@@ -38,4 +38,10 @@ public interface PreferenceRepository extends JpaRepository<Preference, Preferen
      */
     @Query("SELECT p.stock.id FROM Preference p WHERE p.user.id = :userId AND p.preferenceType = :preferenceType")
     List<Integer> findStockIdsByUserIdAndPreferenceType(@Param("userId") Integer userId, @Param("preferenceType") PreferenceType preferenceType);
+    
+    /**
+     * 특정 종목이 Preference에서 사용되었는지 확인 (배치 조회)
+     */
+    @Query("SELECT DISTINCT p.stock.id FROM Preference p WHERE p.stock.id IN :stockIds")
+    List<Integer> findStockIdsUsedInPreferences(@Param("stockIds") List<Integer> stockIds);
 }

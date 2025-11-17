@@ -67,4 +67,21 @@ public class Stock extends Core {
             this.symbolName = symbolName;
         }
     }
+
+    public void setValid(Boolean valid) {
+        this.valid = valid;
+    }
+
+    public void setSector(SECTOR sector) {
+        this.sector = sector;
+    }
+
+    // 종목 데이터 임포트를 위한 생성자
+    public Stock(String symbol, String symbolName, String securityName, EXCHANGENUM exchangeNum, Boolean valid) {
+        this.symbol = symbol;
+        this.symbolName = symbolName;
+        this.securityName = securityName;
+        this.exchangeNum = exchangeNum;
+        this.valid = valid;
+    }
 }
