@@ -339,6 +339,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         return List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF).contains(exchangenum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
     }
 
+    @Transactional
     public ExperimentSimpleResponse buyExperiment(final CustomUserDetails customUserDetails, final Integer stockId, String country) {
         // Stock 조회 및 검증
         final Optional<Stock> stockById = stockRepository.findStockById(stockId);
@@ -953,6 +954,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
     }
 
     // 자동판매 - 실험 데이터 수정
+    @Transactional
     public void updateExperiment(Experiment experiment) {
         try {
             // 이미 완료된 실험은 스킵
@@ -1014,6 +1016,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
     }
 
+    @Transactional
     public void saveExperimentTradeItem(Experiment experiment) {
         final LocalDateTime now = LocalDateTime.now();
         final LocalDateTime startOfToday = now.toLocalDate().atStartOfDay(); // 오늘 시작 시간
@@ -1024,18 +1027,39 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         if (experimentTradeItemsByExperimentId.isEmpty()) {
             final Stock stock = experiment.getStock();
 
-            final StockInfoResponse stockInfoResponse = securityService.getSecurityStockInfoKorea(
-                stock.getId(),
-                stock.getSymbolName(),
-                stock.getSecurityName(),
-                stock.getSymbol(),
-                stock.getExchangeNum(),
-                getCountryFromExchangeNum(stock.getExchangeNum())
-            ).block();
+            StockInfoResponse stockInfoResponse;
+            try {
+                stockInfoResponse = securityService.getSecurityStockInfoKorea(
+                    stock.getId(),
+                    stock.getSymbolName(),
+                    stock.getSecurityName(),
+                    stock.getSymbol(),
+                    stock.getExchangeNum(),
+                    getCountryFromExchangeNum(stock.getExchangeNum())
+                ).block();
+            } catch (Exception e) {
+                log.error("Failed to get StockInfo for saveExperimentTradeItem - experimentId: {}, stockId: {}", 
+                    experiment.getId(), stock.getId(), e);
+                return;
+            }
+
+            if (stockInfoResponse == null || stockInfoResponse.getPrice() == null) {
+                log.warn("StockInfo or price is null for saveExperimentTradeItem - experimentId: {}, stockId: {}", 
+                    experiment.getId(), stock.getId());
+                return;
+            }
 
             final Double price = stockInfoResponse.getPrice();
             double roi = ((price - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
-            final Score findByStockIdAndDate = scoreRepository.findByStockIdAndDate(experiment.getStock().getId(), LocalDate.now()).get();
+            
+            Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(experiment.getStock().getId(), LocalDate.now());
+            if (scoreOptional.isEmpty()) {
+                log.warn("Today's score not found for saveExperimentTradeItem - experimentId: {}, stockId: {}", 
+                    experiment.getId(), stock.getId());
+                return;
+            }
+            
+            final Score findByStockIdAndDate = scoreOptional.get();
             int score = 9999;
 
             if (stockInfoResponse.getCountry().equals(COUNTRY.KOREA)) {
@@ -1053,6 +1077,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 .build();
 
             experimentTradeItemRepository.save(experimentTradeItem);
+            log.debug("Saved ExperimentTradeItem for experimentId: {}", experiment.getId());
         }
     }
 }
