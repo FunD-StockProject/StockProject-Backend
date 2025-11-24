@@ -38,7 +38,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Mono;
 import com.fund.stockProject.portfolio.dto.PortfolioResultResponse;
 
 @Slf4j
@@ -58,21 +57,21 @@ public class ExperimentService {
     /*
      * 실험실 - 매수 현황
      * */
-    public Mono<ExperimentStatusResponse> getExperimentStatus(final CustomUserDetails customUserDetails) {
+    public ExperimentStatusResponse getExperimentStatus(final CustomUserDetails customUserDetails) {
         // 로그인한 유저 관련 모의 투자 정보 조회
 final List<Experiment> experimentsByUserId = experimentRepository.findExperimentsByEmail(
     customUserDetails.getEmail());
 
         if (experimentsByUserId.isEmpty()) {
             // 빈 실험일 때도 기본값을 가진 응답 반환 (에러가 아닌 빈 상태)
-            return Mono.just(ExperimentStatusResponse.builder()
+            return ExperimentStatusResponse.builder()
                 .progressExperiments(new ArrayList<>())
                 .completeExperiments(new ArrayList<>())
                 .avgRoi(0.0)
                 .totalTradeCount(0)
                 .progressTradeCount(0)
                 .successRate(0.0)
-                .build());
+                .build();
         }
 
         // 진행중인 모의 투자 종목
@@ -202,7 +201,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         final long count = experimentsByUserId.stream().filter(p -> p.getSellPrice() != null && p.getSellPrice() - p.getBuyPrice() > 0).count(); // 모의투자에 성공한 종목 개수
         double successRate = experimentsByUserId.size() > 0 ? ((double) count / experimentsByUserId.size()) * 100 : 0.0;
 
-        final ExperimentStatusResponse experimentStatusResponse = ExperimentStatusResponse.builder()
+        return ExperimentStatusResponse.builder()
             .progressExperiments(progressExperimentsInfo) // 진행중인 실험 정보
             .completeExperiments(completeExperimentsInfo) // 완료된 실험 정보
             .avgRoi(averageRoi) // 평균 수익률
@@ -210,19 +209,17 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .progressTradeCount(countByStatusProgress) // 진행중인 실험 수 (사용자별 진행중인 모의투자 개수)
             .successRate(successRate) // 성공률
             .build();
-
-        return Mono.just(experimentStatusResponse);
     }
 
     /*
      * 실험실 - 종목 매수 현황 자세히 보기
      * */
-    public Mono<ExperimentStatusDetailResponse> getExperimentStatusDetail(final Integer experimentId) {
+    public ExperimentStatusDetailResponse getExperimentStatusDetail(final Integer experimentId) {
         // 자세히 보기 선택한 실험 데이터 조회
         final Optional<Experiment> experimentOptional = experimentRepository.findExperimentByExperimentId(experimentId);
         if (experimentOptional.isEmpty()) {
             log.warn("Experiment not found - experimentId: {}", experimentId);
-            return Mono.error(new NoSuchElementException("실험을 찾을 수 없습니다"));
+            throw new NoSuchElementException("실험을 찾을 수 없습니다");
         }
         final Experiment experiment = experimentOptional.get();
         
@@ -290,7 +287,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             // 최종 수익률 계산: 현재 가격 기준
             double roi = ((currentPrice - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
             
-            return Mono.just(ExperimentStatusDetailResponse.builder()
+            return ExperimentStatusDetailResponse.builder()
                 .tradeInfos(new ArrayList<>())
                 .roi(roi)
                 .status(experiment.getStatus())
@@ -300,7 +297,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 .buyPrice(experiment.getBuyPrice().intValue())
                 .currentPrice(currentPrice)
                 .buyAt(experiment.getBuyAt())
-                .build());
+                .build();
         }
         
         // 가장 최근 수익률 조회
@@ -325,7 +322,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             );
         }
 
-        return Mono.just(ExperimentStatusDetailResponse.builder()
+        return ExperimentStatusDetailResponse.builder()
             .tradeInfos(tradeInfos)
             .roi(roi)
             .status(experiment.getStatus())
@@ -335,24 +332,24 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .buyPrice(experiment.getBuyPrice().intValue())
             .currentPrice(currentPrice)
             .buyAt(experiment.getBuyAt())
-            .build());
+            .build();
     }
 
     private COUNTRY getCountryFromExchangeNum(EXCHANGENUM exchangenum) {
         return List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF).contains(exchangenum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
     }
 
-    public Mono<ExperimentSimpleResponse> buyExperiment(final CustomUserDetails customUserDetails, final Integer stockId, String country) {
+    @Transactional
+    public ExperimentSimpleResponse buyExperiment(final CustomUserDetails customUserDetails, final Integer stockId, String country) {
         // Stock 조회 및 검증
         final Optional<Stock> stockById = stockRepository.findStockById(stockId);
         if (stockById.isEmpty()) {
             log.warn("Stock not found - stockId: {}", stockId);
-            return Mono.just(ExperimentSimpleResponse.builder()
+            return ExperimentSimpleResponse.builder()
                 .message("종목을 찾을 수 없습니다")
                 .success(false)
                 .price(0.0d)
-                .build()
-            );
+                .build();
         }
         final Stock stock = stockById.get();
 
@@ -360,12 +357,11 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         final Optional<User> userById = userRepository.findByEmail(customUserDetails.getEmail());
         if (userById.isEmpty()) {
             log.warn("User not found - email: {}", customUserDetails.getEmail());
-            return Mono.just(ExperimentSimpleResponse.builder()
+            return ExperimentSimpleResponse.builder()
                 .message("사용자 정보를 찾을 수 없습니다")
                 .success(false)
                 .price(0.0d)
-                .build()
-            );
+                .build();
         }
         final User user = userById.get();
 
@@ -384,12 +380,11 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             scoreOptional = scoreRepository.findTopByStockIdOrderByDateDesc(stockId);
             if (scoreOptional.isEmpty()) {
                 log.error("No score found for stock - stockId: {}", stockId);
-                return Mono.just(ExperimentSimpleResponse.builder()
+                return ExperimentSimpleResponse.builder()
                     .message("점수 정보를 찾을 수 없습니다")
                     .success(false)
                     .price(0.0d)
-                    .build()
-                );
+                    .build();
             }
             log.info("Using latest score instead of today's score for stockId: {}", stockId);
         }
@@ -398,27 +393,24 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
         // 차트에서 이미 작동하는 getSecurityStockInfoKorea 사용 (inquire-price API)
         // inquire-price-2는 작동하지 않으므로 inquire-price로 변경
-        final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea(
-            stock.getId(),
-            stock.getSymbolName(),
-            stock.getSecurityName(),
-            stock.getSymbol(),
-            stock.getExchangeNum(),
-            getCountryFromExchangeNum(stock.getExchangeNum())
-        );
-
         // StockInfo 조회 - 차트와 동일한 방식으로 .block() 사용
         StockInfoResponse stockInfoResponse;
         try {
-            stockInfoResponse = securityStockInfoKorea.block();
+            stockInfoResponse = securityService.getSecurityStockInfoKorea(
+                stock.getId(),
+                stock.getSymbolName(),
+                stock.getSecurityName(),
+                stock.getSymbol(),
+                stock.getExchangeNum(),
+                getCountryFromExchangeNum(stock.getExchangeNum())
+            ).block();
         } catch (Exception e) {
             log.warn("Failed to get StockInfo for stock - stockId: {}, error: {}", stockId, e.getMessage());
-            return Mono.just(ExperimentSimpleResponse.builder()
+            return ExperimentSimpleResponse.builder()
                 .message("주가 정보를 가져올 수 없습니다")
                 .success(false)
                 .price(0.0d)
-                .build()
-            );
+                .build();
         }
 
         if (stockInfoResponse.getCountry().equals(COUNTRY.KOREA)) {
@@ -427,12 +419,11 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
             // 하루에 같은 종목 중복 구매 불가 처리
             if (experimentByStockIdAndBuyAt.isPresent()) {
-                return Mono.just(ExperimentSimpleResponse.builder()
+                return ExperimentSimpleResponse.builder()
                     .message("같은 종목 중복 구매")
                     .success(false)
                     .price(0.0d)
-                    .build()
-                );
+                    .build();
             }
 
             LocalTime koreaEndTime = LocalTime.of(17, 0);
@@ -449,12 +440,11 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             if (price == null) {
                 log.error("Price is null for stock - stockId: {}, stockInfo: price={}, yesterdayPrice={}", 
                     stockId, stockInfoResponse.getPrice(), stockInfoResponse.getYesterdayPrice());
-                return Mono.just(ExperimentSimpleResponse.builder()
+                return ExperimentSimpleResponse.builder()
                     .message("주가 정보를 가져올 수 없습니다")
                     .success(false)
                     .price(0.0d)
-                    .build()
-                );
+                    .build();
             }
         } else {
             // 해외 주식 로직
@@ -464,12 +454,11 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             Optional<Experiment> existingItem = experimentRepository.findExperimentByStockIdForToday(stockId, startOfToday, endOfToday);
 
             if (existingItem.isPresent()) {
-                return Mono.just(ExperimentSimpleResponse.builder()
+                return ExperimentSimpleResponse.builder()
                     .message("같은 종목 중복 구매")
                     .success(false)
                     .price(0.0d)
-                    .build()
-                );
+                    .build();
             }
 
             LocalTime overseasEndTime = LocalTime.of(6, 0);
@@ -486,12 +475,11 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             if (price == null) {
                 log.error("Price is null for overseas stock - stockId: {}, stockInfo: price={}, yesterdayPrice={}", 
                     stockId, stockInfoResponse.getPrice(), stockInfoResponse.getYesterdayPrice());
-                return Mono.just(ExperimentSimpleResponse.builder()
+                return ExperimentSimpleResponse.builder()
                     .message("주가 정보를 가져올 수 없습니다")
                     .success(false)
                     .price(0.0d)
-                    .build()
-                );
+                    .build();
             }
         }
 
@@ -521,16 +509,15 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
         experimentTradeItemRepository.save(experimentTradeItem);
 
-        return Mono.just(ExperimentSimpleResponse.builder()
+        return ExperimentSimpleResponse.builder()
             .message("모의 매수 성공")
             .success(true)
             .price(price)
-            .build()
-        );
+            .build();
     }
 
     // 매수결과 조회
-    public Mono<ExperimentReportResponse> getReport(CustomUserDetails customUserDetails) {
+    public ExperimentReportResponse getReport(CustomUserDetails customUserDetails) {
         final String email = customUserDetails.getEmail();
 
         // 인간지표 점수대별 평균 수익률
@@ -665,7 +652,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         }
 
         // 투자 패턴 그래프 데이터
-        final ExperimentReportResponse experimentReportResponse = ExperimentReportResponse.builder()
+        return ExperimentReportResponse.builder()
             .weeklyExperimentCount(weeklyExperimentCount)
             .reportStatisticDtos(reportStatisticDtos)
             .sameGradeUserRate(sameGradeUserRage)
@@ -673,12 +660,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .totalUserExperiments(totalExperimentCount)
             .reportPatternDtos(reportPatternDtos)
             .build();
-
-        return Mono.just(experimentReportResponse);
     }
 
     // Lab 결과 화면용 응답 (mock 구조 기반)
-    public Mono<PortfolioResultResponse> getPortfolioResult(final CustomUserDetails customUserDetails) {
+    public PortfolioResultResponse getPortfolioResult(final CustomUserDetails customUserDetails) {
         final String email = customUserDetails.getEmail();
 
         // 완료/진행 실험 분리 집계
@@ -914,15 +899,13 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .lowestProfit(lowest)
             .build();
 
-        PortfolioResultResponse response = PortfolioResultResponse.builder()
+        return PortfolioResultResponse.builder()
             .scoreTable(scoreTable)
             .experimentSummary(summary)
             .humanIndex(humanIndex)
             .investmentPattern(investmentPattern)
             .history(history)
             .build();
-
-        return Mono.just(response);
     }
 
     private String toScoreRangeLabel(int score) {
@@ -971,6 +954,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
     }
 
     // 자동판매 - 실험 데이터 수정
+    @Transactional
     public void updateExperiment(Experiment experiment) {
         try {
             // 이미 완료된 실험은 스킵
@@ -984,18 +968,17 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                     experiment.getId(), experiment.getStock().getId(), experiment.getStock().getSymbol());
             final Stock stock = experiment.getStock();
 
-            final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea
-                (
-                    stock.getId(),
-                    stock.getSymbolName(),
-                    stock.getSecurityName(),
-                    stock.getSymbol(),
-                    stock.getExchangeNum(),
-                    getCountryFromExchangeNum(stock.getExchangeNum())
-                );
+            final StockInfoResponse stockInfo = securityService.getSecurityStockInfoKorea(
+                stock.getId(),
+                stock.getSymbolName(),
+                stock.getSecurityName(),
+                stock.getSymbol(),
+                stock.getExchangeNum(),
+                getCountryFromExchangeNum(stock.getExchangeNum())
+            ).block();
 
-            if (securityStockInfoKorea.blockOptional().isPresent()) {
-                final Double price = securityStockInfoKorea.block().getPrice();
+            if (stockInfo != null && stockInfo.getPrice() != null) {
+                final Double price = stockInfo.getPrice();
                 // ROI 계산: ((현재가 - 매수가) / 매수가) * 100
                 final Double roi = ((price - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
 
@@ -1033,6 +1016,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
     }
 
+    @Transactional
     public void saveExperimentTradeItem(Experiment experiment) {
         final LocalDateTime now = LocalDateTime.now();
         final LocalDateTime startOfToday = now.toLocalDate().atStartOfDay(); // 오늘 시작 시간
@@ -1043,21 +1027,39 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         if (experimentTradeItemsByExperimentId.isEmpty()) {
             final Stock stock = experiment.getStock();
 
-            final Mono<StockInfoResponse> securityStockInfoKorea = securityService.getSecurityStockInfoKorea
-                (
+            StockInfoResponse stockInfoResponse;
+            try {
+                stockInfoResponse = securityService.getSecurityStockInfoKorea(
                     stock.getId(),
                     stock.getSymbolName(),
                     stock.getSecurityName(),
                     stock.getSymbol(),
                     stock.getExchangeNum(),
                     getCountryFromExchangeNum(stock.getExchangeNum())
-                );
+                ).block();
+            } catch (Exception e) {
+                log.error("Failed to get StockInfo for saveExperimentTradeItem - experimentId: {}, stockId: {}", 
+                    experiment.getId(), stock.getId(), e);
+                return;
+            }
 
-            final StockInfoResponse stockInfoResponse = securityStockInfoKorea.block();
+            if (stockInfoResponse == null || stockInfoResponse.getPrice() == null) {
+                log.warn("StockInfo or price is null for saveExperimentTradeItem - experimentId: {}, stockId: {}", 
+                    experiment.getId(), stock.getId());
+                return;
+            }
 
             final Double price = stockInfoResponse.getPrice();
             double roi = ((price - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
-            final Score findByStockIdAndDate = scoreRepository.findByStockIdAndDate(experiment.getStock().getId(), LocalDate.now()).get();
+            
+            Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(experiment.getStock().getId(), LocalDate.now());
+            if (scoreOptional.isEmpty()) {
+                log.warn("Today's score not found for saveExperimentTradeItem - experimentId: {}, stockId: {}", 
+                    experiment.getId(), stock.getId());
+                return;
+            }
+            
+            final Score findByStockIdAndDate = scoreOptional.get();
             int score = 9999;
 
             if (stockInfoResponse.getCountry().equals(COUNTRY.KOREA)) {
@@ -1075,6 +1077,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 .build();
 
             experimentTradeItemRepository.save(experimentTradeItem);
+            log.debug("Saved ExperimentTradeItem for experimentId: {}", experiment.getId());
         }
     }
 }

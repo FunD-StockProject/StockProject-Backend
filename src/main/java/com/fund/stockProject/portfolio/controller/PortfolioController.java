@@ -13,7 +13,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import reactor.core.publisher.Mono;
 
 @RestController
 @RequiredArgsConstructor
@@ -29,11 +28,11 @@ public class PortfolioController {
             summary = "실험 결과 리포트 조회 (Alias)",
             description = "/experiment/report와 동일한 응답을 반환합니다."
     )
-    public ResponseEntity<Mono<ExperimentReportResponse>> getReport(
+    public ResponseEntity<ExperimentReportResponse> getReport(
             @io.swagger.v3.oas.annotations.Parameter(hidden = true)
             @AuthenticationPrincipal CustomUserDetails customUserDetails
     ) {
-        return ResponseEntity.ok().body(experimentService.getReport(customUserDetails));
+        return ResponseEntity.ok(experimentService.getReport(customUserDetails));
     }
 
     @GetMapping("/result")
@@ -41,11 +40,11 @@ public class PortfolioController {
             summary = "포트폴리오 결과 조회",
             description = "사용자의 투자 포트폴리오 결과를 종합 분석하여 반환합니다. 점수 테이블, 인간지표, 투자 패턴, 히스토리 데이터를 포함합니다."
     )
-    public ResponseEntity<Mono<PortfolioResultResponse>> getResult(
+    public ResponseEntity<PortfolioResultResponse> getResult(
             @io.swagger.v3.oas.annotations.Parameter(hidden = true)
             @AuthenticationPrincipal CustomUserDetails customUserDetails
     ) {
-        return ResponseEntity.ok().body(experimentService.getPortfolioResult(customUserDetails));
+        return ResponseEntity.ok(experimentService.getPortfolioResult(customUserDetails));
     }
 }
 
