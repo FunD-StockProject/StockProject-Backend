@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import reactor.core.publisher.Mono;
 
 @RestController
 @RequiredArgsConstructor
@@ -35,9 +34,9 @@ public class ExperimentController {
             summary = "실험 현황 조회 (Alias)",
             description = "/experiment/status와 동일한 응답을 반환합니다."
     )
-    public ResponseEntity<Mono<ExperimentStatusResponse>> getExperimentStatusAlias(
+    public ResponseEntity<ExperimentStatusResponse> getExperimentStatusAlias(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails customUserDetails) {
-        return ResponseEntity.ok().body(experimentService.getExperimentStatus(customUserDetails));
+        return ResponseEntity.ok(experimentService.getExperimentStatus(customUserDetails));
     }
 
     @GetMapping("/status")
@@ -45,9 +44,9 @@ public class ExperimentController {
             summary = "실험 현황 조회",
             description = "사용자의 모든 실험 현황을 조회합니다. 진행 중인 실험과 완료된 실험을 분리하여 반환합니다."
     )
-    public ResponseEntity<Mono<ExperimentStatusResponse>> getExperimentStatus(
+    public ResponseEntity<ExperimentStatusResponse> getExperimentStatus(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails customUserDetails) {
-        return ResponseEntity.ok().body(experimentService.getExperimentStatus(customUserDetails));
+        return ResponseEntity.ok(experimentService.getExperimentStatus(customUserDetails));
     }
 
     @GetMapping("/status/{experimentId}/detail")
@@ -55,14 +54,14 @@ public class ExperimentController {
             summary = "실험 상세 정보 조회",
             description = "특정 실험의 상세 정보 및 5영업일간의 점수/가격 변화 그래프 데이터를 조회합니다."
     )
-    public ResponseEntity<Mono<ExperimentStatusDetailResponse>> getExperimentStatusDetail(
+    public ResponseEntity<ExperimentStatusDetailResponse> getExperimentStatusDetail(
             @Parameter(
                     description = "실험 ID",
                     required = true,
                     example = "1"
             )
             @PathVariable("experimentId") Integer experimentId) {
-        return ResponseEntity.ok().body(experimentService.getExperimentStatusDetail(experimentId));
+        return ResponseEntity.ok(experimentService.getExperimentStatusDetail(experimentId));
     }
 
     @PostMapping("/{stockId}/buy/{country}")
@@ -70,7 +69,7 @@ public class ExperimentController {
             summary = "종목 매수 (실험 시작)",
             description = "지정된 종목을 모의 매수하여 실험을 시작합니다. 5영업일 후 자동 매도됩니다."
     )
-    public ResponseEntity<Mono<ExperimentSimpleResponse>> buyExperiment(
+    public ResponseEntity<ExperimentSimpleResponse> buyExperiment(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails customUserDetails,
             @Parameter(
                     description = "종목 ID",
@@ -85,7 +84,7 @@ public class ExperimentController {
                     schema = @Schema(allowableValues = {"KOREA", "OVERSEA"})
             )
             @PathVariable("country") String country) {
-        return ResponseEntity.ok().body(experimentService.buyExperiment(customUserDetails, stockId, country));
+        return ResponseEntity.ok(experimentService.buyExperiment(customUserDetails, stockId, country));
     }
 
     @GetMapping("/report")
@@ -93,8 +92,8 @@ public class ExperimentController {
             summary = "실험 결과 리포트 조회",
             description = "완료된 실험들의 결과 리포트를 조회합니다."
     )
-    public ResponseEntity<Mono<ExperimentReportResponse>> getReport(
+    public ResponseEntity<ExperimentReportResponse> getReport(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails customUserDetails) {
-        return ResponseEntity.ok().body(experimentService.getReport(customUserDetails));
+        return ResponseEntity.ok(experimentService.getReport(customUserDetails));
     }
 }
