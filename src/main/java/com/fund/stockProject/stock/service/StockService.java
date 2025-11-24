@@ -13,7 +13,8 @@ import com.fund.stockProject.score.service.ScoreService;
 import com.fund.stockProject.stock.domain.CATEGORY;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
-import com.fund.stockProject.stock.domain.SECTOR;
+import com.fund.stockProject.stock.domain.DomesticSector;
+import com.fund.stockProject.stock.domain.OverseasSector;
 import com.fund.stockProject.stock.dto.response.*;
 import com.fund.stockProject.stock.dto.response.StockChartResponse.PriceInfo;
 import com.fund.stockProject.stock.entity.Stock;
@@ -897,24 +898,79 @@ public class StockService {
     }
 
     /**
-     * 특정 SECTOR의 주식을 추천합니다.
+     * 특정 DomesticSector의 주식을 추천합니다.
      * 점수 기반 가중치 랜덤 추천을 사용합니다.
      * 
      * 금융 서비스이므로 UNKNOWN 섹터는 추천 대상에서 제외합니다.
      * 
-     * @param sector 추천할 섹터
+     * @param sector 추천할 국내 섹터
      * @return 추천된 주식(Stock) 엔티티, 없으면 null
      */
-    public Stock getRecommendedStockBySector(SECTOR sector) {
+    public Stock getRecommendedStockByDomesticSector(DomesticSector sector) {
         // UNKNOWN 섹터는 추천하지 않음 (부정확한 정보 제공 방지)
-        if (sector == SECTOR.UNKNOWN) {
+        if (sector == null || sector == DomesticSector.UNKNOWN) {
             return null;
         }
         
         LocalDate today = LocalDate.now();
         
-        // 해당 SECTOR의 valid=true인 주식만 조회
-        List<Stock> validStocks = stockRepository.findValidStocksBySector(sector);
+        // 해당 DomesticSector의 valid=true인 주식만 조회
+        List<Stock> validStocks = stockRepository.findValidStocksByDomesticSector(sector);
+        
+        if (validStocks.isEmpty()) {
+            return null;
+        }
+        
+        // 배치로 점수 조회 (N+1 문제 해결)
+        List<Integer> candidateStockIds = validStocks.stream()
+                .map(Stock::getId)
+                .collect(Collectors.toList());
+        
+        // 오늘 날짜 점수와 최신 점수를 배치로 조회
+        List<Score> todayScores = scoreRepository.findTodayScoresByStockIds(candidateStockIds, today);
+        List<Score> latestScores = scoreRepository.findLatestScoresByStockIds(candidateStockIds);
+        
+        // stockId -> Score 맵 생성 (오늘 점수 우선, 없으면 최신 점수)
+        Map<Integer, Score> scoreMap = new HashMap<>();
+        todayScores.forEach(score -> scoreMap.put(score.getStockId(), score));
+        latestScores.forEach(score -> scoreMap.putIfAbsent(score.getStockId(), score));
+        
+        // 점수가 있는 주식만 필터링
+        List<Stock> stocksWithScore = validStocks.stream()
+                .filter(stock -> scoreMap.containsKey(stock.getId()))
+                .collect(Collectors.toList());
+        
+        if (stocksWithScore.isEmpty()) {
+            return null;
+        }
+        
+        // 각 주식의 가중치 계산 (점수 맵을 전달하여 메모리에서 조회)
+        List<StockWithWeight> stocksWithWeight = calculateWeightsForSector(stocksWithScore, scoreMap);
+        
+        // 가중치 기반 랜덤 선택
+        Random random = new Random(System.currentTimeMillis());
+        return selectWeightedRandom(stocksWithWeight, random);
+    }
+
+    /**
+     * 특정 OverseasSector의 주식을 추천합니다.
+     * 점수 기반 가중치 랜덤 추천을 사용합니다.
+     * 
+     * 금융 서비스이므로 UNKNOWN 섹터는 추천 대상에서 제외합니다.
+     * 
+     * @param sector 추천할 해외 섹터
+     * @return 추천된 주식(Stock) 엔티티, 없으면 null
+     */
+    public Stock getRecommendedStockByOverseasSector(OverseasSector sector) {
+        // UNKNOWN 섹터는 추천하지 않음 (부정확한 정보 제공 방지)
+        if (sector == null || sector == OverseasSector.UNKNOWN) {
+            return null;
+        }
+        
+        LocalDate today = LocalDate.now();
+        
+        // 해당 OverseasSector의 valid=true인 주식만 조회
+        List<Stock> validStocks = stockRepository.findValidStocksByOverseasSector(sector);
         
         if (validStocks.isEmpty()) {
             return null;

@@ -5,7 +5,8 @@ import com.fund.stockProject.preference.repository.PreferenceRepository;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
-import com.fund.stockProject.stock.domain.SECTOR;
+import com.fund.stockProject.stock.domain.DomesticSector;
+import com.fund.stockProject.stock.domain.OverseasSector;
 import com.fund.stockProject.stock.dto.response.StockInfoResponse;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockRepository;
@@ -114,7 +115,7 @@ public class ShortViewService {
         Stock recommendedStock = selectWeightedRandom(stocksWithWeight, random);
         
         log.info("사용자(id:{})에게 주식(id:{}, symbol:{}, sector:{}) 가중치 기반 추천 완료", 
-                user.getId(), recommendedStock.getId(), recommendedStock.getSymbol(), recommendedStock.getSector());
+                user.getId(), recommendedStock.getId(), recommendedStock.getSymbol(), recommendedStock.getSectorString());
         
         return recommendedStock;
     }
@@ -127,9 +128,17 @@ public class ShortViewService {
      */
     private List<StockWithWeight> calculateWeights(List<Stock> stocks, Map<Integer, Score> scoreMap) {
         // Sector별 분포 계산 (다양성 확보를 위해)
-        Map<SECTOR, Long> sectorCounts = stocks.stream()
+        // 국내/해외 섹터를 모두 고려하여 문자열로 통합
+        Map<String, Long> sectorCounts = stocks.stream()
                 .collect(Collectors.groupingBy(
-                        stock -> stock.getSector() != null ? stock.getSector() : SECTOR.UNKNOWN,
+                        stock -> {
+                            if (stock.getDomesticSector() != null && stock.getDomesticSector() != DomesticSector.UNKNOWN) {
+                                return "DOMESTIC_" + stock.getDomesticSector().getName();
+                            } else if (stock.getOverseasSector() != null && stock.getOverseasSector() != OverseasSector.UNKNOWN) {
+                                return "OVERSEAS_" + stock.getOverseasSector().getName();
+                            }
+                            return "UNKNOWN";
+                        },
                         Collectors.counting()
                 ));
         
@@ -147,8 +156,12 @@ public class ShortViewService {
                     double scoreWeight = calculateScoreWeight(scoreValue);
                     
                     // 2. Sector 다양성 가중치 (적게 나온 sector에 더 높은 가중치)
-                    SECTOR sector = stock.getSector() != null ? stock.getSector() : SECTOR.UNKNOWN;
-                    long sectorCount = sectorCounts.getOrDefault(sector, 1L);
+                    String sectorKey = stock.getDomesticSector() != null && stock.getDomesticSector() != DomesticSector.UNKNOWN
+                            ? "DOMESTIC_" + stock.getDomesticSector().getName()
+                            : (stock.getOverseasSector() != null && stock.getOverseasSector() != OverseasSector.UNKNOWN
+                                ? "OVERSEAS_" + stock.getOverseasSector().getName()
+                                : "UNKNOWN");
+                    long sectorCount = sectorCounts.getOrDefault(sectorKey, 1L);
                     double sectorWeight = calculateSectorDiversityWeight(sectorCount, totalStocks);
                     
                     // 최종 가중치 = 점수 가중치 * sector 가중치
@@ -190,7 +203,9 @@ public class ShortViewService {
         if (totalStocks == 0) return 1.0;
         
         // 평균 섹터 개수보다 적게 나온 섹터에 보너스 가중치
-        double avgSectorCount = totalStocks / (double) SECTOR.values().length;
+        // 국내/해외 섹터를 모두 고려 (대략적인 평균 계산)
+        int totalSectorTypes = DomesticSector.values().length + OverseasSector.values().length;
+        double avgSectorCount = totalStocks / (double) totalSectorTypes;
         double ratio = avgSectorCount / Math.max(sectorCount, 1.0);
         
         // 0.8 ~ 1.5 범위로 제한 (너무 극단적이지 않게)
