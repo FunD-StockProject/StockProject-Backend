@@ -1,7 +1,8 @@
 package com.fund.stockProject.stock.repository;
 
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
-import com.fund.stockProject.stock.domain.SECTOR;
+import com.fund.stockProject.stock.domain.DomesticSector;
+import com.fund.stockProject.stock.domain.OverseasSector;
 import com.fund.stockProject.stock.entity.Stock;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -48,8 +49,14 @@ public interface StockRepository extends JpaRepository<Stock, Integer> {
     List<Stock> findAllValidStocks();
 
     /**
-     * 특정 SECTOR의 valid=true인 주식만 조회
+     * 특정 DomesticSector의 valid=true인 주식만 조회
      */
-    @Query("SELECT s FROM Stock s WHERE s.valid = true AND s.sector = :sector")
-    List<Stock> findValidStocksBySector(@Param("sector") SECTOR sector);
+    @Query("SELECT s FROM Stock s WHERE s.valid = true AND s.domesticSector = :sector")
+    List<Stock> findValidStocksByDomesticSector(@Param("sector") DomesticSector sector);
+
+    /**
+     * 특정 OverseasSector의 valid=true인 주식만 조회
+     */
+    @Query("SELECT s FROM Stock s WHERE s.valid = true AND s.overseasSector = :sector")
+    List<Stock> findValidStocksByOverseasSector(@Param("sector") OverseasSector sector);
 }

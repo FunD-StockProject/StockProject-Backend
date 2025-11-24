@@ -8,7 +8,8 @@ import com.fund.stockProject.keyword.entity.StockKeyword;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 
-import com.fund.stockProject.stock.domain.SECTOR;
+import com.fund.stockProject.stock.domain.DomesticSector;
+import com.fund.stockProject.stock.domain.OverseasSector;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -56,7 +57,10 @@ public class Stock extends Core {
     private EXCHANGENUM exchangeNum;
 
     @Enumerated(EnumType.STRING)
-    private SECTOR sector = SECTOR.UNKNOWN;
+    private DomesticSector domesticSector;
+
+    @Enumerated(EnumType.STRING)
+    private OverseasSector overseasSector;
 
     private String imageUrl;
 
@@ -72,8 +76,39 @@ public class Stock extends Core {
         this.valid = valid;
     }
 
-    public void setSector(SECTOR sector) {
-        this.sector = sector;
+    public void setDomesticSector(DomesticSector domesticSector) {
+        this.domesticSector = domesticSector;
+        this.overseasSector = null; // 국내 섹터 설정 시 해외 섹터는 null
+    }
+
+    public void setOverseasSector(OverseasSector overseasSector) {
+        this.overseasSector = overseasSector;
+        this.domesticSector = null; // 해외 섹터 설정 시 국내 섹터는 null
+    }
+
+    /**
+     * 거래소에 따라 적절한 섹터를 설정합니다.
+     */
+    public void setSectorByExchange(String sectorCode, EXCHANGENUM exchangeNum) {
+        if (exchangeNum == EXCHANGENUM.KOSPI || exchangeNum == EXCHANGENUM.KOSDAQ) {
+            this.domesticSector = DomesticSector.fromCode(sectorCode, exchangeNum);
+            this.overseasSector = null;
+        } else if (exchangeNum == EXCHANGENUM.NAS || exchangeNum == EXCHANGENUM.NYS || exchangeNum == EXCHANGENUM.AMS) {
+            this.overseasSector = OverseasSector.fromCode(sectorCode);
+            this.domesticSector = null;
+        }
+    }
+
+    /**
+     * 현재 섹터 정보를 문자열로 반환합니다 (로깅용).
+     */
+    public String getSectorString() {
+        if (domesticSector != null && domesticSector != DomesticSector.UNKNOWN) {
+            return domesticSector.getName();
+        } else if (overseasSector != null && overseasSector != OverseasSector.UNKNOWN) {
+            return overseasSector.getName();
+        }
+        return "Unknown";
     }
 
     // 종목 데이터 임포트를 위한 생성자

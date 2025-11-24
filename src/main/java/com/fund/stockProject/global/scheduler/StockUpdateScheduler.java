@@ -30,6 +30,12 @@ public class StockUpdateScheduler {
             String scriptPath = "scripts/import_stocks.py";
             File scriptFile = new File(scriptPath);
             
+            // Docker 환경에서는 /app 경로 기준으로 실행
+            if (!scriptFile.exists()) {
+                scriptPath = "/app/scripts/import_stocks.py";
+                scriptFile = new File(scriptPath);
+            }
+            
             if (!scriptFile.exists()) {
                 log.error("Stock import script not found: {}", scriptPath);
                 return;
@@ -37,7 +43,9 @@ public class StockUpdateScheduler {
 
             log.info("Executing Python script: {}", scriptPath);
             ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath);
-            processBuilder.directory(new File("."));
+            // 스크립트가 있는 디렉토리를 작업 디렉토리로 설정
+            File scriptDir = scriptFile.getParentFile();
+            processBuilder.directory(scriptDir != null ? scriptDir : new File("."));
             processBuilder.redirectErrorStream(true);
             
             Process process = processBuilder.start();
@@ -59,6 +67,16 @@ public class StockUpdateScheduler {
             
             // 2. 생성된 JSON 파일을 DB에 반영
             String jsonFilePath = "scripts/stocks_data.json";
+            File jsonFile = new File(jsonFilePath);
+            // Docker 환경에서는 /app 경로 기준으로 확인
+            if (!jsonFile.exists()) {
+                jsonFilePath = "/app/scripts/stocks_data.json";
+                jsonFile = new File(jsonFilePath);
+            }
+            if (!jsonFile.exists()) {
+                log.error("Generated JSON file not found: {}", jsonFilePath);
+                return;
+            }
             log.info("Importing stocks from JSON file: {}", jsonFilePath);
             stockImportService.importStocksFromJson(jsonFilePath);
             

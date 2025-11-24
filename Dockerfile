@@ -33,7 +33,8 @@ RUN pip install --no-cache-dir \
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-COPY scripts/*.py /app/
+# Python 스크립트와 필요한 모듈만 복사 (scripts 폴더에 stocks_info 포함)
+COPY scripts/ /app/scripts/
 
 COPY --from=build /app/build/libs/*.jar /app/app.jar
 

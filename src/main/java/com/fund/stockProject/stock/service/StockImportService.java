@@ -5,9 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fund.stockProject.experiment.repository.ExperimentRepository;
 import com.fund.stockProject.preference.repository.PreferenceRepository;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
-import com.fund.stockProject.stock.domain.SECTOR;
+import com.fund.stockProject.stock.domain.DomesticSector;
+import com.fund.stockProject.stock.domain.OverseasSector;
 import com.fund.stockProject.stock.entity.Stock;
-import com.fund.stockProject.stock.mapper.KisGicsMapper;
 import com.fund.stockProject.stock.repository.StockRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -86,18 +86,29 @@ public class StockImportService {
                         continue;
                     }
 
-                    // 섹터 코드 매핑 (KIS 업종 코드 → GICS Sector)
-                    // 금융 서비스이므로 부정확한 매핑보다는 UNKNOWN을 반환하는 것이 안전합니다.
-                    SECTOR sector = SECTOR.UNKNOWN;
+                    // 섹터 코드 매핑 (KIS 업종 코드 → DomesticSector 또는 OverseasSector)
+                    // KIS에서 제공하는 공식 업종 코드를 그대로 사용합니다.
                     if (sectorCodeStr != null && !sectorCodeStr.isEmpty() && !sectorCodeStr.equals("nan")) {
-                        sector = KisGicsMapper.mapToGicsSector(sectorCodeStr, exchangeNum);
-                        if (sector == SECTOR.UNKNOWN) {
-                            // 매핑 실패는 정상적인 상황일 수 있으므로 debug 레벨로 로깅
-                            log.debug("Sector mapping failed: code={}, exchange={}, stock={}. Using UNKNOWN.", 
-                                sectorCodeStr, exchangeNum, symbol);
-                        } else {
-                            log.trace("Mapped KIS sector code: {} -> GICS Sector: {} for stock: {}", 
-                                sectorCodeStr, sector, symbol);
+                        if (exchangeNum == EXCHANGENUM.KOSPI || exchangeNum == EXCHANGENUM.KOSDAQ) {
+                            // 국내 주식: DomesticSector 사용
+                            DomesticSector domesticSector = DomesticSector.fromCode(sectorCodeStr, exchangeNum);
+                            if (domesticSector == DomesticSector.UNKNOWN) {
+                                log.debug("Domestic sector mapping failed: code={}, exchange={}, stock={}. Using UNKNOWN.", 
+                                    sectorCodeStr, exchangeNum, symbol);
+                            } else {
+                                log.trace("Mapped KIS sector code: {} -> DomesticSector: {} for stock: {}", 
+                                    sectorCodeStr, domesticSector, symbol);
+                            }
+                        } else if (exchangeNum == EXCHANGENUM.NAS || exchangeNum == EXCHANGENUM.NYS || exchangeNum == EXCHANGENUM.AMS) {
+                            // 해외 주식: OverseasSector 사용
+                            OverseasSector overseasSector = OverseasSector.fromCode(sectorCodeStr);
+                            if (overseasSector == OverseasSector.UNKNOWN) {
+                                log.debug("Overseas sector mapping failed: code={}, exchange={}, stock={}. Using UNKNOWN.", 
+                                    sectorCodeStr, exchangeNum, symbol);
+                            } else {
+                                log.trace("Mapped KIS sector code: {} -> OverseasSector: {} for stock: {}", 
+                                    sectorCodeStr, overseasSector, symbol);
+                            }
                         }
                     }
 
@@ -110,16 +121,19 @@ public class StockImportService {
                         stock.updateSymbolNameIfNull(symbolName);
                         // 종목 마스터에 있으므로 valid = true로 설정
                         setStockValid(stock, true);
-                        // 섹터 업데이트 (UNKNOWN이 아닌 경우에만)
-                        if (sector != SECTOR.UNKNOWN) {
-                            stock.setSector(sector);
+                        // 섹터 업데이트
+                        if (sectorCodeStr != null && !sectorCodeStr.isEmpty() && !sectorCodeStr.equals("nan")) {
+                            stock.setSectorByExchange(sectorCodeStr, exchangeNum);
                         }
                         stockRepository.save(stock);
                         updated++;
                     } else {
                         // 새 종목 생성
                         Stock stock = createStock(symbol, symbolName, securityName, exchangeNum, true);
-                        stock.setSector(sector);
+                        // 섹터 설정
+                        if (sectorCodeStr != null && !sectorCodeStr.isEmpty() && !sectorCodeStr.equals("nan")) {
+                            stock.setSectorByExchange(sectorCodeStr, exchangeNum);
+                        }
                         stockRepository.save(stock);
                         saved++;
                     }
@@ -175,7 +189,8 @@ public class StockImportService {
 
             // 섹터 매핑 통계 계산
             long stocksWithSector = stockRepository.findAll().stream()
-                .filter(s -> s.getSector() != null && s.getSector() != SECTOR.UNKNOWN)
+                .filter(s -> (s.getDomesticSector() != null && s.getDomesticSector() != DomesticSector.UNKNOWN) ||
+                             (s.getOverseasSector() != null && s.getOverseasSector() != OverseasSector.UNKNOWN))
                 .count();
             long totalStocks = stockRepository.count();
             double sectorMappingRate = totalStocks > 0 ? 

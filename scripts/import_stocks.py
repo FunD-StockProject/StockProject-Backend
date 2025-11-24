@@ -9,8 +9,12 @@ import os
 import json
 import pandas as pd
 
-# open-trading-api 경로 추가
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'open-trading-api', 'stocks_info'))
+# stocks_info 모듈 경로 추가 (scripts/stocks_info 폴더 사용)
+stocks_info_path = os.path.join(os.path.dirname(__file__), 'stocks_info')
+# 로컬 개발 환경에서는 open-trading-api/stocks_info도 시도
+if not os.path.exists(stocks_info_path):
+    stocks_info_path = os.path.join(os.path.dirname(__file__), '..', 'open-trading-api', 'stocks_info')
+sys.path.insert(0, stocks_info_path)
 
 try:
     from kis_kospi_code_mst import get_kospi_master_dataframe, kospi_master_download

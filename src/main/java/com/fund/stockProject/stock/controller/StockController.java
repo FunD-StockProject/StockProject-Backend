@@ -2,7 +2,8 @@ package com.fund.stockProject.stock.controller;
 
 import com.fund.stockProject.stock.domain.CATEGORY;
 import com.fund.stockProject.stock.domain.COUNTRY;
-import com.fund.stockProject.stock.domain.SECTOR;
+import com.fund.stockProject.stock.domain.DomesticSector;
+import com.fund.stockProject.stock.domain.OverseasSector;
 import com.fund.stockProject.stock.dto.response.*;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.service.StockService;
@@ -111,27 +112,27 @@ public class StockController {
         return ResponseEntity.ok().body(stockService.getSummarys(symbol, country));
     }
 
-    @GetMapping("/sector/{sector}/recommend")
-    @Operation(summary = "SECTOR별 주식 추천", description = "특정 섹터의 주식을 점수 기반으로 추천합니다. 실시간 시세 조회 실패 시 가격 필드는 null로 반환됩니다.")
-    public ResponseEntity<ShortViewResponse> getRecommendationBySector(
-            @io.swagger.v3.oas.annotations.Parameter(description = "추천할 섹터", example = "INFORMATION_TECHNOLOGY", required = true)
+    @GetMapping("/sector/domestic/{sector}/recommend")
+    @Operation(summary = "국내 섹터별 주식 추천", description = "특정 국내 섹터의 주식을 점수 기반으로 추천합니다. 실시간 시세 조회 실패 시 가격 필드는 null로 반환됩니다.")
+    public ResponseEntity<ShortViewResponse> getRecommendationByDomesticSector(
+            @io.swagger.v3.oas.annotations.Parameter(description = "추천할 국내 섹터", example = "RETAIL", required = true)
             @PathVariable String sector
     ) {
         try {
-            // SECTOR enum으로 변환
-            SECTOR sectorEnum;
+            // DomesticSector enum으로 변환
+            DomesticSector sectorEnum;
             try {
-                sectorEnum = SECTOR.valueOf(sector.toUpperCase());
+                sectorEnum = DomesticSector.valueOf(sector.toUpperCase());
             } catch (IllegalArgumentException e) {
-                log.warn("잘못된 SECTOR 값: {}", sector);
+                log.warn("잘못된 DomesticSector 값: {}", sector);
                 return ResponseEntity.badRequest().build();
             }
 
-            log.info("SECTOR({})별 추천을 요청했습니다.", sectorEnum);
+            log.info("DomesticSector({})별 추천을 요청했습니다.", sectorEnum);
 
-            Stock recommendedStock = stockService.getRecommendedStockBySector(sectorEnum);
+            Stock recommendedStock = stockService.getRecommendedStockByDomesticSector(sectorEnum);
             if (recommendedStock != null) {
-                log.info("SECTOR({})에서 주식({})을 추천했습니다.", sectorEnum, recommendedStock.getSymbolName());
+                log.info("DomesticSector({})에서 주식({})을 추천했습니다.", sectorEnum, recommendedStock.getSymbolName());
                 
                 // 실시간 가격 정보를 동기적으로 가져오기
                 try {
@@ -146,7 +147,47 @@ public class StockController {
                 return ResponseEntity.noContent().build();
             }
         } catch (Exception e) {
-            log.error("SECTOR별 추천 중 오류 발생: {}", sector, e);
+            log.error("DomesticSector별 추천 중 오류 발생: {}", sector, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/sector/overseas/{sector}/recommend")
+    @Operation(summary = "해외 섹터별 주식 추천", description = "특정 해외 섹터의 주식을 점수 기반으로 추천합니다. 실시간 시세 조회 실패 시 가격 필드는 null로 반환됩니다.")
+    public ResponseEntity<ShortViewResponse> getRecommendationByOverseasSector(
+            @io.swagger.v3.oas.annotations.Parameter(description = "추천할 해외 섹터", example = "FINANCIALS", required = true)
+            @PathVariable String sector
+    ) {
+        try {
+            // OverseasSector enum으로 변환
+            OverseasSector sectorEnum;
+            try {
+                sectorEnum = OverseasSector.valueOf(sector.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("잘못된 OverseasSector 값: {}", sector);
+                return ResponseEntity.badRequest().build();
+            }
+
+            log.info("OverseasSector({})별 추천을 요청했습니다.", sectorEnum);
+
+            Stock recommendedStock = stockService.getRecommendedStockByOverseasSector(sectorEnum);
+            if (recommendedStock != null) {
+                log.info("OverseasSector({})에서 주식({})을 추천했습니다.", sectorEnum, recommendedStock.getSymbolName());
+                
+                // 실시간 가격 정보를 동기적으로 가져오기
+                try {
+                    var stockInfo = securityService.getRealTimeStockPrice(recommendedStock).block();
+                    return ResponseEntity.ok(ShortViewResponse.fromEntityWithPrice(recommendedStock, stockInfo));
+                } catch (Exception e) {
+                    log.warn("실시간 가격 조회 실패, 기본 정보로 응답합니다. stock_id: {}, error: {}", 
+                            recommendedStock.getId(), e.getMessage());
+                    return ResponseEntity.ok(ShortViewResponse.fromEntity(recommendedStock));
+                }
+            } else {
+                return ResponseEntity.noContent().build();
+            }
+        } catch (Exception e) {
+            log.error("OverseasSector별 추천 중 오류 발생: {}", sector, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
