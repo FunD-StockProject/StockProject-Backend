@@ -79,18 +79,14 @@ public class UserService {
      * 사용자의 모든 데이터를 삭제합니다.
      * 북마크, 알림, 실험, 포트폴리오 등 모든 사용자 관련 데이터를 삭제합니다.
      * 회원 탈퇴와 달리 사용자 계정은 유지됩니다.
+     * @param userId 삭제할 사용자 ID
      */
     @Transactional
-    public void deleteAllUserData() {
-        String email = AuthService.getCurrentUserEmail();
-        if (email == null) {
-            throw new IllegalStateException("Authentication required");
+    public void deleteAllUserData(Integer userId) {
+        // 사용자 존재 여부 확인
+        if (!userRepository.existsById(userId)) {
+            throw new EntityNotFoundException("User not found with id: " + userId);
         }
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new EntityNotFoundException("User not found: " + email));
-
-        Integer userId = user.getId();
 
         // 1. ExperimentTradeItem 삭제 (외래 키 제약 조건 때문에 가장 먼저 삭제)
         experimentTradeItemRepository.deleteByUserId(userId);

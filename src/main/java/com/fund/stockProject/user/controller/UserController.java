@@ -79,16 +79,19 @@ public class UserController {
         }
     }
 
-    @DeleteMapping("/all")
+    @DeleteMapping("/all/{userId}")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "모든 사용자 데이터 삭제", description = "북마크, 알림, 실험, 포트폴리오 등 사용자의 모든 데이터를 삭제합니다. 회원 탈퇴와 달리 사용자 계정은 유지됩니다.")
+    @Operation(summary = "모든 사용자 데이터 삭제", description = "ADMIN 권한 필요. 북마크, 알림, 실험, 포트폴리오 등 지정된 사용자의 모든 데이터를 삭제합니다. 회원 탈퇴와 달리 사용자 계정은 유지됩니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "삭제 성공", content = @Content),
             @ApiResponse(responseCode = "401", description = "인증 필요", content = @Content),
+            @ApiResponse(responseCode = "403", description = "권한 없음 (ADMIN만 가능)", content = @Content),
             @ApiResponse(responseCode = "404", description = "사용자 없음", content = @Content),
             @ApiResponse(responseCode = "500", description = "서버 오류", content = @Content)
     })
     public ResponseEntity<?> deleteAllUserData(
+            @Parameter(description = "삭제할 사용자 ID", required = true)
+            @PathVariable Integer userId,
             @Parameter(hidden = true)
             @AuthenticationPrincipal CustomUserDetails customUserDetails) {
         try {
@@ -96,7 +99,16 @@ public class UserController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Authentication required");
             }
             
-            userService.deleteAllUserData();
+            // ADMIN 권한 체크
+            boolean isAdmin = customUserDetails.getAuthorities().stream()
+                    .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+            
+            if (!isAdmin) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("message", "Only ADMIN users can delete user data"));
+            }
+            
+            userService.deleteAllUserData(userId);
             return ResponseEntity.ok(Map.of("message", "All user data deleted successfully"));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Authentication required");
