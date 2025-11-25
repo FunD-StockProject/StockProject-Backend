@@ -336,6 +336,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
     }
 
     private COUNTRY getCountryFromExchangeNum(EXCHANGENUM exchangenum) {
+        if (exchangenum == null) {
+            log.warn("ExchangeNum is null, defaulting to KOREA");
+            return COUNTRY.KOREA; // 기본값
+        }
         return List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ, EXCHANGENUM.KOREAN_ETF).contains(exchangenum) ? COUNTRY.KOREA : COUNTRY.OVERSEA;
     }
 
@@ -928,7 +932,35 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             return new ArrayList<>();
         }
 
-        log.info("Found {} experiments that have passed 5 business days", ExperimentsAfter5BusinessDays.size());
+        // Stock이 제대로 로드되었는지 검증
+        int nullStockCount = 0;
+        for (Experiment exp : ExperimentsAfter5BusinessDays) {
+            try {
+                Stock stock = exp.getStock();
+                if (stock == null) {
+                    nullStockCount++;
+                    log.error("Stock is null after fetch - experimentId: {}", exp.getId());
+                } else {
+                    // Stock 필드 접근하여 프록시 초기화 확인
+                    Integer stockId = stock.getId();
+                    if (stockId == null) {
+                        nullStockCount++;
+                        log.error("Stock.id is null after fetch - experimentId: {}", exp.getId());
+                    }
+                }
+            } catch (Exception e) {
+                nullStockCount++;
+                log.error("Failed to access Stock for experiment - experimentId: {}, error: {}", exp.getId(), e.getMessage());
+            }
+        }
+        
+        if (nullStockCount > 0) {
+            log.warn("Found {} experiments with null or inaccessible Stock out of {} total", 
+                    nullStockCount, ExperimentsAfter5BusinessDays.size());
+        }
+
+        log.info("Found {} experiments that have passed 5 business days ({} with valid Stock)", 
+                ExperimentsAfter5BusinessDays.size(), ExperimentsAfter5BusinessDays.size() - nullStockCount);
         return ExperimentsAfter5BusinessDays;
     }
 
@@ -955,27 +987,47 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
     // 자동판매 - 실험 데이터 수정
     @Transactional
-    public void updateExperiment(Experiment experiment) {
+    public boolean updateExperiment(Experiment experiment) {
         try {
             // 이미 완료된 실험은 스킵
             if (!"PROGRESS".equals(experiment.getStatus())) {
                 log.info("Skipping already completed experiment - experimentId: {}, status: {}", 
                         experiment.getId(), experiment.getStatus());
-                return;
+                return true; // 스킵은 성공으로 간주
+            }
+            
+            // Stock이 null인 경우 실패
+            final Stock stock = experiment.getStock();
+            if (stock == null) {
+                log.error("Stock is null for experiment - experimentId: {}", experiment.getId());
+                return false;
+            }
+            
+            // Stock 필수 필드 검증
+            if (stock.getId() == null || stock.getSymbol() == null || stock.getExchangeNum() == null) {
+                log.error("Stock has null required fields for experiment - experimentId: {}, stockId: {}, symbol: {}, exchangeNum: {}", 
+                        experiment.getId(), stock.getId(), stock.getSymbol(), stock.getExchangeNum());
+                return false;
             }
             
             log.info("Starting auto-sell update for experiment - experimentId: {}, stockId: {}, symbol: {}", 
-                    experiment.getId(), experiment.getStock().getId(), experiment.getStock().getSymbol());
-            final Stock stock = experiment.getStock();
+                    experiment.getId(), stock.getId(), stock.getSymbol());
 
-            final StockInfoResponse stockInfo = securityService.getSecurityStockInfoKorea(
-                stock.getId(),
-                stock.getSymbolName(),
-                stock.getSecurityName(),
-                stock.getSymbol(),
-                stock.getExchangeNum(),
-                getCountryFromExchangeNum(stock.getExchangeNum())
-            ).block();
+            final StockInfoResponse stockInfo;
+            try {
+                stockInfo = securityService.getSecurityStockInfoKorea(
+                    stock.getId(),
+                    stock.getSymbolName(),
+                    stock.getSecurityName(),
+                    stock.getSymbol(),
+                    stock.getExchangeNum(),
+                    getCountryFromExchangeNum(stock.getExchangeNum())
+                ).block();
+            } catch (Exception e) {
+                log.error("Failed to fetch stock info for auto-sell - experimentId: {}, stockId: {}, symbol: {}, error: {}", 
+                        experiment.getId(), stock.getId(), stock.getSymbol(), e.getMessage(), e);
+                return false;
+            }
 
             if (stockInfo != null && stockInfo.getPrice() != null) {
                 final Double price = stockInfo.getPrice();
@@ -987,13 +1039,16 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 experimentRepository.save(experiment);
                 log.info("Auto-sell completed successfully - experimentId: {}, price: {}, roi: {}", 
                         experiment.getId(), price, roi);
+                return true;
             } else {
                 log.warn("Failed to get stock info for auto-sell - experimentId: {}, stockId: {}", 
                         experiment.getId(), stock.getId());
+                return false;
             }
 
         } catch (Exception e) {
             log.error("Failed to auto-sell experiment - experimentId: {}", experiment.getId(), e);
+            return false;
         }
     }
 
