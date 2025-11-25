@@ -144,6 +144,7 @@ public class StockController {
                     return ResponseEntity.ok(ShortViewResponse.fromEntity(recommendedStock));
                 }
             } else {
+                log.warn("DomesticSector({})에 대한 추천 주식을 찾을 수 없습니다. (유효한 주식이 없거나 점수가 없음)", sectorEnum);
                 return ResponseEntity.noContent().build();
             }
         } catch (Exception e) {

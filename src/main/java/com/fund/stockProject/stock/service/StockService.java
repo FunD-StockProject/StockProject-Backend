@@ -37,12 +37,14 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class StockService {
@@ -918,8 +920,14 @@ public class StockService {
         List<Stock> validStocks = stockRepository.findValidStocksByDomesticSector(sector);
         
         if (validStocks.isEmpty()) {
+            log.warn("No valid stocks found for DomesticSector: {} - 쿼리 결과가 비어있습니다. " +
+                    "데이터베이스에 valid=true이고 domesticSector={}인 주식이 있는지 확인하세요.", sector, sector);
             return null;
         }
+        
+        log.info("Found {} valid stocks for DomesticSector: {} (stockIds: {})", 
+                validStocks.size(), sector, 
+                validStocks.stream().map(Stock::getId).limit(10).collect(Collectors.toList()));
         
         // 배치로 점수 조회 (N+1 문제 해결)
         List<Integer> candidateStockIds = validStocks.stream()
@@ -929,6 +937,9 @@ public class StockService {
         // 오늘 날짜 점수와 최신 점수를 배치로 조회
         List<Score> todayScores = scoreRepository.findTodayScoresByStockIds(candidateStockIds, today);
         List<Score> latestScores = scoreRepository.findLatestScoresByStockIds(candidateStockIds);
+        
+        log.info("Score query results for DomesticSector: {} - today scores: {}, latest scores: {} (out of {} stocks)", 
+                sector, todayScores.size(), latestScores.size(), candidateStockIds.size());
         
         // stockId -> Score 맵 생성 (오늘 점수 우선, 없으면 최신 점수)
         Map<Integer, Score> scoreMap = new HashMap<>();
@@ -941,8 +952,26 @@ public class StockService {
                 .collect(Collectors.toList());
         
         if (stocksWithScore.isEmpty()) {
+            // 9999 점수를 가진 주식 개수 확인
+            long invalidScoreCount = validStocks.stream()
+                    .filter(stock -> {
+                        Score score = scoreMap.get(stock.getId());
+                        if (score == null) return false;
+                        int scoreValue = getScoreByCountry(score, stock.getExchangeNum());
+                        return scoreValue == 9999;
+                    })
+                    .count();
+            
+            log.warn("No stocks with valid score found for DomesticSector: {} - " +
+                    "valid stocks: {}, today scores: {}, latest scores: {}, total scores in map: {}, " +
+                    "stocks with 9999 (invalid) score: {}. " +
+                    "Score 테이블에 해당 stockId들의 유효한 점수 데이터가 있는지 확인하세요.", 
+                    sector, validStocks.size(), todayScores.size(), latestScores.size(), scoreMap.size(), invalidScoreCount);
             return null;
         }
+        
+        log.info("Found {} stocks with score for DomesticSector: {} (will select one randomly)", 
+                stocksWithScore.size(), sector);
         
         // 각 주식의 가중치 계산 (점수 맵을 전달하여 메모리에서 조회)
         List<StockWithWeight> stocksWithWeight = calculateWeightsForSector(stocksWithScore, scoreMap);
@@ -990,9 +1019,17 @@ public class StockService {
         todayScores.forEach(score -> scoreMap.put(score.getStockId(), score));
         latestScores.forEach(score -> scoreMap.putIfAbsent(score.getStockId(), score));
         
-        // 점수가 있는 주식만 필터링
+        // 점수가 있고, 9999가 아닌 유효한 점수를 가진 주식만 필터링
         List<Stock> stocksWithScore = validStocks.stream()
-                .filter(stock -> scoreMap.containsKey(stock.getId()))
+                .filter(stock -> {
+                    Score score = scoreMap.get(stock.getId());
+                    if (score == null) {
+                        return false;
+                    }
+                    // 9999는 "점수 없음"을 의미하므로 제외
+                    int scoreValue = getScoreByCountry(score, stock.getExchangeNum());
+                    return scoreValue != 9999;
+                })
                 .collect(Collectors.toList());
         
         if (stocksWithScore.isEmpty()) {
