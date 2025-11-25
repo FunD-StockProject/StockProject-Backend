@@ -69,7 +69,7 @@ public class ScoreService {
     public List<StockWordResponse> getWordCloud(final String symbol, final COUNTRY country) {
         try {
             log.info("Starting word cloud generation - symbol: {}, country: {}", symbol, country);
-            String scriptPath = "wc.py";
+            String scriptPath = "/app/scripts/wc.py";
 
             ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol,
                 country.toString());
@@ -277,7 +277,7 @@ public class ScoreService {
 
     private Map<String, Integer> executeStockIndexUpdateAI() {
         try {
-            String scriptPath = "stockindex.py"; // 스크립트 경로
+            String scriptPath = "/app/scripts/stockindex.py"; // 스크립트 경로
             ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath);
             processBuilder.redirectErrorStream(true);
             Process process = processBuilder.start();
@@ -309,7 +309,7 @@ public class ScoreService {
         try {
             log.info("Starting score AI execution - symbol: {}, country: {}", symbol, country);
             // Python 스크립트 경로
-            String scriptPath = "score.py";
+            String scriptPath = "/app/scripts/score.py";
 
             // ProcessBuilder를 사용하여 Python 스크립트 실행
             ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol,
@@ -366,7 +366,7 @@ public class ScoreService {
         try {
             log.info("Starting update AI execution - symbol: {}, country: {}", symbol, country);
             // Python 스크립트 경로
-            String scriptPath = "update.py";
+            String scriptPath = "/app/scripts/update.py";
 
             // ProcessBuilder를 사용하여 Python 스크립트 실행
             ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol,
