@@ -33,8 +33,12 @@ public class AutoSellScheduler {
         
         for (Experiment experiment : experimentsAfter5BusinessDays) {
             try {
-                experimentService.updateExperiment(experiment);
-                successCount++;
+                boolean success = experimentService.updateExperiment(experiment);
+                if (success) {
+                    successCount++;
+                } else {
+                    failureCount++;
+                }
             } catch (Exception e) {
                 failureCount++;
                 log.error("Error processing auto-sell for experiment - experimentId: {}", experiment.getId(), e);

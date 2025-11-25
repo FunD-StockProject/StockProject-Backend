@@ -37,11 +37,12 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
     /**
      * 5영업일 이상 지난 진행중인 실험 조회 (자동 매도 대상)
      * buyAt이 지정된 날짜 이전이고 status가 PROGRESS인 실험만 조회
+     * Stock을 JOIN FETCH로 함께 로드하여 LazyInitializationException 방지
      */
-    @Query("SELECT e FROM Experiment e WHERE e.buyAt <= :endDate AND e.status = 'PROGRESS'")
+    @Query("SELECT e FROM Experiment e JOIN FETCH e.stock WHERE e.buyAt <= :endDate AND e.status = 'PROGRESS'")
     List<Experiment> findExperimentsAfterFiveDays(@Param("endDate") LocalDateTime endDate);
 
-    @Query("SELECT e FROM Experiment e WHERE e.buyAt > :start AND e.status = :status")
+    @Query("SELECT e FROM Experiment e JOIN FETCH e.stock WHERE e.buyAt > :start AND e.status = :status")
     List<Experiment> findProgressExperiments(@Param("start") LocalDateTime start, @Param("status") String status);
 
     @Query("SELECT AVG(e.roi) FROM Experiment e WHERE e.score BETWEEN :start AND :end AND e.user.email = :email AND e.status = 'COMPLETE'")
