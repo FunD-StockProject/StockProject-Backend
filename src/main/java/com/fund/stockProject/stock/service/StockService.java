@@ -201,7 +201,7 @@ public class StockService {
     public Mono<List<StockHotSearchResponse>> getHotSearch() {
         try {
             // Python 스크립트 경로
-            String scriptPath = "hotsearch.py";
+            String scriptPath = "/app/scripts/hotsearch.py";
 
             // Python 스크립트를 실행하는 ProcessBuilder
             ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath);
@@ -267,7 +267,7 @@ public class StockService {
     public Mono<List<String>> getSummarys(String symbol, COUNTRY country) {
         try {
             // Python 스크립트 경로
-            String scriptPath = "summary.py";
+            String scriptPath = "/app/scripts/summary.py";
 
             // Python 스크립트를 실행하기 위한 ProcessBuilder 설정
             ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath, symbol, country.toString());
