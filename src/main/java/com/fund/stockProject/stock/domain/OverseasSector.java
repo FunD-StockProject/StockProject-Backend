@@ -3,79 +3,76 @@ package com.fund.stockProject.stock.domain;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * 해외 주식 섹터 분류
  * 한국투자증권(KIS)에서 제공하는 GICS 업종분류코드(3자리)를 기반으로 합니다.
+ * 같은 섹터명에 속하는 여러 GICS 코드를 하나의 enum으로 통합 관리합니다.
  */
 @Getter
 @RequiredArgsConstructor
 public enum OverseasSector {
 
     // 에너지
-    ENERGY("10", "Energy"),
+    ENERGY("Energy", "10"),
 
     // 소재
-    MATERIALS("110", "Materials"),
-    MATERIALS_2("130", "Materials"),
+    MATERIALS("Materials", "110", "130"),
 
     // 산업재
-    INDUSTRIALS("210", "Industrials"),
-    INDUSTRIALS_2("220", "Industrials"),
-    INDUSTRIALS_3("230", "Industrials"),
-    INDUSTRIALS_4("250", "Industrials"),
-    INDUSTRIALS_5("260", "Industrials"),
+    INDUSTRIALS("Industrials", "210", "220", "230", "250", "260"),
 
     // 임의소비재
-    CONSUMER_DISCRETIONARY("320", "Consumer Discretionary"),
-    CONSUMER_DISCRETIONARY_2("330", "Consumer Discretionary"),
-    CONSUMER_DISCRETIONARY_3("340", "Consumer Discretionary"),
-    CONSUMER_DISCRETIONARY_4("350", "Consumer Discretionary"),
-    CONSUMER_DISCRETIONARY_5("360", "Consumer Discretionary"),
-    CONSUMER_DISCRETIONARY_6("380", "Consumer Discretionary"),
+    CONSUMER_DISCRETIONARY("Consumer Discretionary", "320", "330", "340", "350", "360", "380"),
 
     // 필수소비재
-    CONSUMER_STAPLES("410", "Consumer Staples"),
-    CONSUMER_STAPLES_2("420", "Consumer Staples"),
+    CONSUMER_STAPLES("Consumer Staples", "410", "420"),
 
     // 헬스케어
-    HEALTH_CARE("510", "Health Care"),
-    HEALTH_CARE_2("520", "Health Care"),
-    HEALTH_CARE_3("530", "Health Care"),
+    HEALTH_CARE("Health Care", "510", "520", "530"),
 
     // 금융
-    FINANCIALS("610", "Financials"),
-    FINANCIALS_2("620", "Financials"),
-    FINANCIALS_3("630", "Financials"),
-    FINANCIALS_4("640", "Financials"),
+    FINANCIALS("Financials", "610", "620", "630", "640"),
 
     // 정보기술
-    INFORMATION_TECHNOLOGY("710", "Information Technology"),
-    INFORMATION_TECHNOLOGY_2("720", "Information Technology"),
-    INFORMATION_TECHNOLOGY_3("730", "Information Technology"),
-    INFORMATION_TECHNOLOGY_4("740", "Information Technology"),
+    INFORMATION_TECHNOLOGY("Information Technology", "710", "720", "730", "740"),
 
     // 통신서비스
-    COMMUNICATION_SERVICES("370", "Communication Services"),
+    COMMUNICATION_SERVICES("Communication Services", "370"),
 
     // 유틸리티
-    UTILITIES("910", "Utilities"),
-    UTILITIES_2("930", "Utilities"),
+    UTILITIES("Utilities", "910", "930"),
 
     // 기타
-    UNKNOWN("999", "Unknown");
+    UNKNOWN("Unknown", "999");
 
-    private final String code;    // GICS 업종분류코드 (3자리)
     private final String name;    // 섹터명
+    private final List<String> codes;    // GICS 업종분류코드 리스트 (3자리)
+
+    OverseasSector(String name, String... codes) {
+        this.name = name;
+        this.codes = Arrays.asList(codes);
+    }
+
+    /**
+     * 첫 번째 코드를 반환합니다 (하위 호환성 유지)
+     */
+    public String getCode() {
+        return codes.isEmpty() ? null : codes.get(0);
+    }
 
     // 코드 -> OverseasSector 매핑
     private static final Map<String, OverseasSector> CODE_MAP = new HashMap<>();
 
     static {
         for (OverseasSector sector : values()) {
-            CODE_MAP.put(sector.code, sector);
+            for (String code : sector.codes) {
+                CODE_MAP.put(code, sector);
+            }
         }
     }
 
