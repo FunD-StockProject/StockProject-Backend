@@ -525,41 +525,41 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
         // 1. 60점 이하 평균 수익률
         final double totalAvgRoi_0_59 = experimentRepository.findTotalAvgRoi(0, 59);
-        final double userAvgRoi_0_59 = experimentRepository.findUserAvgRoi(0, 59, email);
+        final Double userAvgRoi_0_59 = experimentRepository.findUserAvgRoi(0, 59, email);
 
         reportStatisticDtos.add(ReportStatisticDto.builder()
             .totalAvgRoi(totalAvgRoi_0_59)
-            .userAvgRoi(userAvgRoi_0_59)
+            .userAvgRoi(userAvgRoi_0_59 != null ? userAvgRoi_0_59 : 0.0)
             .scoreRange(SCORERANGE.RANGE_0_59.getRange())
             .build());
 
         // 2. 60~69점 평균 수익률
         final double totalAvgRoi_60_69 = experimentRepository.findTotalAvgRoi(60, 69);
-        final double userAvgRoi_60_69 = experimentRepository.findUserAvgRoi(60, 69, email);
+        final Double userAvgRoi_60_69 = experimentRepository.findUserAvgRoi(60, 69, email);
 
         reportStatisticDtos.add(ReportStatisticDto.builder()
             .totalAvgRoi(totalAvgRoi_60_69)
-            .userAvgRoi(userAvgRoi_60_69)
+            .userAvgRoi(userAvgRoi_60_69 != null ? userAvgRoi_60_69 : 0.0)
             .scoreRange(SCORERANGE.RANGE_60_69.getRange())
             .build());
 
         // 3. 70~79점 평균 수익률
         final double totalAvgRoi_70_79 = experimentRepository.findTotalAvgRoi(70, 79);
-        final double userAvgRoi_70_79 = experimentRepository.findUserAvgRoi(70, 79, email);
+        final Double userAvgRoi_70_79 = experimentRepository.findUserAvgRoi(70, 79, email);
 
         reportStatisticDtos.add(ReportStatisticDto.builder()
             .totalAvgRoi(totalAvgRoi_70_79)
-            .userAvgRoi(userAvgRoi_70_79)
+            .userAvgRoi(userAvgRoi_70_79 != null ? userAvgRoi_70_79 : 0.0)
             .scoreRange(SCORERANGE.RANGE_70_79.getRange())
             .build());
 
         // 3. 80~89점 평균 수익률
         final double totalAvgRoi_80_89 = experimentRepository.findTotalAvgRoi(80, 89);
-        final double userAvgRoi_80_89 = experimentRepository.findUserAvgRoi(80, 89, email);
+        final Double userAvgRoi_80_89 = experimentRepository.findUserAvgRoi(80, 89, email);
 
         reportStatisticDtos.add(ReportStatisticDto.builder()
             .totalAvgRoi(totalAvgRoi_80_89)
-            .userAvgRoi(userAvgRoi_80_89)
+            .userAvgRoi(userAvgRoi_80_89 != null ? userAvgRoi_80_89 : 0.0)
             .scoreRange(SCORERANGE.RANGE_80_89.getRange())
             .build());
 
@@ -771,10 +771,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         };
 
         List<PortfolioResultResponse.ScoreTableItem> scoreTable = new ArrayList<>();
-        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("60점 이하").avg(u_0_59).median(medianByRange.apply(new int[]{0,59})).build());
-        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("60-70점").avg(u_60_69).median(medianByRange.apply(new int[]{60,69})).build());
-        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("70-80점").avg(u_70_79).median(medianByRange.apply(new int[]{70,79})).build());
-        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("80점 이상").avg(u_80_100).median(medianByRange.apply(new int[]{80,100})).build());
+        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("60점 이하").avg(u_0_59 != null ? u_0_59 : 0.0).median(medianByRange.apply(new int[]{0,59})).build());
+        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("60-70점").avg(u_60_69 != null ? u_60_69 : 0.0).median(medianByRange.apply(new int[]{60,69})).build());
+        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("70-80점").avg(u_70_79 != null ? u_70_79 : 0.0).median(medianByRange.apply(new int[]{70,79})).build());
+        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("80점 이상").avg(u_80_100 != null ? u_80_100 : 0.0).median(medianByRange.apply(new int[]{80,100})).build());
 
         // 패턴 그래프용 히스토리 포인트 (score, roi, buyAt → x,y,label) - 사용자별 필터링
         final List<Object[]> experimentGroupByBuyAt = experimentRepository.findExperimentGroupByBuyAtByUser(email);
