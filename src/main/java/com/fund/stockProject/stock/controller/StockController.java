@@ -11,6 +11,7 @@ import com.fund.stockProject.stock.service.SecurityService;
 import com.fund.stockProject.shortview.dto.ShortViewResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.time.LocalDate;
@@ -33,6 +34,7 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 @RequestMapping("/stock")
 @Tag(name = "주식 (Stock)", description = "주식 정보 조회 API")
+@SecurityRequirement(name = "bearerAuth")
 public class StockController {
 
     private final StockService stockService;
