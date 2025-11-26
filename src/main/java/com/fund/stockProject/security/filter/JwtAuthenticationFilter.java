@@ -64,36 +64,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
-        String requestUri = request.getRequestURI();
-        log.info("JWT 필터 실행 - URI: {}, Method: {}", requestUri, request.getMethod());
-        
         String accessToken = resolveToken(request);
         Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
 
         if (accessToken != null) {
-            log.info("Access token 발견 - URI: {}, token length: {}", requestUri, accessToken.length());
             try {
                 if (!isReusable(currentAuth, accessToken)) {
-                    log.info("새로운 인증 처리 시작 - URI: {}", requestUri);
-                    processJwtAuthentication(accessToken, requestUri); // JWT 파싱/검증
-                } else {
-                    log.info("재사용 가능한 인증 정보 사용 - URI: {}", requestUri);
+                    processJwtAuthentication(accessToken); // JWT 파싱/검증
                 }
             } catch (ExpiredJwtException | MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
-                log.warn("JWT 검증 실패 - URI: {}, Error: {}", requestUri, e.getMessage());
+                log.warn("JWT 검증 실패: {}", e.getMessage());
                 SecurityContextHolder.clearContext(); // 토큰 자체 문제일 때만 초기화
             }
-        } else {
-            log.warn("Access token이 없습니다 - URI: {}, Authorization header: {}", 
-                    requestUri, request.getHeader("Authorization"));
-        }
-
-        // 인증 후 SecurityContext 상태 확인
-        Authentication authAfter = SecurityContextHolder.getContext().getAuthentication();
-        if (authAfter != null && authAfter.isAuthenticated()) {
-            log.info("인증 완료 - URI: {}, authenticated: true", requestUri);
-        } else {
-            log.warn("인증 실패 또는 미인증 상태 - URI: {}, auth: {}", requestUri, authAfter);
         }
 
         // 비즈니스 예외는 여기서 잡지 않고 그대로 상위로 전달 (double dispatch 방지)
@@ -109,11 +91,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     /**
      * JWT 토큰을 처리하고 인증 정보를 설정합니다.
      */
-    private void processJwtAuthentication(String accessToken, String requestUri) {
+    private void processJwtAuthentication(String accessToken) {
         try {
-            String category = jwtUtil.getCategory(accessToken);
-            if (!JWT_CATEGORY_ACCESS.equals(category)) {
-                log.warn("Authorization 헤더에 Access Token이 아닌 토큰이 전달되었습니다. URI: {}, category={}", requestUri, category);
+            if (!JWT_CATEGORY_ACCESS.equals(jwtUtil.getCategory(accessToken))) {
+                log.warn("Authorization 헤더에 Access Token이 아닌 토큰이 전달되었습니다. category={}", jwtUtil.getCategory(accessToken));
                 SecurityContextHolder.clearContext();
                 return;
             }
@@ -132,7 +113,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             User user = findUserByEmailOptimized(email);
             if (user == null) {
-                log.warn("사용자를 찾을 수 없습니다. URI: {}, email={}", requestUri, email);
+                log.warn("사용자를 찾을 수 없습니다. email={}", email);
                 SecurityContextHolder.clearContext();
                 return;
             }
@@ -146,16 +127,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             );
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            log.debug("JWT 인증 성공 - URI: {}, email={}", requestUri, email);
 
         } catch (MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
-            log.warn("유효하지 않은 JWT 토큰 - URI: {}, Error: {}", requestUri, e.getMessage());
+            log.warn("유효하지 않은 JWT 토큰: {}", e.getMessage());
             SecurityContextHolder.clearContext();
         } catch (ExpiredJwtException e) {
-            log.warn("만료된 JWT 토큰 - URI: {}, Error: {}", requestUri, e.getMessage());
+            log.warn("만료된 JWT 토큰: {}", e.getMessage());
             SecurityContextHolder.clearContext();
         } catch (Exception e) {
-            log.error("JWT 인증 처리 중 예기치 못한 오류 - URI: {}", requestUri, e);
+            log.error("JWT 인증 처리 중 예기치 못한 오류", e);
             SecurityContextHolder.clearContext();
         }
     }
