@@ -17,6 +17,8 @@ import java.util.List;
 public class NotificationResponse {
     @Schema(description = "알림 ID", example = "101")
     private Integer id;
+    @Schema(description = "관련 종목 ID (없을 수 있음)", example = "1234")
+    private Integer stockId;
     @Schema(description = "관련 종목 심볼/이름 (없을 수 있음)", example = "AAPL")
     private String stockName;
     @Schema(description = "알림 타입", example = "SCORE_SPIKE")
@@ -47,6 +49,7 @@ public class NotificationResponse {
         
         return NotificationResponse.builder()
                 .id(notification.getId())
+                .stockId(notification.getStock() != null ? notification.getStock().getId() : null)
                 .stockName(notification.getStock() != null ? notification.getStock().getSymbolName() : null)
                 .notificationType(notification.getNotificationType())
                 .oldScore(notification.getOldScore())

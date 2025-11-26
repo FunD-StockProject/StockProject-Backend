@@ -9,6 +9,7 @@ import com.fund.stockProject.keyword.entity.Keyword;
 import com.fund.stockProject.keyword.entity.StockKeyword;
 import com.fund.stockProject.keyword.repository.KeywordRepository;
 import com.fund.stockProject.keyword.repository.StockKeywordRepository;
+import com.fund.stockProject.notification.service.StockScoreAlertService;
 import com.fund.stockProject.score.dto.response.ScoreKeywordResponse;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
@@ -26,6 +27,7 @@ public class ScorePersistenceService {
     private final StockRepository stockRepository;
     private final KeywordRepository keywordRepository;
     private final StockKeywordRepository stockKeywordRepository;
+    private final StockScoreAlertService stockScoreAlertService;
 
     @Transactional
     public void saveScoreAndKeyword(Integer stockId, COUNTRY country, int yesterdayScore,
@@ -47,6 +49,9 @@ public class ScorePersistenceService {
 
         newScore.setStock(stock);
         scoreRepository.save(newScore);
+
+        // 점수 급변 알림 트리거 (절대 변화량 기준은 StockScoreAlertService 에서 판단)
+        stockScoreAlertService.onScoreChanged(stock.getId(), yesterdayScore, finalScore);
 
         stockKeywordRepository.deleteByStock(stock);
         scoreKeywordResponse.getTopKeywords().forEach(keywordDto -> {
