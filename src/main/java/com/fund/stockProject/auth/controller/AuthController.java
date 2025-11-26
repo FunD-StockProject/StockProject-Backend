@@ -138,10 +138,10 @@ public class AuthController {
             return ResponseEntity.ok(response);
         } catch (org.springframework.security.authentication.BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new LoginResponse("FAILED", null, null, null, null));
+                    .body(new LoginResponse("FAILED", null, null, null, null, null));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new LoginResponse("FAILED", null, null, null, null));
+                    .body(new LoginResponse("FAILED", null, null, null, null, null));
         }
     }
 
@@ -184,10 +184,10 @@ public class AuthController {
         } catch (Exception e) {
             if (e instanceof ExpiredJwtException || e.getMessage().contains("expired")) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(new LoginResponse("FAILED", null, null, null, null));
+                        .body(new LoginResponse("FAILED", null, null, null, null, null));
             }
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(new LoginResponse("FAILED", null, null, null, null));
+                    .body(new LoginResponse("FAILED", null, null, null, null, null));
         }
     }
 
