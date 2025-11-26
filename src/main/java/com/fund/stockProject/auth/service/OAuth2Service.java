@@ -36,7 +36,7 @@ public class OAuth2Service {
 
         Optional<User> userOptional = userRepository.findByEmail(kakaoUserInfo.getEmail());
         if(userOptional.isEmpty()) {
-            return new LoginResponse("NEED_REGISTER", kakaoUserInfo.getEmail(), null, null, null);
+            return new LoginResponse("NEED_REGISTER", kakaoUserInfo.getEmail(), null, null, null, null);
         }
 
         User user = userOptional.get();
@@ -54,7 +54,7 @@ public class OAuth2Service {
 
         Optional<User> userOptional = userRepository.findByEmail(naverUserInfo.getEmail());
         if(userOptional.isEmpty()) {
-            return new LoginResponse("NEED_REGISTER", naverUserInfo.getEmail(), null, null, null);
+            return new LoginResponse("NEED_REGISTER", naverUserInfo.getEmail(), null, null, null, null);
         }
 
         User user = userOptional.get();
@@ -72,7 +72,7 @@ public class OAuth2Service {
 
         Optional<User> userOptional = userRepository.findByEmail(googleUserInfo.getEmail());
         if(userOptional.isEmpty()) {
-            return new LoginResponse("NEED_REGISTER", googleUserInfo.getEmail(), null, null, null);
+            return new LoginResponse("NEED_REGISTER", googleUserInfo.getEmail(), null, null, null, null);
         }
 
         User user = userOptional.get();
@@ -91,7 +91,7 @@ public class OAuth2Service {
 
         Optional<User> userOptional = userRepository.findByEmail(appleUserInfo.getEmail());
         if (userOptional.isEmpty()) {
-            return new LoginResponse("NEED_REGISTER", appleUserInfo.getEmail(), null, null, null);
+            return new LoginResponse("NEED_REGISTER", appleUserInfo.getEmail(), null, null, null, null);
         }
 
         User user = userOptional.get();

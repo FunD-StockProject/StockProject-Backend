@@ -50,9 +50,9 @@ public class TokenService {
         RefreshToken refreshToken = new RefreshToken(email, newRefreshToken, System.currentTimeMillis() + refreshTokenExpirationMs);
         refreshTokenRepository.save(refreshToken);
 
-        String nickname = getNickname(email); // 사용자 닉네임 조회
+        UserProfile userProfile = getUserProfile(email); // 사용자 닉네임/프로필 이미지 조회
 
-        return new LoginResponse("SUCCESS", email, nickname, accessToken, newRefreshToken);
+        return new LoginResponse("SUCCESS", email, userProfile.nickname(), userProfile.profileImageUrl(), accessToken, newRefreshToken);
     }
 
     /**
@@ -103,10 +103,10 @@ public class TokenService {
                     .build();
 
             refreshTokenRepository.save(refreshToken);
-            String nickname = getNickname(email); // 사용자 닉네임 조회
+            UserProfile userProfile = getUserProfile(email); // 사용자 닉네임/프로필 이미지 조회
 
             // 6. 새 토큰들을 DTO에 담아 반환
-            return new LoginResponse("SUCCESS", email, nickname, newAccessToken, newRefreshToken);
+            return new LoginResponse("SUCCESS", email, userProfile.nickname(), userProfile.profileImageUrl(), newAccessToken, newRefreshToken);
 
         } catch (ExpiredJwtException e) {
             // 만료된 경우, DB에 토큰이 남아있다면 삭제해주는 것이 보안상 좋습니다.
@@ -156,10 +156,12 @@ public class TokenService {
         refreshTokenRepository.deleteByRefreshToken(refreshToken);
     }
 
-    private String getNickname(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new JwtException("User not found with email: " + email))
-                .getNickname(); // 사용자 닉네임 조회
+    private UserProfile getUserProfile(String email) {
+        var user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new JwtException("User not found with email: " + email));
+        return new UserProfile(user.getNickname(), user.getProfileImageUrl());
     }
+
+    private record UserProfile(String nickname, String profileImageUrl) {}
 
 }

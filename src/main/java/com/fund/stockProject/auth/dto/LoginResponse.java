@@ -18,6 +18,9 @@ public class LoginResponse {
     @Schema(description = "사용자 닉네임", example = "human123")
     private String nickname;
 
+    @Schema(description = "프로필 이미지 URL", example = "https://example-bucket.s3.ap-northeast-2.amazonaws.com/users/profile.jpg")
+    private String profileImageUrl;
+
     @Schema(description = "액세스 토큰(JWT)", example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...", accessMode = Schema.AccessMode.READ_ONLY)
     @JsonProperty("access_token")
     private String accessToken;
