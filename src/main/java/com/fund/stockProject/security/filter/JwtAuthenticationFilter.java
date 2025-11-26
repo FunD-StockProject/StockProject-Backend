@@ -64,22 +64,36 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
+        String requestUri = request.getRequestURI();
+        log.info("JWT 필터 실행 - URI: {}, Method: {}", requestUri, request.getMethod());
+        
         String accessToken = resolveToken(request);
         Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
 
         if (accessToken != null) {
+            log.info("Access token 발견 - URI: {}, token length: {}", requestUri, accessToken.length());
             try {
                 if (!isReusable(currentAuth, accessToken)) {
-                    processJwtAuthentication(accessToken, request.getRequestURI()); // JWT 파싱/검증
+                    log.info("새로운 인증 처리 시작 - URI: {}", requestUri);
+                    processJwtAuthentication(accessToken, requestUri); // JWT 파싱/검증
                 } else {
-                    log.debug("재사용 가능한 인증 정보 사용 - URI: {}", request.getRequestURI());
+                    log.info("재사용 가능한 인증 정보 사용 - URI: {}", requestUri);
                 }
             } catch (ExpiredJwtException | MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
-                log.warn("JWT 검증 실패 - URI: {}, Error: {}", request.getRequestURI(), e.getMessage());
+                log.warn("JWT 검증 실패 - URI: {}, Error: {}", requestUri, e.getMessage());
                 SecurityContextHolder.clearContext(); // 토큰 자체 문제일 때만 초기화
             }
         } else {
-            log.debug("Access token이 없습니다 - URI: {}", request.getRequestURI());
+            log.warn("Access token이 없습니다 - URI: {}, Authorization header: {}", 
+                    requestUri, request.getHeader("Authorization"));
+        }
+
+        // 인증 후 SecurityContext 상태 확인
+        Authentication authAfter = SecurityContextHolder.getContext().getAuthentication();
+        if (authAfter != null && authAfter.isAuthenticated()) {
+            log.info("인증 완료 - URI: {}, authenticated: true", requestUri);
+        } else {
+            log.warn("인증 실패 또는 미인증 상태 - URI: {}, auth: {}", requestUri, authAfter);
         }
 
         // 비즈니스 예외는 여기서 잡지 않고 그대로 상위로 전달 (double dispatch 방지)
