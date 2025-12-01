@@ -716,8 +716,8 @@ public class SecurityService {
             if (outputNode != null) {
                 int count = 0; // 추가된 데이터 개수 추적
                 for (JsonNode node : outputNode) {
-                    if (count >= 3) {
-                        break; // 3개까지만 추가
+                    if (count >= 9) {
+                        break; // 9개까지만 추가
                     }
 
                     StockOverseaVolumeRankResponse responseData = new StockOverseaVolumeRankResponse();
@@ -791,8 +791,8 @@ public class SecurityService {
             if (outputNode != null) {
                 int count = 0; // 추가된 데이터 개수 추적
                 for (JsonNode node : outputNode) {
-                    if (count >= 3) {
-                        break; // 3개까지만 추가
+                    if (count >= 9) {
+                        break; // 9개까지만 추가
                     }
 
                     StockKoreaVolumeRankResponse responseData = new StockKoreaVolumeRankResponse();
