@@ -1031,12 +1031,46 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
             if (stockInfo != null && stockInfo.getPrice() != null) {
                 final Double price = stockInfo.getPrice();
+                final LocalDateTime sellAt = LocalDateTime.now();
                 // ROI 계산: ((현재가 - 매수가) / 매수가) * 100
                 final Double roi = ((price - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
 
-                experiment.updateExperiment(price, "COMPLETE", LocalDateTime.now(), roi);
+                experiment.updateExperiment(price, "COMPLETE", sellAt, roi);
                 // 변경사항 저장
                 experimentRepository.save(experiment);
+                
+                // 완료 시점의 trade item 저장
+                try {
+                    Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(stock.getId(), LocalDate.now());
+                    if (scoreOptional.isEmpty()) {
+                        scoreOptional = scoreRepository.findTopByStockIdOrderByDateDesc(stock.getId());
+                    }
+                    
+                    int score = experiment.getScore(); // 기본값은 실험의 점수
+                    if (scoreOptional.isPresent()) {
+                        final Score scoreData = scoreOptional.get();
+                        if (stockInfo.getCountry().equals(COUNTRY.KOREA)) {
+                            score = scoreData.getScoreKorea();
+                        } else {
+                            score = scoreData.getScoreOversea();
+                        }
+                    }
+                    
+                    final ExperimentTradeItem finalTradeItem = ExperimentTradeItem.builder()
+                        .experiment(experiment)
+                        .price(price)
+                        .roi(roi)
+                        .score(score)
+                        .tradeAt(sellAt)
+                        .build();
+                    
+                    experimentTradeItemRepository.save(finalTradeItem);
+                    log.info("Saved final trade item for completed experiment - experimentId: {}", experiment.getId());
+                } catch (Exception e) {
+                    log.warn("Failed to save final trade item for experiment - experimentId: {}", experiment.getId(), e);
+                    // trade item 저장 실패해도 실험 완료는 성공으로 처리
+                }
+                
                 log.info("Auto-sell completed successfully - experimentId: {}, price: {}, roi: {}", 
                         experiment.getId(), price, roi);
                 return true;
@@ -1132,7 +1166,14 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 .build();
 
             experimentTradeItemRepository.save(experimentTradeItem);
-            log.debug("Saved ExperimentTradeItem for experimentId: {}", experiment.getId());
+            
+            // Experiment 엔티티의 ROI도 업데이트 (PROGRESS 상태일 때만)
+            if ("PROGRESS".equals(experiment.getStatus())) {
+                experiment.updateExperiment(null, "PROGRESS", null, roi);
+                experimentRepository.save(experiment);
+            }
+            
+            log.debug("Saved ExperimentTradeItem for experimentId: {}, updated ROI: {}", experiment.getId(), roi);
         }
     }
 }
