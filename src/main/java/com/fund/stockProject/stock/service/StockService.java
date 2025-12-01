@@ -90,15 +90,49 @@ public class StockService {
             return null;
         }
 
+        final LocalDate today = LocalDate.now();
+        final List<Integer> stockIds = stocks.stream()
+            .map(Stock::getId)
+            .collect(Collectors.toList());
+        
+        // 배치로 오늘 날짜 점수 조회, 없으면 최신 점수 조회
+        final List<Score> todayScores = scoreRepository.findTodayScoresByStockIds(stockIds, today);
+        final List<Score> latestScores = scoreRepository.findLatestScoresByStockIds(stockIds);
+        
+        // stockId를 키로 하는 Map 생성
+        final Map<Integer, Score> scoreMap = new HashMap<>();
+        todayScores.forEach(score -> scoreMap.put(score.getStockId(), score));
+        latestScores.forEach(score -> scoreMap.putIfAbsent(score.getStockId(), score));
+
         return stocks.stream()
-            .map(stock -> StockSearchResponse.builder()
-                .stockId(stock.getId())
-                .symbol(stock.getSymbol())
-                .symbolName(stock.getSymbolName())
-                .securityName(stock.getSecurityName())
-                .exchangeNum(stock.getExchangeNum())
-                .country(getCountryFromExchangeNum(stock.getExchangeNum()))
-                .build())
+            .map(stock -> {
+                final COUNTRY country = getCountryFromExchangeNum(stock.getExchangeNum());
+                final Score score = scoreMap.get(stock.getId());
+                
+                Integer scoreValue = null;
+                Integer diff = null;
+                
+                if (score != null) {
+                    scoreValue = (country == COUNTRY.KOREA) ? score.getScoreKorea() : score.getScoreOversea();
+                    diff = score.getDiff();
+                    
+                    // 9999는 점수가 없는 경우이므로 null로 처리
+                    if (scoreValue != null && scoreValue == 9999) {
+                        scoreValue = null;
+                    }
+                }
+                
+                return StockSearchResponse.builder()
+                    .stockId(stock.getId())
+                    .symbol(stock.getSymbol())
+                    .symbolName(stock.getSymbolName())
+                    .securityName(stock.getSecurityName())
+                    .exchangeNum(stock.getExchangeNum())
+                    .country(country)
+                    .score(scoreValue)
+                    .diff(diff)
+                    .build();
+            })
             .collect(Collectors.toList());
     }
 
