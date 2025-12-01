@@ -18,10 +18,10 @@ public class StockUpdateScheduler {
     private final StockImportService stockImportService;
 
     /**
-     * 매주 월요일 새벽 3시에 종목 마스터 데이터 업데이트
+     * 매주 화요일 새벽 3시에 종목 마스터 데이터 업데이트
      * Python 스크립트를 실행하여 최신 종목 데이터를 수집하고 DB에 반영합니다.
      */
-    @Scheduled(cron = "0 0 3 * * MON", zone = "Asia/Seoul") // 매주 월요일 3시 실행
+    @Scheduled(cron = "0 0 3 * * TUE", zone = "Asia/Seoul") // 매주 화요일 3시 실행
     public void updateStockMaster() {
         log.info("Starting weekly stock master update scheduler");
         
@@ -42,9 +42,12 @@ public class StockUpdateScheduler {
             }
 
             log.info("Executing Python script: {}", scriptPath);
-            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath);
-            // 스크립트가 있는 디렉토리를 작업 디렉토리로 설정
+            // 스크립트 파일명만 사용 (작업 디렉토리를 스크립트 디렉토리로 설정하므로)
+            String scriptFileName = scriptFile.getName();
             File scriptDir = scriptFile.getParentFile();
+            
+            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptFileName);
+            // 스크립트가 있는 디렉토리를 작업 디렉토리로 설정
             processBuilder.directory(scriptDir != null ? scriptDir : new File("."));
             processBuilder.redirectErrorStream(true);
             
