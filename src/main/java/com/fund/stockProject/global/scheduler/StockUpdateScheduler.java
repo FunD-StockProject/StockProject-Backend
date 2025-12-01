@@ -42,9 +42,12 @@ public class StockUpdateScheduler {
             }
 
             log.info("Executing Python script: {}", scriptPath);
-            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptPath);
-            // 스크립트가 있는 디렉토리를 작업 디렉토리로 설정
+            // 스크립트 파일명만 사용 (작업 디렉토리를 스크립트 디렉토리로 설정하므로)
+            String scriptFileName = scriptFile.getName();
             File scriptDir = scriptFile.getParentFile();
+            
+            ProcessBuilder processBuilder = new ProcessBuilder("python3", scriptFileName);
+            // 스크립트가 있는 디렉토리를 작업 디렉토리로 설정
             processBuilder.directory(scriptDir != null ? scriptDir : new File("."));
             processBuilder.redirectErrorStream(true);
             
