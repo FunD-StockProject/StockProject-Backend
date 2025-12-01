@@ -79,6 +79,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         // 완료된 모의 투자 종목
         final List<ExperimentInfoResponse> completeExperimentsInfo = new ArrayList<>();
 
+        // 진행중인 실험 수를 DB에서 직접 조회 (Experiment 엔티티의 status 필드 기반, StockInfo 조회와 무관)
+        final int countByStatusProgress = experimentRepository.countExperimentsByEmailAndStatus(
+            customUserDetails.getEmail(), "PROGRESS");
+
         // 로그인한 유저 관련 모의 투자 정보 조회 진행/완료 리스트에 저장
         for (final Experiment experiment : experimentsByUserId) {
             final Optional<Stock> bySymbol = stockRepository.findBySymbol(experiment.getStock().getSymbol());
@@ -92,7 +96,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             final Stock stock = bySymbol.get();
 
             // StockInfo 조회 시 타임아웃이나 에러 처리
-            StockInfoResponse stockInfoKorea;
+            StockInfoResponse stockInfoKorea = null;
+            COUNTRY country = getCountryFromExchangeNum(stock.getExchangeNum()); // 기본값 설정
             try {
                 stockInfoKorea = securityService.getSecurityStockInfoKorea(
                     stock.getId(),
@@ -100,18 +105,16 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                     stock.getSecurityName(),
                     stock.getSymbol(),
                     stock.getExchangeNum(),
-                    getCountryFromExchangeNum(stock.getExchangeNum())
+                    country
                 ).block();
                 
-                if (stockInfoKorea == null) {
-                    log.warn("StockInfo is null for stockId: {}, experimentId: {}", 
-                        stock.getId(), experiment.getId());
-                    continue; // 해당 실험을 건너뛰고 다음 실험 처리
+                if (stockInfoKorea != null && stockInfoKorea.getCountry() != null) {
+                    country = stockInfoKorea.getCountry();
                 }
             } catch (Exception e) {
-                log.error("Failed to get StockInfo for stockId: {}, experimentId: {}", 
+                log.warn("Failed to get StockInfo for stockId: {}, experimentId: {}, will use default values", 
                     stock.getId(), experiment.getId(), e);
-                continue; // 해당 실험을 건너뛰고 다음 실험 처리
+                // StockInfo 조회 실패해도 실험 정보는 포함시킴
             }
 
             // 매수 시점 점수
@@ -123,7 +126,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             if (!tradeItems.isEmpty()) {
                 // 가장 최근 trade item의 score 사용
                 currentScore = tradeItems.get(tradeItems.size() - 1).getScore();
-            } else {
+            } else if (stockInfoKorea != null) {
                 // trade item이 없으면 Score 테이블에서 최신 점수 조회
                 try {
                     final Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(stock.getId(), LocalDate.now());
@@ -131,7 +134,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                         final Optional<Score> latestScoreOptional = scoreRepository.findTopByStockIdOrderByDateDesc(stock.getId());
                         if (latestScoreOptional.isPresent()) {
                             final Score latestScore = latestScoreOptional.get();
-                            if (stockInfoKorea.getCountry().equals(COUNTRY.KOREA)) {
+                            if (country.equals(COUNTRY.KOREA)) {
                                 currentScore = latestScore.getScoreKorea();
                             } else {
                                 currentScore = latestScore.getScoreOversea();
@@ -139,7 +142,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                         }
                     } else {
                         final Score todayScore = scoreOptional.get();
-                        if (stockInfoKorea.getCountry().equals(COUNTRY.KOREA)) {
+                        if (country.equals(COUNTRY.KOREA)) {
                             currentScore = todayScore.getScoreKorea();
                         } else {
                             currentScore = todayScore.getScoreOversea();
@@ -153,7 +156,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             }
             
             // 현재 가격
-            final Integer currentPrice = stockInfoKorea.getPrice() != null 
+            final Integer currentPrice = (stockInfoKorea != null && stockInfoKorea.getPrice() != null)
                 ? stockInfoKorea.getPrice().intValue() 
                 : experiment.getBuyPrice().intValue();
 
@@ -165,7 +168,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                     .buyPrice(experiment.getBuyPrice().intValue())
                     .symbolName(stock.getSymbolName())
                     .status(experiment.getStatus())
-                    .country(stockInfoKorea.getCountry())
+                    .country(country)
                     .buyScore(buyScore)
                     .currentScore(currentScore)
                     .currentPrice(currentPrice)
@@ -182,16 +185,13 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 .buyPrice(experiment.getBuyPrice().intValue())
                 .symbolName(stock.getSymbolName())
                 .status(experiment.getStatus())
-                .country(stockInfoKorea.getCountry())
+                .country(country)
                 .buyScore(buyScore)
                 .currentScore(currentScore)
                 .currentPrice(currentPrice)
                 .stockId(stock.getId())
                 .build());
         }
-
-        // 진행중인 실험 수는 progressExperimentsInfo의 크기로 계산 (사용자별)
-        final int countByStatusProgress = progressExperimentsInfo.size(); // 진행중인 실험 수
 
         final double averageRoi = experimentsByUserId.stream()
             .mapToDouble(Experiment::getRoi) // 각 ROI 값을 double로 추출

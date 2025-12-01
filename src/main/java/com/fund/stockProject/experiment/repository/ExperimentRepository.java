@@ -19,6 +19,9 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
     @Query("SELECT COUNT(e) FROM Experiment e WHERE e.status = :status")
     int countExperimentsByStatus(@Param("status") String status); // 상태(진행/완료) 별 실험 개수
 
+    @Query("SELECT COUNT(e) FROM Experiment e JOIN e.user u WHERE u.email = :email AND e.status = :status")
+    int countExperimentsByEmailAndStatus(@Param("email") String email, @Param("status") String status); // 이메일과 상태별 실험 개수
+
     @Query("SELECT e FROM Experiment e JOIN e.user u  WHERE u.email = :email and e.status = :status ORDER BY e.roi ASC")
     List<Experiment> findExperimentsByEmailAndStatus(@Param("email") String email, @Param("status") String status); // 이메일과 완료된 실험을 기준으로 해당 유저의 실험정보 조회
 
