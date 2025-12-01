@@ -23,4 +23,8 @@ public class StockSearchResponse {
     private EXCHANGENUM exchangeNum;
 
     private COUNTRY country;
+
+    private Integer score; // 점수
+
+    private Integer diff; // 점수 등락폭
 }
