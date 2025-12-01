@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface ExperimentTradeItemRepository extends JpaRepository<ExperimentTradeItem, Integer> {
-    @Query("SELECT e FROM ExperimentTradeItem e WHERE e.experiment.id = :experimentId")
+    @Query("SELECT e FROM ExperimentTradeItem e WHERE e.experiment.id = :experimentId ORDER BY e.tradeAt ASC")
     List<ExperimentTradeItem> findExperimentTradeItemsByExperimentId(@Param("experimentId") Integer experimentId);
 
     @Query("SELECT e FROM ExperimentTradeItem e WHERE e.experiment.id = :experimentId AND e.tradeAt BETWEEN :start and :end ORDER BY e.tradeAt")
