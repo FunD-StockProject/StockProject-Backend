@@ -13,7 +13,6 @@ def kospi_master_download(base_dir, verbose=False):
     if (verbose): print(f"current directory is {cwd}")
     ssl._create_default_https_context = ssl._create_unverified_context
 
-    import os
     urllib.request.urlretrieve("https://new.real.download.dws.co.kr/common/master/kospi_code.mst.zip",
                                os.path.join(base_dir, "kospi_code.zip"))
 
