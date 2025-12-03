@@ -62,7 +62,12 @@ public class StockImportService {
             int invalidated = 0;
             int preserved = 0;
 
+            // 기존 종목들을 symbol로 조회하여 Map으로 변환 (성능 최적화)
+            Map<String, Stock> existingStocksMap = stockRepository.findAll().stream()
+                .collect(Collectors.toMap(Stock::getSymbol, stock -> stock, (existing, replacement) -> existing));
+
             // 1. 종목 마스터에 있는 종목 처리 (추가/업데이트)
+            List<Stock> stocksToSave = new ArrayList<>();
             for (Map<String, Object> stockData : stocksData) {
                 try {
                     String symbol = (String) stockData.get("symbol");
@@ -86,62 +91,37 @@ public class StockImportService {
                         continue;
                     }
 
-                    // 섹터 코드 매핑 (KIS 업종 코드 → DomesticSector 또는 OverseasSector)
-                    // KIS에서 제공하는 공식 업종 코드를 그대로 사용합니다.
-                    if (sectorCodeStr != null && !sectorCodeStr.isEmpty() && !sectorCodeStr.equals("nan")) {
-                        if (exchangeNum == EXCHANGENUM.KOSPI || exchangeNum == EXCHANGENUM.KOSDAQ) {
-                            // 국내 주식: DomesticSector 사용
-                            DomesticSector domesticSector = DomesticSector.fromCode(sectorCodeStr, exchangeNum);
-                            if (domesticSector == DomesticSector.UNKNOWN) {
-                                log.debug("Domestic sector mapping failed: code={}, exchange={}, stock={}. Using UNKNOWN.", 
-                                    sectorCodeStr, exchangeNum, symbol);
-                            } else {
-                                log.trace("Mapped KIS sector code: {} -> DomesticSector: {} for stock: {}", 
-                                    sectorCodeStr, domesticSector, symbol);
-                            }
-                        } else if (exchangeNum == EXCHANGENUM.NAS || exchangeNum == EXCHANGENUM.NYS || exchangeNum == EXCHANGENUM.AMS) {
-                            // 해외 주식: OverseasSector 사용
-                            OverseasSector overseasSector = OverseasSector.fromCode(sectorCodeStr);
-                            if (overseasSector == OverseasSector.UNKNOWN) {
-                                log.debug("Overseas sector mapping failed: code={}, exchange={}, stock={}. Using UNKNOWN.", 
-                                    sectorCodeStr, exchangeNum, symbol);
-                            } else {
-                                log.trace("Mapped KIS sector code: {} -> OverseasSector: {} for stock: {}", 
-                                    sectorCodeStr, overseasSector, symbol);
-                            }
-                        }
-                    }
-
+                    Stock stock;
                     // 기존 종목 확인
-                    Optional<Stock> existingStock = stockRepository.findBySymbol(symbol);
-                    
-                    if (existingStock.isPresent()) {
+                    if (existingStocksMap.containsKey(symbol)) {
                         // 기존 종목 업데이트
-                        Stock stock = existingStock.get();
+                        stock = existingStocksMap.get(symbol);
                         stock.updateSymbolNameIfNull(symbolName);
                         // 종목 마스터에 있으므로 valid = true로 설정
                         setStockValid(stock, true);
-                        // 섹터 업데이트
-                        if (sectorCodeStr != null && !sectorCodeStr.isEmpty() && !sectorCodeStr.equals("nan")) {
-                            stock.setSectorByExchange(sectorCodeStr, exchangeNum);
-                        }
-                        stockRepository.save(stock);
                         updated++;
                     } else {
                         // 새 종목 생성
-                        Stock stock = createStock(symbol, symbolName, securityName, exchangeNum, true);
-                        // 섹터 설정
-                        if (sectorCodeStr != null && !sectorCodeStr.isEmpty() && !sectorCodeStr.equals("nan")) {
-                            stock.setSectorByExchange(sectorCodeStr, exchangeNum);
-                        }
-                        stockRepository.save(stock);
+                        stock = createStock(symbol, symbolName, securityName, exchangeNum, true);
                         saved++;
                     }
+                    
+                    // 섹터 업데이트
+                    if (sectorCodeStr != null && !sectorCodeStr.isEmpty() && !sectorCodeStr.equals("nan")) {
+                        stock.setSectorByExchange(sectorCodeStr, exchangeNum);
+                    }
+                    
+                    stocksToSave.add(stock);
 
                 } catch (Exception e) {
                     log.error("Error processing stock: {}", stockData, e);
                     skipped++;
                 }
+            }
+            
+            // 배치로 저장
+            if (!stocksToSave.isEmpty()) {
+                stockRepository.saveAll(stocksToSave);
             }
 
             // 2. 종목 마스터에 없는 종목 찾기

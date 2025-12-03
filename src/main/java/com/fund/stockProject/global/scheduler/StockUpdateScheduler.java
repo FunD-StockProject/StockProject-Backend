@@ -18,10 +18,10 @@ public class StockUpdateScheduler {
     private final StockImportService stockImportService;
 
     /**
-     * 매주 화요일 새벽 3시에 종목 마스터 데이터 업데이트
+     * 매주 목요일 새벽 3시에 종목 마스터 데이터 업데이트
      * Python 스크립트를 실행하여 최신 종목 데이터를 수집하고 DB에 반영합니다.
      */
-    @Scheduled(cron = "0 0 3 * * TUE", zone = "Asia/Seoul") // 매주 화요일 3시 실행
+    @Scheduled(cron = "0 0 3 * * THU", zone = "Asia/Seoul") // 매주 목요일 3시 실행
     public void updateStockMaster() {
         log.info("Starting weekly stock master update scheduler");
         

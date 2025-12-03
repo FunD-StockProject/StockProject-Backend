@@ -49,7 +49,8 @@ def map_overseas_exchange(exchange_id, exchange_code):
 
 def process_korea_stocks():
     """국내 주식 종목 데이터 처리"""
-    base_dir = os.path.join(os.path.dirname(__file__), '..', 'open-trading-api', 'stocks_info')
+    # stocks_info 디렉토리를 base_dir로 사용
+    base_dir = os.path.join(os.path.dirname(__file__), 'stocks_info')
     os.makedirs(base_dir, exist_ok=True)
     
     stocks = []
@@ -130,7 +131,8 @@ def process_korea_stocks():
 
 def process_overseas_stocks():
     """해외 주식 종목 데이터 처리"""
-    base_dir = os.path.join(os.path.dirname(__file__), '..', 'open-trading-api', 'stocks_info')
+    # stocks_info 디렉토리를 base_dir로 사용
+    base_dir = os.path.join(os.path.dirname(__file__), 'stocks_info')
     os.makedirs(base_dir, exist_ok=True)
     
     stocks = []
