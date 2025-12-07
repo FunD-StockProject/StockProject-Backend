@@ -183,10 +183,11 @@ public class StockImportService {
                                 skippedCount++;
                                 log.debug("Stock already exists, updated: {}", stock.getSymbol());
                             } else {
-                                // 새 종목 저장 - persist를 직접 사용하여 배치 회피
-                                entityManager.persist(stock);
+                                // 새 종목 저장 - merge를 사용하여 insert/update 자동 처리
+                                // merge는 ID가 없으면 insert, 있으면 update를 수행
+                                entityManager.merge(stock);
                                 entityManager.flush(); // 저장 즉시 반영하여 ID 확정
-                                entityManager.detach(stock); // 저장 후 detach하여 다음 저장과 충돌 방지
+                                entityManager.clear(); // 영속성 컨텍스트 완전히 정리하여 배치 충돌 방지
                                 savedCount++;
                             }
                         } catch (DataIntegrityViolationException e) {
@@ -332,9 +333,28 @@ public class StockImportService {
         log.warn("Duplicate key detected for stock: {}, attempting to update existing", stock.getSymbol());
         try {
             entityManager.clear(); // 영속성 컨텍스트 정리
-            Optional<Stock> existingStock = stockRepository.findBySymbol(stock.getSymbol());
-            if (existingStock.isPresent()) {
-                Stock existing = existingStock.get();
+            
+            // 예외 메시지에서 ID 추출 시도
+            Integer duplicateId = extractIdFromException(e);
+            
+            Stock existing = null;
+            if (duplicateId != null) {
+                // ID로 직접 조회
+                Optional<Stock> existingById = stockRepository.findById(duplicateId);
+                if (existingById.isPresent()) {
+                    existing = existingById.get();
+                }
+            }
+            
+            // ID로 찾지 못했으면 symbol로 조회
+            if (existing == null) {
+                Optional<Stock> existingBySymbol = stockRepository.findBySymbol(stock.getSymbol());
+                if (existingBySymbol.isPresent()) {
+                    existing = existingBySymbol.get();
+                }
+            }
+            
+            if (existing != null) {
                 existing.updateSymbolNameIfNull(stock.getSymbolName());
                 existing.setValid(true);
                 if (stock.getDomesticSector() != null) {
@@ -345,13 +365,47 @@ public class StockImportService {
                 }
                 stockRepository.save(existing);
                 entityManager.flush();
-                log.debug("Stock updated after duplicate key error: {}", stock.getSymbol());
+                log.debug("Stock updated after duplicate key error: {} (ID: {})", stock.getSymbol(), existing.getId());
             } else {
-                log.warn("Failed to find existing stock after duplicate key error: {}", stock.getSymbol());
+                log.warn("Failed to find existing stock after duplicate key error: {} (extracted ID: {})", 
+                        stock.getSymbol(), duplicateId);
             }
         } catch (Exception ex) {
             log.error("Failed to handle duplicate key error for stock: {}", stock.getSymbol(), ex);
         }
+    }
+    
+    /**
+     * 예외 메시지에서 중복된 ID를 추출합니다.
+     * 예: "Duplicate entry '5130' for key 'stock.PRIMARY'" -> 5130
+     */
+    private Integer extractIdFromException(Exception e) {
+        String message = e.getMessage();
+        if (message == null) {
+            // 원인 예외 체인 확인
+            Throwable cause = e.getCause();
+            while (cause != null && message == null) {
+                message = cause.getMessage();
+                cause = cause.getCause();
+            }
+        }
+        
+        if (message != null && message.contains("Duplicate entry")) {
+            try {
+                // "Duplicate entry '5130' for key" 패턴에서 ID 추출
+                int startIdx = message.indexOf("'");
+                if (startIdx >= 0) {
+                    int endIdx = message.indexOf("'", startIdx + 1);
+                    if (endIdx > startIdx) {
+                        String idStr = message.substring(startIdx + 1, endIdx);
+                        return Integer.parseInt(idStr);
+                    }
+                }
+            } catch (NumberFormatException | StringIndexOutOfBoundsException ex) {
+                log.debug("Failed to extract ID from exception message: {}", message);
+            }
+        }
+        return null;
     }
 }
 
