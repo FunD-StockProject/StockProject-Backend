@@ -11,7 +11,6 @@ import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.Query;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -50,8 +49,8 @@ public class StockImportService {
                 return;
             }
 
-            // 시퀀스 동기화: 실제 DB의 최대 ID로 시퀀스 설정
-            synchronizeSequence();
+            // IDENTITY 전략을 사용하므로 시퀀스 동기화 불필요
+            // MySQL AUTO_INCREMENT가 자동으로 ID를 생성하므로 락 경합 없음
 
             List<Map<String, Object>> stocksData = objectMapper.readValue(
                 file,
@@ -144,24 +143,25 @@ public class StockImportService {
                 }
             }
             
-            // 모든 종목을 symbol 기준으로 UPSERT 처리 (단순하고 안전한 방법)
+            // 모든 종목을 symbol 기준으로 UPSERT 처리
+            // 배치 처리로 시퀀스 접근 최소화 (성능 향상 및 락 경합 감소)
             if (!stocksToSaveMap.isEmpty()) {
                 int processedCount = 0;
                 int updatedCount = 0;
                 int insertedCount = 0;
                 int errorCount = 0;
                 
+                // 배치 크기 설정 (시퀀스 접근 빈도 조절)
+                final int BATCH_SIZE = 50;
+                List<Stock> batch = new ArrayList<>();
+                
                 for (Stock stock : stocksToSaveMap.values()) {
                     try {
-                        // 이전 작업을 DB에 반영
-                        entityManager.flush();
-                        entityManager.clear();
-                        
                         // 항상 DB에서 symbol로 확인 (가장 확실한 방법)
                         Optional<Stock> existingStockOpt = stockRepository.findBySymbol(stock.getSymbol());
                         
                         if (existingStockOpt.isPresent()) {
-                            // 기존 종목 업데이트
+                            // 기존 종목 업데이트 - 즉시 처리
                             Stock existing = existingStockOpt.get();
                             existing.updateSymbolNameIfNull(stock.getSymbolName());
                             existing.setValid(true);
@@ -172,52 +172,41 @@ public class StockImportService {
                                 existing.setOverseasSector(stock.getOverseasSector());
                             }
                             stockRepository.save(existing);
-                            entityManager.flush();
                             updatedCount++;
-                            log.debug("Updated existing stock: {}", stock.getSymbol());
+                            processedCount++;
                         } else {
-                            // 새 종목 저장
-                            // ID가 null인 새 엔티티이므로 persist()가 호출됨
-                            // 시퀀스에서 ID를 생성하지만, 혹시 모를 중복을 대비해 예외 처리
-                            try {
-                                stockRepository.save(stock);
+                            // 새 종목은 배치에 추가
+                            batch.add(stock);
+                            
+                            // 배치가 가득 차면 일괄 처리
+                            if (batch.size() >= BATCH_SIZE) {
+                                BatchResult batchResult = processBatch(batch);
+                                insertedCount += batchResult.inserted;
+                                updatedCount += batchResult.updated;
+                                errorCount += batchResult.errors;
+                                processedCount += batch.size();
+                                batch.clear();
+                                
+                                // 배치 처리 후 영속성 컨텍스트 정리
                                 entityManager.flush();
-                                entityManager.detach(stock); // 영속성 컨텍스트에서 분리
-                                insertedCount++;
-                                log.debug("Inserted new stock: {}", stock.getSymbol());
-                            } catch (DataIntegrityViolationException e) {
-                                // 중복 키 오류 발생 시 기존 종목으로 처리
                                 entityManager.clear();
-                                if (handleDuplicateKeyError(stock, e)) {
-                                    updatedCount++;
-                                    log.debug("Updated stock after duplicate key error: {}", stock.getSymbol());
-                                } else {
-                                    errorCount++;
-                                    log.warn("Failed to handle duplicate key error for stock: {}", stock.getSymbol());
-                                }
-                            } catch (Exception e) {
-                                // 예외 메시지에 "Duplicate entry"가 포함되어 있는지 확인
-                                String errorMessage = getRootCauseMessage(e);
-                                if (errorMessage != null && errorMessage.contains("Duplicate entry")) {
-                                    entityManager.clear();
-                                    if (handleDuplicateKeyError(stock, e)) {
-                                        updatedCount++;
-                                        log.debug("Updated stock after duplicate key error: {}", stock.getSymbol());
-                                    } else {
-                                        errorCount++;
-                                        log.warn("Failed to handle duplicate key error for stock: {}", stock.getSymbol());
-                                    }
-                                } else {
-                                    errorCount++;
-                                    log.warn("Failed to save stock: {} - {}", stock.getSymbol(), errorMessage);
-                                }
                             }
                         }
-                        processedCount++;
                     } catch (Exception e) {
                         errorCount++;
                         log.error("Unexpected error processing stock: {}", stock.getSymbol(), e);
                     }
+                }
+                
+                // 남은 배치 처리
+                if (!batch.isEmpty()) {
+                    BatchResult batchResult = processBatch(batch);
+                    insertedCount += batchResult.inserted;
+                    updatedCount += batchResult.updated;
+                    errorCount += batchResult.errors;
+                    processedCount += batch.size();
+                    entityManager.flush();
+                    entityManager.clear();
                 }
                 
                 log.info("Processed {} stocks - Inserted: {}, Updated: {}, Errors: {}", 
@@ -421,70 +410,57 @@ public class StockImportService {
     }
 
     /**
-     * 시퀀스를 실제 DB의 최대 ID로 동기화합니다.
-     * 이는 중복 키 오류를 방지하기 위해 필요합니다.
-     * Hibernate가 MySQL에서 시퀀스를 사용할 때 생성하는 테이블을 업데이트합니다.
+     * 배치 처리 결과를 담는 내부 클래스
      */
-    private void synchronizeSequence() {
-        try {
-            Integer maxId = stockRepository.findMaxId();
-            if (maxId == null) {
-                maxId = 0;
-            }
-            
-            int nextVal = maxId + 1;
-            
-            // Hibernate가 생성하는 시퀀스 테이블 이름은 버전에 따라 다를 수 있습니다.
-            // 일반적으로 hibernate_sequences 또는 sequence_name이 'stock_sequence'인 테이블을 사용합니다.
-            
-            // 방법 1: hibernate_sequences 테이블 업데이트 시도 (Hibernate 5+)
-            try {
-                Query updateQuery = entityManager.createNativeQuery(
-                    "UPDATE hibernate_sequences SET next_val = :nextVal WHERE sequence_name = 'stock_sequence'"
-                );
-                updateQuery.setParameter("nextVal", nextVal);
-                int updated = updateQuery.executeUpdate();
-                
-                if (updated == 0) {
-                    // 레코드가 없으면 생성
-                    Query insertQuery = entityManager.createNativeQuery(
-                        "INSERT INTO hibernate_sequences (sequence_name, next_val) VALUES ('stock_sequence', :nextVal) " +
-                        "ON DUPLICATE KEY UPDATE next_val = :nextVal"
-                    );
-                    insertQuery.setParameter("nextVal", nextVal);
-                    insertQuery.executeUpdate();
-                }
-                log.info("Synchronized sequence to max ID: {} (next_val: {})", maxId, nextVal);
-            } catch (Exception e1) {
-                // hibernate_sequences 테이블이 없으면 다른 방법 시도
-                log.debug("hibernate_sequences table not found, trying alternative method: {}", e1.getMessage());
-                
-                // 방법 2: stock_sequence 테이블 직접 업데이트 시도
-                try {
-                    Query updateQuery2 = entityManager.createNativeQuery(
-                        "UPDATE stock_sequence SET next_val = :nextVal"
-                    );
-                    updateQuery2.setParameter("nextVal", nextVal);
-                    int updated2 = updateQuery2.executeUpdate();
-                    
-                    if (updated2 == 0) {
-                        Query insertQuery2 = entityManager.createNativeQuery(
-                            "INSERT INTO stock_sequence (next_val) VALUES (:nextVal) " +
-                            "ON DUPLICATE KEY UPDATE next_val = :nextVal"
-                        );
-                        insertQuery2.setParameter("nextVal", nextVal);
-                        insertQuery2.executeUpdate();
-                    }
-                    log.info("Synchronized sequence to max ID: {} (next_val: {})", maxId, nextVal);
-                } catch (Exception e2) {
-                    log.warn("Failed to synchronize sequence using alternative method: {}", e2.getMessage());
-                    // 시퀀스 동기화 실패는 치명적이지 않으므로 계속 진행
-                }
-            }
-        } catch (Exception e) {
-            // 시퀀스 동기화 실패는 치명적이지 않으므로 경고만 로깅
-            log.warn("Failed to synchronize sequence: {}", e.getMessage());
-        }
+    private static class BatchResult {
+        int inserted = 0;
+        int updated = 0;
+        int errors = 0;
     }
+    
+    /**
+     * 배치로 새 종목을 저장합니다.
+     * 중복 키 오류가 발생하면 개별 처리합니다.
+     * @return 배치 처리 결과 (inserted, updated, errors)
+     */
+    private BatchResult processBatch(List<Stock> batch) {
+        BatchResult result = new BatchResult();
+        
+        for (Stock stock : batch) {
+            try {
+                stockRepository.save(stock);
+                result.inserted++;
+            } catch (DataIntegrityViolationException e) {
+                // 중복 키 오류 발생 시 기존 종목으로 처리
+                entityManager.clear();
+                if (handleDuplicateKeyError(stock, e)) {
+                    result.updated++;
+                    log.debug("Updated stock after duplicate key error in batch: {}", stock.getSymbol());
+                } else {
+                    result.errors++;
+                    log.warn("Failed to handle duplicate key error for stock in batch: {}", stock.getSymbol());
+                }
+            } catch (Exception e) {
+                // 예외 메시지에 "Duplicate entry" 또는 "Lock wait timeout"이 포함되어 있는지 확인
+                String errorMessage = getRootCauseMessage(e);
+                if (errorMessage != null && (errorMessage.contains("Duplicate entry") || errorMessage.contains("Lock wait timeout"))) {
+                    entityManager.clear();
+                    if (handleDuplicateKeyError(stock, e)) {
+                        result.updated++;
+                        log.debug("Updated stock after error in batch: {}", stock.getSymbol());
+                    } else {
+                        result.errors++;
+                        log.warn("Failed to handle error for stock in batch: {} - {}", stock.getSymbol(), errorMessage);
+                    }
+                } else {
+                    result.errors++;
+                    log.warn("Failed to save stock in batch: {} - {}", stock.getSymbol(), errorMessage);
+                }
+            }
+        }
+        
+        return result;
+    }
+
 }
 
