@@ -162,6 +162,7 @@ public class StockImportService {
                         try {
                             // 이전 저장을 DB에 반영하여 중복 체크 정확도 향상
                             entityManager.flush();
+                            entityManager.clear(); // 영속성 컨텍스트 정리하여 배치 충돌 방지
                             
                             // symbol로 이미 존재하는지 다시 확인 (DB에서 직접 확인)
                             // flush 후 조회하여 방금 저장된 종목도 확인 가능
@@ -182,41 +183,26 @@ public class StockImportService {
                                 skippedCount++;
                                 log.debug("Stock already exists, updated: {}", stock.getSymbol());
                             } else {
-                                // 새 종목 저장
-                                stockRepository.save(stock);
+                                // 새 종목 저장 - persist를 직접 사용하여 배치 회피
+                                entityManager.persist(stock);
                                 entityManager.flush(); // 저장 즉시 반영하여 ID 확정
+                                entityManager.detach(stock); // 저장 후 detach하여 다음 저장과 충돌 방지
                                 savedCount++;
                             }
                         } catch (DataIntegrityViolationException e) {
                             // 중복 키 오류 발생 시 기존 종목으로 처리
-                            log.warn("Duplicate key detected for stock: {}, attempting to update existing", stock.getSymbol());
-                            try {
-                                Optional<Stock> existingStock = stockRepository.findBySymbol(stock.getSymbol());
-                                if (existingStock.isPresent()) {
-                                    Stock existing = existingStock.get();
-                                    existing.updateSymbolNameIfNull(stock.getSymbolName());
-                                    existing.setValid(true);
-                                    if (stock.getDomesticSector() != null) {
-                                        existing.setDomesticSector(stock.getDomesticSector());
-                                    }
-                                    if (stock.getOverseasSector() != null) {
-                                        existing.setOverseasSector(stock.getOverseasSector());
-                                    }
-                                    stockRepository.save(existing);
-                                    entityManager.flush();
-                                    skippedCount++;
-                                    log.debug("Stock updated after duplicate key error: {}", stock.getSymbol());
-                                } else {
-                                    skippedCount++;
-                                    log.warn("Failed to find existing stock after duplicate key error: {}", stock.getSymbol());
-                                }
-                            } catch (Exception ex) {
-                                log.error("Failed to handle duplicate key error for stock: {}", stock.getSymbol(), ex);
+                            handleDuplicateKeyError(stock, e);
+                            skippedCount++;
+                        } catch (Exception e) {
+                            // 예외 메시지에 "Duplicate entry"가 포함되어 있는지 확인
+                            String errorMessage = e.getMessage();
+                            if (errorMessage != null && errorMessage.contains("Duplicate entry")) {
+                                handleDuplicateKeyError(stock, e);
+                                skippedCount++;
+                            } else {
+                                log.warn("Failed to save stock: {} - {}", stock.getSymbol(), errorMessage);
                                 skippedCount++;
                             }
-                        } catch (Exception e) {
-                            log.warn("Failed to save stock: {} - {}", stock.getSymbol(), e.getMessage());
-                            skippedCount++;
                         }
                     }
                     log.info("Saved {} new stocks, {} skipped (already exists or error)", savedCount, skippedCount);
@@ -337,6 +323,35 @@ public class StockImportService {
     private Stock createStock(String symbol, String symbolName, String securityName, 
                               EXCHANGENUM exchangeNum, Boolean valid) {
         return new Stock(symbol, symbolName, securityName, exchangeNum, valid);
+    }
+
+    /**
+     * 중복 키 오류 발생 시 기존 종목을 찾아 업데이트합니다.
+     */
+    private void handleDuplicateKeyError(Stock stock, Exception e) {
+        log.warn("Duplicate key detected for stock: {}, attempting to update existing", stock.getSymbol());
+        try {
+            entityManager.clear(); // 영속성 컨텍스트 정리
+            Optional<Stock> existingStock = stockRepository.findBySymbol(stock.getSymbol());
+            if (existingStock.isPresent()) {
+                Stock existing = existingStock.get();
+                existing.updateSymbolNameIfNull(stock.getSymbolName());
+                existing.setValid(true);
+                if (stock.getDomesticSector() != null) {
+                    existing.setDomesticSector(stock.getDomesticSector());
+                }
+                if (stock.getOverseasSector() != null) {
+                    existing.setOverseasSector(stock.getOverseasSector());
+                }
+                stockRepository.save(existing);
+                entityManager.flush();
+                log.debug("Stock updated after duplicate key error: {}", stock.getSymbol());
+            } else {
+                log.warn("Failed to find existing stock after duplicate key error: {}", stock.getSymbol());
+            }
+        } catch (Exception ex) {
+            log.error("Failed to handle duplicate key error for stock: {}", stock.getSymbol(), ex);
+        }
     }
 }
 
