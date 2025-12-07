@@ -68,6 +68,17 @@ def process_korea_stocks():
         for _, row in df_kospi.iterrows():
             symbol = str(row['단축코드']).strip()
             symbol_name = str(row['한글명']).strip()
+            
+            # 실제 주식 종목만 필터링
+            # 1. 단축코드가 6자리 숫자인 것만
+            if not re.match(r'^\d{6}$', symbol):
+                continue
+            
+            # 2. ETP가 NaN인 것만 (ETF/ETP 제외)
+            etp_value = row.get('ETP', '')
+            if not pd.isna(etp_value):
+                continue
+            
             # 지수업종대분류 코드 추출
             sector_code_raw = row.get('지수업종대분류', '')
             if pd.isna(sector_code_raw):
@@ -110,6 +121,11 @@ def process_korea_stocks():
         for _, row in df_kosdaq.iterrows():
             symbol = str(row['단축코드']).strip()
             symbol_name = str(row['한글종목명']).strip()
+            
+            # 실제 주식 종목만 필터링 (단축코드가 숫자로 시작하는 것만, 900번대는 제외)
+            if not re.match(r'^[0-8]\d', symbol):
+                continue
+            
             # 지수업종 대분류 코드 추출
             sector_code_raw = row.get('지수업종 대분류 코드', '')
             if pd.isna(sector_code_raw):
@@ -160,8 +176,12 @@ def process_overseas_stocks():
             
             for _, row in df.iterrows():
                 # Security type이 2(Stock)인 것만 처리
-                security_type = str(row.get('Security type(1:Index,2:Stock,3:ETP(ETF),4:Warrant)', '')).strip()
-                if security_type != '2':
+                security_type_raw = row.get('Security type(1:Index,2:Stock,3:ETP(ETF),4:Warrant)', '')
+                # 숫자 타입일 수도 있고 문자열 타입일 수도 있음
+                if pd.isna(security_type_raw):
+                    continue
+                security_type = str(security_type_raw).strip()
+                if security_type != '2' and security_type != '2.0':
                     continue
                 
                 symbol = str(row.get('Symbol', '')).strip()
