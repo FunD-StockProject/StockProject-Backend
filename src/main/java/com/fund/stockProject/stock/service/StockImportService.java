@@ -13,6 +13,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -159,7 +160,11 @@ public class StockImportService {
                     int skippedCount = 0;
                     for (Stock stock : newStocks) {
                         try {
+                            // 이전 저장을 DB에 반영하여 중복 체크 정확도 향상
+                            entityManager.flush();
+                            
                             // symbol로 이미 존재하는지 다시 확인 (DB에서 직접 확인)
+                            // flush 후 조회하여 방금 저장된 종목도 확인 가능
                             Optional<Stock> existingStock = stockRepository.findBySymbol(stock.getSymbol());
                             if (existingStock.isPresent()) {
                                 // 이미 존재하면 업데이트로 처리
@@ -173,19 +178,47 @@ public class StockImportService {
                                     existing.setOverseasSector(stock.getOverseasSector());
                                 }
                                 stockRepository.save(existing);
+                                entityManager.flush(); // 업데이트 즉시 반영
                                 skippedCount++;
                                 log.debug("Stock already exists, updated: {}", stock.getSymbol());
                             } else {
                                 // 새 종목 저장
                                 stockRepository.save(stock);
+                                entityManager.flush(); // 저장 즉시 반영하여 ID 확정
                                 savedCount++;
+                            }
+                        } catch (DataIntegrityViolationException e) {
+                            // 중복 키 오류 발생 시 기존 종목으로 처리
+                            log.warn("Duplicate key detected for stock: {}, attempting to update existing", stock.getSymbol());
+                            try {
+                                Optional<Stock> existingStock = stockRepository.findBySymbol(stock.getSymbol());
+                                if (existingStock.isPresent()) {
+                                    Stock existing = existingStock.get();
+                                    existing.updateSymbolNameIfNull(stock.getSymbolName());
+                                    existing.setValid(true);
+                                    if (stock.getDomesticSector() != null) {
+                                        existing.setDomesticSector(stock.getDomesticSector());
+                                    }
+                                    if (stock.getOverseasSector() != null) {
+                                        existing.setOverseasSector(stock.getOverseasSector());
+                                    }
+                                    stockRepository.save(existing);
+                                    entityManager.flush();
+                                    skippedCount++;
+                                    log.debug("Stock updated after duplicate key error: {}", stock.getSymbol());
+                                } else {
+                                    skippedCount++;
+                                    log.warn("Failed to find existing stock after duplicate key error: {}", stock.getSymbol());
+                                }
+                            } catch (Exception ex) {
+                                log.error("Failed to handle duplicate key error for stock: {}", stock.getSymbol(), ex);
+                                skippedCount++;
                             }
                         } catch (Exception e) {
                             log.warn("Failed to save stock: {} - {}", stock.getSymbol(), e.getMessage());
                             skippedCount++;
                         }
                     }
-                    entityManager.flush();
                     log.info("Saved {} new stocks, {} skipped (already exists or error)", savedCount, skippedCount);
                 }
                 
