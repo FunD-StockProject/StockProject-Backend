@@ -1,5 +1,6 @@
 package com.fund.stockProject.experiment.dto;
 
+import com.fund.stockProject.stock.domain.COUNTRY;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.Builder;
@@ -17,6 +18,7 @@ public class ExperimentStatusDetailResponse {
     private Integer buyPrice; // 매수 가격
     private Integer currentPrice; // 현재 가격
     private LocalDateTime buyAt; // 매수일
+    private COUNTRY country; // 국가
 
     @Getter
     public static class TradeInfo {

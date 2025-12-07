@@ -77,11 +77,7 @@ public class SecurityConfig {
             "/stock/{id}/info/{country}",
             "/stock/category/{category}/{country}",
             "/stock/rankings/hot",
-            "/stock/summary/{symbol}/{country}",
-            "/experiment/status",
-            "/experiment/{id}/buy/{country}",
-            "/experiment/status/{id}/detail",
-            "/experiment/report"
+            "/stock/summary/{symbol}/{country}"
     };
 
     @Bean

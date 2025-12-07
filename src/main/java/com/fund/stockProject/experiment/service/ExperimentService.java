@@ -287,6 +287,9 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             // 최종 수익률 계산: 현재 가격 기준
             double roi = ((currentPrice - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
             
+            // country 설정
+            final COUNTRY country = stockInfo != null ? stockInfo.getCountry() : getCountryFromExchangeNum(stock.getExchangeNum());
+            
             return ExperimentStatusDetailResponse.builder()
                 .tradeInfos(new ArrayList<>())
                 .roi(roi)
@@ -297,6 +300,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 .buyPrice(experiment.getBuyPrice().intValue())
                 .currentPrice(currentPrice)
                 .buyAt(experiment.getBuyAt())
+                .country(country)
                 .build();
         }
         
@@ -322,6 +326,9 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             );
         }
 
+        // country 설정
+        final COUNTRY country = stockInfo != null ? stockInfo.getCountry() : getCountryFromExchangeNum(stock.getExchangeNum());
+
         return ExperimentStatusDetailResponse.builder()
             .tradeInfos(tradeInfos)
             .roi(roi)
@@ -332,6 +339,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .buyPrice(experiment.getBuyPrice().intValue())
             .currentPrice(currentPrice)
             .buyAt(experiment.getBuyAt())
+            .country(country)
             .build();
     }
 

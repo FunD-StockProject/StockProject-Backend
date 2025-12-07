@@ -9,6 +9,8 @@ import com.fund.stockProject.stock.domain.DomesticSector;
 import com.fund.stockProject.stock.domain.OverseasSector;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,9 @@ public class StockImportService {
     private final ObjectMapper objectMapper;
     private final ExperimentRepository experimentRepository;
     private final PreferenceRepository preferenceRepository;
+    
+    @PersistenceContext
+    private EntityManager entityManager;
 
     /**
      * JSON 파일에서 종목 데이터를 읽어서 DB에 저장하고, 종목 마스터에 없는 종목은 isValid=false로 설정합니다.
@@ -67,7 +72,8 @@ public class StockImportService {
                 .collect(Collectors.toMap(Stock::getSymbol, stock -> stock, (existing, replacement) -> existing));
 
             // 1. 종목 마스터에 있는 종목 처리 (추가/업데이트)
-            List<Stock> stocksToSave = new ArrayList<>();
+            // symbol을 키로 사용하여 중복 제거 (같은 symbol이 여러 번 나와도 한 번만 처리)
+            Map<String, Stock> stocksToSaveMap = new LinkedHashMap<>();
             for (Map<String, Object> stockData : stocksData) {
                 try {
                     String symbol = (String) stockData.get("symbol");
@@ -79,6 +85,12 @@ public class StockImportService {
                     if (symbol == null || symbolName == null || securityName == null || exchangeNumStr == null) {
                         log.warn("Skipping stock with missing required fields: {}", stockData);
                         skipped++;
+                        continue;
+                    }
+
+                    // 이미 처리된 symbol이면 스킵 (중복 방지)
+                    if (stocksToSaveMap.containsKey(symbol)) {
+                        log.debug("Skipping duplicate symbol in JSON: {}", symbol);
                         continue;
                     }
 
@@ -94,8 +106,12 @@ public class StockImportService {
                     Stock stock;
                     // 기존 종목 확인
                     if (existingStocksMap.containsKey(symbol)) {
-                        // 기존 종목 업데이트
+                        // 기존 종목 업데이트 - 영속성 컨텍스트에서 분리하여 충돌 방지
                         stock = existingStocksMap.get(symbol);
+                        // 엔티티를 detach하여 새로운 세션에서 처리되도록 함
+                        if (entityManager.contains(stock)) {
+                            entityManager.detach(stock);
+                        }
                         stock.updateSymbolNameIfNull(symbolName);
                         // 종목 마스터에 있으므로 valid = true로 설정
                         setStockValid(stock, true);
@@ -111,7 +127,7 @@ public class StockImportService {
                         stock.setSectorByExchange(sectorCodeStr, exchangeNum);
                     }
                     
-                    stocksToSave.add(stock);
+                    stocksToSaveMap.put(symbol, stock);
 
                 } catch (Exception e) {
                     log.error("Error processing stock: {}", stockData, e);
@@ -120,8 +136,32 @@ public class StockImportService {
             }
             
             // 배치로 저장
-            if (!stocksToSave.isEmpty()) {
-                stockRepository.saveAll(stocksToSave);
+            if (!stocksToSaveMap.isEmpty()) {
+                try {
+                    // 영속성 컨텍스트 정리 (기존 엔티티와의 충돌 방지)
+                    entityManager.flush();
+                    entityManager.clear();
+                    
+                    // 배치 저장 시도
+                    stockRepository.saveAll(new ArrayList<>(stocksToSaveMap.values()));
+                    entityManager.flush();
+                } catch (Exception e) {
+                    log.error("Error during batch save, attempting individual saves: {}", e.getMessage());
+                    // 배치 저장 실패 시 개별 저장으로 폴백
+                    int individualSaved = 0;
+                    int individualFailed = 0;
+                    for (Stock stock : stocksToSaveMap.values()) {
+                        try {
+                            entityManager.detach(stock); // 기존 엔티티와의 충돌 방지
+                            stockRepository.save(stock);
+                            individualSaved++;
+                        } catch (Exception ex) {
+                            log.warn("Failed to save individual stock: {} - {}", stock.getSymbol(), ex.getMessage());
+                            individualFailed++;
+                        }
+                    }
+                    log.info("Individual save completed - Saved: {}, Failed: {}", individualSaved, individualFailed);
+                }
             }
 
             // 2. 종목 마스터에 없는 종목 찾기
