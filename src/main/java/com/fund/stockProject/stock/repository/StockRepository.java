@@ -59,4 +59,10 @@ public interface StockRepository extends JpaRepository<Stock, Integer> {
      */
     @Query("SELECT s FROM Stock s WHERE s.valid = true AND s.overseasSector = :sector")
     List<Stock> findValidStocksByOverseasSector(@Param("sector") OverseasSector sector);
+
+    /**
+     * Stock 테이블의 최대 ID를 조회합니다 (시퀀스 동기화용)
+     */
+    @Query("SELECT COALESCE(MAX(s.id), 0) FROM Stock s")
+    Integer findMaxId();
 }

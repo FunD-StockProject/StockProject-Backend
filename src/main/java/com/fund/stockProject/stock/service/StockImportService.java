@@ -11,6 +11,7 @@ import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Query;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -48,6 +49,9 @@ public class StockImportService {
                 log.error("JSON file not found: {}", jsonFilePath);
                 return;
             }
+
+            // 시퀀스 동기화: 실제 DB의 최대 ID로 시퀀스 설정
+            synchronizeSequence();
 
             List<Map<String, Object>> stocksData = objectMapper.readValue(
                 file,
@@ -140,109 +144,84 @@ public class StockImportService {
                 }
             }
             
-            // 배치로 저장 - 기존 종목과 새 종목을 분리하여 처리
+            // 모든 종목을 symbol 기준으로 UPSERT 처리 (단순하고 안전한 방법)
             if (!stocksToSaveMap.isEmpty()) {
-                List<Stock> newStocks = new ArrayList<>();
-                List<Stock> existingStocks = new ArrayList<>();
+                int processedCount = 0;
+                int updatedCount = 0;
+                int insertedCount = 0;
+                int errorCount = 0;
                 
-                // 기존 종목과 새 종목 분리
                 for (Stock stock : stocksToSaveMap.values()) {
-                    if (stock.getId() != null) {
-                        existingStocks.add(stock);
-                    } else {
-                        newStocks.add(stock);
-                    }
-                }
-                
-                // 새 종목 저장 - 개별 처리로 중복 ID 방지
-                if (!newStocks.isEmpty()) {
-                    int savedCount = 0;
-                    int skippedCount = 0;
-                    for (Stock stock : newStocks) {
-                        try {
-                            // 이전 저장을 DB에 반영하여 중복 체크 정확도 향상
+                    try {
+                        // 이전 작업을 DB에 반영
+                        entityManager.flush();
+                        entityManager.clear();
+                        
+                        // 항상 DB에서 symbol로 확인 (가장 확실한 방법)
+                        Optional<Stock> existingStockOpt = stockRepository.findBySymbol(stock.getSymbol());
+                        
+                        if (existingStockOpt.isPresent()) {
+                            // 기존 종목 업데이트
+                            Stock existing = existingStockOpt.get();
+                            existing.updateSymbolNameIfNull(stock.getSymbolName());
+                            existing.setValid(true);
+                            if (stock.getDomesticSector() != null) {
+                                existing.setDomesticSector(stock.getDomesticSector());
+                            }
+                            if (stock.getOverseasSector() != null) {
+                                existing.setOverseasSector(stock.getOverseasSector());
+                            }
+                            stockRepository.save(existing);
                             entityManager.flush();
-                            entityManager.clear(); // 영속성 컨텍스트 정리하여 배치 충돌 방지
-                            
-                            // symbol로 이미 존재하는지 다시 확인 (DB에서 직접 확인)
-                            // flush 후 조회하여 방금 저장된 종목도 확인 가능
-                            Optional<Stock> existingStock = stockRepository.findBySymbol(stock.getSymbol());
-                            if (existingStock.isPresent()) {
-                                // 이미 존재하면 업데이트로 처리
-                                Stock existing = existingStock.get();
-                                existing.updateSymbolNameIfNull(stock.getSymbolName());
-                                existing.setValid(true);
-                                if (stock.getDomesticSector() != null) {
-                                    existing.setDomesticSector(stock.getDomesticSector());
+                            updatedCount++;
+                            log.debug("Updated existing stock: {}", stock.getSymbol());
+                        } else {
+                            // 새 종목 저장
+                            // ID가 null인 새 엔티티이므로 persist()가 호출됨
+                            // 시퀀스에서 ID를 생성하지만, 혹시 모를 중복을 대비해 예외 처리
+                            try {
+                                stockRepository.save(stock);
+                                entityManager.flush();
+                                entityManager.detach(stock); // 영속성 컨텍스트에서 분리
+                                insertedCount++;
+                                log.debug("Inserted new stock: {}", stock.getSymbol());
+                            } catch (DataIntegrityViolationException e) {
+                                // 중복 키 오류 발생 시 기존 종목으로 처리
+                                entityManager.clear();
+                                if (handleDuplicateKeyError(stock, e)) {
+                                    updatedCount++;
+                                    log.debug("Updated stock after duplicate key error: {}", stock.getSymbol());
+                                } else {
+                                    errorCount++;
+                                    log.warn("Failed to handle duplicate key error for stock: {}", stock.getSymbol());
                                 }
-                                if (stock.getOverseasSector() != null) {
-                                    existing.setOverseasSector(stock.getOverseasSector());
+                            } catch (Exception e) {
+                                // 예외 메시지에 "Duplicate entry"가 포함되어 있는지 확인
+                                String errorMessage = getRootCauseMessage(e);
+                                if (errorMessage != null && errorMessage.contains("Duplicate entry")) {
+                                    entityManager.clear();
+                                    if (handleDuplicateKeyError(stock, e)) {
+                                        updatedCount++;
+                                        log.debug("Updated stock after duplicate key error: {}", stock.getSymbol());
+                                    } else {
+                                        errorCount++;
+                                        log.warn("Failed to handle duplicate key error for stock: {}", stock.getSymbol());
+                                    }
+                                } else {
+                                    errorCount++;
+                                    log.warn("Failed to save stock: {} - {}", stock.getSymbol(), errorMessage);
                                 }
-                                stockRepository.save(existing);
-                                entityManager.flush(); // 업데이트 즉시 반영
-                                skippedCount++;
-                                log.debug("Stock already exists, updated: {}", stock.getSymbol());
-                            } else {
-                                // 새 종목 저장 - merge를 사용하여 insert/update 자동 처리
-                                // merge는 ID가 없으면 insert, 있으면 update를 수행
-                                entityManager.merge(stock);
-                                entityManager.flush(); // 저장 즉시 반영하여 ID 확정
-                                entityManager.clear(); // 영속성 컨텍스트 완전히 정리하여 배치 충돌 방지
-                                savedCount++;
-                            }
-                        } catch (DataIntegrityViolationException e) {
-                            // 중복 키 오류 발생 시 기존 종목으로 처리
-                            handleDuplicateKeyError(stock, e);
-                            skippedCount++;
-                        } catch (Exception e) {
-                            // 예외 메시지에 "Duplicate entry"가 포함되어 있는지 확인
-                            String errorMessage = e.getMessage();
-                            if (errorMessage != null && errorMessage.contains("Duplicate entry")) {
-                                handleDuplicateKeyError(stock, e);
-                                skippedCount++;
-                            } else {
-                                log.warn("Failed to save stock: {} - {}", stock.getSymbol(), errorMessage);
-                                skippedCount++;
                             }
                         }
+                        processedCount++;
+                    } catch (Exception e) {
+                        errorCount++;
+                        log.error("Unexpected error processing stock: {}", stock.getSymbol(), e);
                     }
-                    log.info("Saved {} new stocks, {} skipped (already exists or error)", savedCount, skippedCount);
                 }
                 
-                // 기존 종목 업데이트 - 개별 처리로 안전하게
-                if (!existingStocks.isEmpty()) {
-                    int updatedCount = 0;
-                    int failedCount = 0;
-                    for (Stock stock : existingStocks) {
-                        try {
-                            // ID로 다시 조회하여 영속성 컨텍스트에서 가져옴
-                            Stock managedStock = stockRepository.findById(stock.getId())
-                                    .orElse(null);
-                            if (managedStock != null) {
-                                // 조회한 엔티티에 변경사항 반영
-                                managedStock.updateSymbolNameIfNull(stock.getSymbolName());
-                                managedStock.setValid(stock.getValid());
-                                if (stock.getDomesticSector() != null) {
-                                    managedStock.setDomesticSector(stock.getDomesticSector());
-                                }
-                                if (stock.getOverseasSector() != null) {
-                                    managedStock.setOverseasSector(stock.getOverseasSector());
-                                }
-                                stockRepository.save(managedStock);
-                                updatedCount++;
-                            } else {
-                                log.warn("Stock not found for update: ID={}, Symbol={}", stock.getId(), stock.getSymbol());
-                                failedCount++;
-                            }
-                        } catch (Exception e) {
-                            log.warn("Failed to update stock: ID={}, Symbol={} - {}", 
-                                    stock.getId(), stock.getSymbol(), e.getMessage());
-                            failedCount++;
-                        }
-                    }
-                    entityManager.flush();
-                    log.info("Updated {} existing stocks, {} failed", updatedCount, failedCount);
-                }
+                log.info("Processed {} stocks - Inserted: {}, Updated: {}, Errors: {}", 
+                        processedCount, insertedCount, updatedCount, errorCount);
             }
 
             // 2. 종목 마스터에 없는 종목 찾기
@@ -328,29 +307,32 @@ public class StockImportService {
 
     /**
      * 중복 키 오류 발생 시 기존 종목을 찾아 업데이트합니다.
+     * @return 처리 성공 여부
      */
-    private void handleDuplicateKeyError(Stock stock, Exception e) {
+    private boolean handleDuplicateKeyError(Stock stock, Exception e) {
         log.warn("Duplicate key detected for stock: {}, attempting to update existing", stock.getSymbol());
         try {
-            entityManager.clear(); // 영속성 컨텍스트 정리
-            
             // 예외 메시지에서 ID 추출 시도
             Integer duplicateId = extractIdFromException(e);
+            log.debug("Extracted duplicate ID from exception: {} for stock: {}", duplicateId, stock.getSymbol());
             
             Stock existing = null;
-            if (duplicateId != null) {
-                // ID로 직접 조회
+            
+            // 1. 먼저 symbol로 조회 (가장 확실한 방법)
+            Optional<Stock> existingBySymbol = stockRepository.findBySymbol(stock.getSymbol());
+            if (existingBySymbol.isPresent()) {
+                existing = existingBySymbol.get();
+                log.debug("Found existing stock by symbol: {} (ID: {})", stock.getSymbol(), existing.getId());
+            }
+            
+            // 2. symbol로 찾지 못했고 ID가 추출되었으면 ID로 조회
+            if (existing == null && duplicateId != null) {
                 Optional<Stock> existingById = stockRepository.findById(duplicateId);
                 if (existingById.isPresent()) {
                     existing = existingById.get();
-                }
-            }
-            
-            // ID로 찾지 못했으면 symbol로 조회
-            if (existing == null) {
-                Optional<Stock> existingBySymbol = stockRepository.findBySymbol(stock.getSymbol());
-                if (existingBySymbol.isPresent()) {
-                    existing = existingBySymbol.get();
+                    log.debug("Found existing stock by ID: {} (Symbol: {})", duplicateId, existing.getSymbol());
+                } else {
+                    log.debug("Stock with ID {} not found in repository", duplicateId);
                 }
             }
             
@@ -366,12 +348,15 @@ public class StockImportService {
                 stockRepository.save(existing);
                 entityManager.flush();
                 log.debug("Stock updated after duplicate key error: {} (ID: {})", stock.getSymbol(), existing.getId());
+                return true;
             } else {
                 log.warn("Failed to find existing stock after duplicate key error: {} (extracted ID: {})", 
                         stock.getSymbol(), duplicateId);
+                return false;
             }
         } catch (Exception ex) {
             log.error("Failed to handle duplicate key error for stock: {}", stock.getSymbol(), ex);
+            return false;
         }
     }
     
@@ -380,22 +365,24 @@ public class StockImportService {
      * 예: "Duplicate entry '5130' for key 'stock.PRIMARY'" -> 5130
      */
     private Integer extractIdFromException(Exception e) {
-        String message = e.getMessage();
-        if (message == null) {
-            // 원인 예외 체인 확인
-            Throwable cause = e.getCause();
-            while (cause != null && message == null) {
-                message = cause.getMessage();
-                cause = cause.getCause();
-            }
-        }
+        String message = getRootCauseMessage(e);
         
         if (message != null && message.contains("Duplicate entry")) {
             try {
                 // "Duplicate entry '5130' for key" 패턴에서 ID 추출
+                // 여러 패턴 시도: '5130', "5130", '5130'
                 int startIdx = message.indexOf("'");
                 if (startIdx >= 0) {
                     int endIdx = message.indexOf("'", startIdx + 1);
+                    if (endIdx > startIdx) {
+                        String idStr = message.substring(startIdx + 1, endIdx);
+                        return Integer.parseInt(idStr);
+                    }
+                }
+                // 작은따옴표로 찾지 못했으면 큰따옴표 시도
+                startIdx = message.indexOf("\"");
+                if (startIdx >= 0) {
+                    int endIdx = message.indexOf("\"", startIdx + 1);
                     if (endIdx > startIdx) {
                         String idStr = message.substring(startIdx + 1, endIdx);
                         return Integer.parseInt(idStr);
@@ -406,6 +393,98 @@ public class StockImportService {
             }
         }
         return null;
+    }
+    
+    /**
+     * 예외 체인을 따라가며 루트 원인 메시지를 추출합니다.
+     */
+    private String getRootCauseMessage(Exception e) {
+        String message = e.getMessage();
+        Throwable cause = e.getCause();
+        
+        // 예외 체인을 따라가며 "Duplicate entry"가 포함된 메시지 찾기
+        while (cause != null) {
+            String causeMessage = cause.getMessage();
+            if (causeMessage != null && causeMessage.contains("Duplicate entry")) {
+                message = causeMessage;
+                break;
+            }
+            cause = cause.getCause();
+        }
+        
+        // 여전히 null이면 원본 예외 메시지 사용
+        if (message == null) {
+            message = e.getMessage();
+        }
+        
+        return message;
+    }
+
+    /**
+     * 시퀀스를 실제 DB의 최대 ID로 동기화합니다.
+     * 이는 중복 키 오류를 방지하기 위해 필요합니다.
+     * Hibernate가 MySQL에서 시퀀스를 사용할 때 생성하는 테이블을 업데이트합니다.
+     */
+    private void synchronizeSequence() {
+        try {
+            Integer maxId = stockRepository.findMaxId();
+            if (maxId == null) {
+                maxId = 0;
+            }
+            
+            int nextVal = maxId + 1;
+            
+            // Hibernate가 생성하는 시퀀스 테이블 이름은 버전에 따라 다를 수 있습니다.
+            // 일반적으로 hibernate_sequences 또는 sequence_name이 'stock_sequence'인 테이블을 사용합니다.
+            
+            // 방법 1: hibernate_sequences 테이블 업데이트 시도 (Hibernate 5+)
+            try {
+                Query updateQuery = entityManager.createNativeQuery(
+                    "UPDATE hibernate_sequences SET next_val = :nextVal WHERE sequence_name = 'stock_sequence'"
+                );
+                updateQuery.setParameter("nextVal", nextVal);
+                int updated = updateQuery.executeUpdate();
+                
+                if (updated == 0) {
+                    // 레코드가 없으면 생성
+                    Query insertQuery = entityManager.createNativeQuery(
+                        "INSERT INTO hibernate_sequences (sequence_name, next_val) VALUES ('stock_sequence', :nextVal) " +
+                        "ON DUPLICATE KEY UPDATE next_val = :nextVal"
+                    );
+                    insertQuery.setParameter("nextVal", nextVal);
+                    insertQuery.executeUpdate();
+                }
+                log.info("Synchronized sequence to max ID: {} (next_val: {})", maxId, nextVal);
+            } catch (Exception e1) {
+                // hibernate_sequences 테이블이 없으면 다른 방법 시도
+                log.debug("hibernate_sequences table not found, trying alternative method: {}", e1.getMessage());
+                
+                // 방법 2: stock_sequence 테이블 직접 업데이트 시도
+                try {
+                    Query updateQuery2 = entityManager.createNativeQuery(
+                        "UPDATE stock_sequence SET next_val = :nextVal"
+                    );
+                    updateQuery2.setParameter("nextVal", nextVal);
+                    int updated2 = updateQuery2.executeUpdate();
+                    
+                    if (updated2 == 0) {
+                        Query insertQuery2 = entityManager.createNativeQuery(
+                            "INSERT INTO stock_sequence (next_val) VALUES (:nextVal) " +
+                            "ON DUPLICATE KEY UPDATE next_val = :nextVal"
+                        );
+                        insertQuery2.setParameter("nextVal", nextVal);
+                        insertQuery2.executeUpdate();
+                    }
+                    log.info("Synchronized sequence to max ID: {} (next_val: {})", maxId, nextVal);
+                } catch (Exception e2) {
+                    log.warn("Failed to synchronize sequence using alternative method: {}", e2.getMessage());
+                    // 시퀀스 동기화 실패는 치명적이지 않으므로 계속 진행
+                }
+            }
+        } catch (Exception e) {
+            // 시퀀스 동기화 실패는 치명적이지 않으므로 경고만 로깅
+            log.warn("Failed to synchronize sequence: {}", e.getMessage());
+        }
     }
 }
 
