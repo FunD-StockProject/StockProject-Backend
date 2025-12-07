@@ -153,17 +153,40 @@ public class StockImportService {
                     }
                 }
                 
-                // 새 종목 저장
+                // 새 종목 저장 - 개별 처리로 중복 ID 방지
                 if (!newStocks.isEmpty()) {
-                    try {
-                        entityManager.flush();
-                        stockRepository.saveAll(newStocks);
-                        entityManager.flush();
-                        log.info("Saved {} new stocks", newStocks.size());
-                    } catch (Exception e) {
-                        log.error("Error saving new stocks: {}", e.getMessage());
-                        throw e;
+                    int savedCount = 0;
+                    int skippedCount = 0;
+                    for (Stock stock : newStocks) {
+                        try {
+                            // symbol로 이미 존재하는지 다시 확인 (DB에서 직접 확인)
+                            Optional<Stock> existingStock = stockRepository.findBySymbol(stock.getSymbol());
+                            if (existingStock.isPresent()) {
+                                // 이미 존재하면 업데이트로 처리
+                                Stock existing = existingStock.get();
+                                existing.updateSymbolNameIfNull(stock.getSymbolName());
+                                existing.setValid(true);
+                                if (stock.getDomesticSector() != null) {
+                                    existing.setDomesticSector(stock.getDomesticSector());
+                                }
+                                if (stock.getOverseasSector() != null) {
+                                    existing.setOverseasSector(stock.getOverseasSector());
+                                }
+                                stockRepository.save(existing);
+                                skippedCount++;
+                                log.debug("Stock already exists, updated: {}", stock.getSymbol());
+                            } else {
+                                // 새 종목 저장
+                                stockRepository.save(stock);
+                                savedCount++;
+                            }
+                        } catch (Exception e) {
+                            log.warn("Failed to save stock: {} - {}", stock.getSymbol(), e.getMessage());
+                            skippedCount++;
+                        }
                     }
+                    entityManager.flush();
+                    log.info("Saved {} new stocks, {} skipped (already exists or error)", savedCount, skippedCount);
                 }
                 
                 // 기존 종목 업데이트 - 개별 처리로 안전하게
