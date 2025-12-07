@@ -73,18 +73,22 @@ public class StockImportService {
             int saved = 0;
             int skipped = 0;
             int updated = 0;
-            int invalidated = 0;
-            int preserved = 0;
+            final int[] invalidated = {0};
+            final int[] preserved = {0};
 
             // 기존 종목들을 symbol로 조회하여 Map으로 변환 (성능 최적화)
             // 조회 후 즉시 detach하여 영속성 컨텍스트 충돌 방지
             Map<String, Stock> existingStocksMap = new HashMap<>();
-            List<Stock> allExistingStocks = stockRepository.findAll();
-            for (Stock stock : allExistingStocks) {
-                if (entityManager.contains(stock)) {
-                    entityManager.detach(stock);
+            List<Stock> allExistingStocks = getTransactionTemplate().execute(status -> {
+                return stockRepository.findAll();
+            });
+            if (allExistingStocks != null) {
+                for (Stock stock : allExistingStocks) {
+                    if (entityManager.contains(stock)) {
+                        entityManager.detach(stock);
+                    }
+                    existingStocksMap.put(stock.getSymbol(), stock);
                 }
-                existingStocksMap.put(stock.getSymbol(), stock);
             }
 
             // 1. 종목 마스터에 있는 종목 처리 (추가/업데이트)
@@ -187,63 +191,81 @@ public class StockImportService {
                         processedCount, insertedCount, updatedCount, errorCount);
             }
 
-            // 2. 종목 마스터에 없는 종목 찾기
-            // 영속성 컨텍스트를 정리한 후 조회하여 세션 안전성 보장
-            entityManager.flush();
-            entityManager.clear();
-            List<Stock> allStocks = stockRepository.findAll();
-            List<Integer> stockIdsToCheck = allStocks.stream()
-                .filter(stock -> !masterSymbols.contains(stock.getSymbol()))
-                .map(Stock::getId)
-                .collect(Collectors.toList());
+            // 2. 종목 마스터에 없는 종목 찾기 및 invalid 처리
+            // 트랜잭션 내에서 모든 작업을 수행하여 커넥션 누수 방지
+            getTransactionTemplate().execute(status -> {
+                List<Stock> allStocks = stockRepository.findAll();
+                if (allStocks == null || allStocks.isEmpty()) {
+                    return null;
+                }
+                
+                List<Integer> stockIdsToCheck = allStocks.stream()
+                    .filter(stock -> !masterSymbols.contains(stock.getSymbol()))
+                    .map(Stock::getId)
+                    .collect(Collectors.toList());
 
-            if (!stockIdsToCheck.isEmpty()) {
-                log.info("Found {} stocks not in master file", stockIdsToCheck.size());
+                if (!stockIdsToCheck.isEmpty()) {
+                    log.info("Found {} stocks not in master file", stockIdsToCheck.size());
 
-                // 실험에서 사용된 종목 ID 조회 (배치)
-                Set<Integer> usedInExperiments = new HashSet<>(
-                    experimentRepository.findStockIdsUsedInExperiments(stockIdsToCheck)
-                );
+                    // 실험에서 사용된 종목 ID 조회 (배치)
+                    Set<Integer> usedInExperiments = new HashSet<>(
+                        experimentRepository.findStockIdsUsedInExperiments(stockIdsToCheck)
+                    );
 
-                // Preference에서 사용된 종목 ID 조회 (배치)
-                Set<Integer> usedInPreferences = new HashSet<>(
-                    preferenceRepository.findStockIdsUsedInPreferences(stockIdsToCheck)
-                );
+                    // Preference에서 사용된 종목 ID 조회 (배치)
+                    Set<Integer> usedInPreferences = new HashSet<>(
+                        preferenceRepository.findStockIdsUsedInPreferences(stockIdsToCheck)
+                    );
 
-                // 종목 마스터에 없고, 실험/Preference에서도 사용되지 않은 종목만 invalid 처리
-                for (Stock stock : allStocks) {
-                    if (!masterSymbols.contains(stock.getSymbol())) {
-                        Integer stockId = stock.getId();
-                        
-                        // 실험 또는 Preference에서 사용된 종목은 보존
-                        if (usedInExperiments.contains(stockId) || usedInPreferences.contains(stockId)) {
-                            log.debug("Preserving stock {} (used in experiments/preferences)", stock.getSymbol());
-                            preserved++;
-                            continue;
-                        }
+                    // 종목 마스터에 없고, 실험/Preference에서도 사용되지 않은 종목만 invalid 처리
+                    for (Stock stock : allStocks) {
+                        if (!masterSymbols.contains(stock.getSymbol())) {
+                            Integer stockId = stock.getId();
+                            
+                            // 실험 또는 Preference에서 사용된 종목은 보존
+                            if (usedInExperiments.contains(stockId) || usedInPreferences.contains(stockId)) {
+                                log.debug("Preserving stock {} (used in experiments/preferences)", stock.getSymbol());
+                                preserved[0]++;
+                                continue;
+                            }
 
-                        // 사용되지 않은 종목은 isValid = false로 설정
-                        if (stock.getValid() == null || stock.getValid()) {
-                            setStockValid(stock, false);
-                            stockRepository.save(stock);
-                            invalidated++;
-                            log.debug("Invalidated stock: {} (not in master, not used)", stock.getSymbol());
+                            // 사용되지 않은 종목은 isValid = false로 설정
+                            if (stock.getValid() == null || stock.getValid()) {
+                                setStockValid(stock, false);
+                                stockRepository.save(stock);
+                                invalidated[0]++;
+                                log.debug("Invalidated stock: {} (not in master, not used)", stock.getSymbol());
+                            }
                         }
                     }
                 }
-            }
+                return null;
+            });
 
             // 섹터 매핑 통계 계산
-            long stocksWithSector = stockRepository.findAll().stream()
-                .filter(s -> (s.getDomesticSector() != null && s.getDomesticSector() != DomesticSector.UNKNOWN) ||
-                             (s.getOverseasSector() != null && s.getOverseasSector() != OverseasSector.UNKNOWN))
-                .count();
-            long totalStocks = stockRepository.count();
+            long stocksWithSector = 0;
+            long totalStocks = 0;
+            long[] stats = getTransactionTemplate().execute(status -> {
+                List<Stock> allStocksForStats = stockRepository.findAll();
+                long stocksWithSectorCount = 0;
+                if (allStocksForStats != null) {
+                    stocksWithSectorCount = allStocksForStats.stream()
+                        .filter(s -> (s.getDomesticSector() != null && s.getDomesticSector() != DomesticSector.UNKNOWN) ||
+                                     (s.getOverseasSector() != null && s.getOverseasSector() != OverseasSector.UNKNOWN))
+                        .count();
+                }
+                long totalStocksCount = stockRepository.count();
+                return new long[]{stocksWithSectorCount, totalStocksCount};
+            });
+            if (stats != null) {
+                stocksWithSector = stats[0];
+                totalStocks = stats[1];
+            }
             double sectorMappingRate = totalStocks > 0 ? 
                 (double) stocksWithSector / totalStocks * 100 : 0.0;
 
             log.info("Import completed - Saved: {}, Updated: {}, Skipped: {}, Invalidated: {}, Preserved: {}", 
-                saved, updated, skipped, invalidated, preserved);
+                saved, updated, skipped, invalidated[0], preserved[0]);
             log.info("Sector mapping statistics - Mapped: {}/{}, Rate: {:.2f}%", 
                 stocksWithSector, totalStocks, sectorMappingRate);
 
