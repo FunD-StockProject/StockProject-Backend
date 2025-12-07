@@ -140,9 +140,16 @@ def get_overseas_master_dataframe(base_dir,val):
         df = pd.read_table(cod_file_path, sep='\t', encoding='cp949')
         df.columns = columns
         
-        # 엑셀 파일 저장 (선택사항)
-        excel_path = os.path.join(base_dir, f'{val}_code.xlsx')
-        df.to_excel(excel_path, index=False)
+        # 엑셀 파일 저장 (선택사항) - openpyxl이 없으면 스킵
+        try:
+            excel_path = os.path.join(base_dir, f'{val}_code.xlsx')
+            df.to_excel(excel_path, index=False)
+        except ImportError:
+            # openpyxl이 없으면 엑셀 저장 스킵
+            pass
+        except Exception as e:
+            # 기타 에러는 무시
+            print(f"Warning: Could not save Excel file: {e}")
         
         return df
         
