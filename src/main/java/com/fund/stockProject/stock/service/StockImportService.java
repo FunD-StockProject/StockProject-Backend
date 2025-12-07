@@ -15,7 +15,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,9 +32,14 @@ public class StockImportService {
     private final ObjectMapper objectMapper;
     private final ExperimentRepository experimentRepository;
     private final PreferenceRepository preferenceRepository;
+    private final PlatformTransactionManager transactionManager;
     
     @PersistenceContext
     private EntityManager entityManager;
+    
+    private TransactionTemplate getTransactionTemplate() {
+        return new TransactionTemplate(transactionManager);
+    }
 
     /**
      * JSON 파일에서 종목 데이터를 읽어서 DB에 저장하고, 종목 마스터에 없는 종목은 isValid=false로 설정합니다.
@@ -389,66 +395,68 @@ public class StockImportService {
     /**
      * 작은 트랜잭션으로 배치를 처리합니다.
      * 각 배치는 독립적인 트랜잭션으로 처리되어 락 경합을 최소화합니다.
+     * TransactionTemplate을 사용하여 명시적으로 트랜잭션을 관리합니다.
      */
-    @Transactional
     private UpsertResult processBatchInTransaction(List<Stock> batch) {
-        UpsertResult result = new UpsertResult();
-        
-        for (Stock stock : batch) {
-            try {
-                // symbol로 기존 종목 확인
-                Optional<Stock> existingOpt = stockRepository.findBySymbol(stock.getSymbol());
-                
-                if (existingOpt.isPresent()) {
-                    // 기존 종목 업데이트
-                    Stock existing = existingOpt.get();
-                    existing.updateSymbolNameIfNull(stock.getSymbolName());
-                    existing.setValid(true);
-                    if (stock.getDomesticSector() != null) {
-                        existing.setDomesticSector(stock.getDomesticSector());
+        return getTransactionTemplate().execute(status -> {
+            UpsertResult result = new UpsertResult();
+            
+            for (Stock stock : batch) {
+                try {
+                    // symbol로 기존 종목 확인
+                    Optional<Stock> existingOpt = stockRepository.findBySymbol(stock.getSymbol());
+                    
+                    if (existingOpt.isPresent()) {
+                        // 기존 종목 업데이트
+                        Stock existing = existingOpt.get();
+                        existing.updateSymbolNameIfNull(stock.getSymbolName());
+                        existing.setValid(true);
+                        if (stock.getDomesticSector() != null) {
+                            existing.setDomesticSector(stock.getDomesticSector());
+                        }
+                        if (stock.getOverseasSector() != null) {
+                            existing.setOverseasSector(stock.getOverseasSector());
+                        }
+                        stockRepository.save(existing);
+                        result.updated++;
+                    } else {
+                        // 새 종목 삽입 (IDENTITY 전략 사용)
+                        stockRepository.save(stock);
+                        result.inserted++;
                     }
-                    if (stock.getOverseasSector() != null) {
-                        existing.setOverseasSector(stock.getOverseasSector());
-                    }
-                    stockRepository.save(existing);
-                    result.updated++;
-                } else {
-                    // 새 종목 삽입 (IDENTITY 전략 사용)
-                    stockRepository.save(stock);
-                    result.inserted++;
-                }
-            } catch (DataIntegrityViolationException e) {
-                // 중복 키 오류 발생 시 기존 종목으로 처리
-                entityManager.clear();
-                if (handleDuplicateKeyError(stock, e)) {
-                    result.updated++;
-                } else {
-                    result.errors++;
-                    log.warn("Failed to handle duplicate key error for stock: {}", stock.getSymbol());
-                }
-            } catch (Exception e) {
-                String errorMessage = getRootCauseMessage(e);
-                if (errorMessage != null && (errorMessage.contains("Duplicate entry") || 
-                                             errorMessage.contains("Lock wait timeout") || 
-                                             errorMessage.contains("could not read a hi value"))) {
+                } catch (DataIntegrityViolationException e) {
+                    // 중복 키 오류 발생 시 기존 종목으로 처리
                     entityManager.clear();
                     if (handleDuplicateKeyError(stock, e)) {
                         result.updated++;
                     } else {
                         result.errors++;
-                        log.warn("Failed to handle error for stock: {} - {}", stock.getSymbol(), errorMessage);
+                        log.warn("Failed to handle duplicate key error for stock: {}", stock.getSymbol());
                     }
-                } else {
-                    result.errors++;
-                    log.warn("Failed to save stock: {} - {}", stock.getSymbol(), errorMessage);
+                } catch (Exception e) {
+                    String errorMessage = getRootCauseMessage(e);
+                    if (errorMessage != null && (errorMessage.contains("Duplicate entry") || 
+                                                 errorMessage.contains("Lock wait timeout") || 
+                                                 errorMessage.contains("could not read a hi value"))) {
+                        entityManager.clear();
+                        if (handleDuplicateKeyError(stock, e)) {
+                            result.updated++;
+                        } else {
+                            result.errors++;
+                            log.warn("Failed to handle error for stock: {} - {}", stock.getSymbol(), errorMessage);
+                        }
+                    } else {
+                        result.errors++;
+                        log.warn("Failed to save stock: {} - {}", stock.getSymbol(), errorMessage);
+                    }
                 }
             }
-        }
-        
-        // 트랜잭션 내에서 flush하여 ID 생성 확정
-        entityManager.flush();
-        
-        return result;
+            
+            // 트랜잭션 내에서 flush하여 ID 생성 확정
+            entityManager.flush();
+            
+            return result;
+        });
     }
     
 
