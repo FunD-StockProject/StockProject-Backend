@@ -68,6 +68,9 @@ spring:
           time_zone: Asia/Seoul
         order_inserts: true
         order_updates: true
+        # ID 생성 전략 명시 (MySQL은 IDENTITY 사용)
+        id:
+          new_generator_mappings: true
         # 트랜잭션 관리 설정
         connection:
           provider_disables_autocommit: true
