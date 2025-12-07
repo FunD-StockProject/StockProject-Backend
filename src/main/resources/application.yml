@@ -69,8 +69,11 @@ spring:
         order_inserts: true
         order_updates: true
         # ID 생성 전략 명시 (MySQL은 IDENTITY 사용)
+        # 시퀀스 테이블 사용 완전 비활성화
         id:
           new_generator_mappings: true
+          # MySQL은 시퀀스를 사용하지 않으므로 명시적으로 비활성화
+          use_legacy_id_generator_mappings: false
         # 트랜잭션 관리 설정
         connection:
           provider_disables_autocommit: true
