@@ -7,6 +7,7 @@ open-trading-api의 종목 마스터 파일을 사용하여 종목 정보를 수
 import sys
 import os
 import json
+import re
 import pandas as pd
 
 # stocks_info 모듈 경로 추가 (scripts/stocks_info 폴더 사용)
@@ -67,8 +68,14 @@ def process_korea_stocks():
         for _, row in df_kospi.iterrows():
             symbol = str(row['단축코드']).strip()
             symbol_name = str(row['한글명']).strip()
-            # 지수업종대분류 코드 추출 (GICS 형식일 수 있음: 첫 2자리가 Sector)
-            sector_code = str(row.get('지수업종대분류', '')).strip() if '지수업종대분류' in row else ''
+            # 지수업종대분류 코드 추출
+            sector_code_raw = row.get('지수업종대분류', '')
+            if pd.isna(sector_code_raw):
+                sector_code = ''
+            else:
+                sector_code = str(sector_code_raw).strip()
+                # 숫자가 아닌 문자 제거 (예: "16유통" -> "16")
+                sector_code = re.sub(r'[^0-9]', '', sector_code)
             
             if not symbol or not symbol_name or symbol == 'nan' or symbol_name == 'nan':
                 continue
@@ -81,8 +88,8 @@ def process_korea_stocks():
                 'valid': True
             }
             
-            # 섹터 코드가 있으면 추가
-            if sector_code and sector_code != 'nan' and sector_code:
+            # 섹터 코드가 있으면 추가 (빈 문자열이 아니고 숫자만 포함)
+            if sector_code and sector_code != 'nan' and sector_code and sector_code != '0' and sector_code != '0000':
                 stock_data['sectorCode'] = sector_code
             
             stocks.append(stock_data)
@@ -103,8 +110,14 @@ def process_korea_stocks():
         for _, row in df_kosdaq.iterrows():
             symbol = str(row['단축코드']).strip()
             symbol_name = str(row['한글종목명']).strip()
-            # 지수업종 대분류 코드 추출 (GICS 형식일 수 있음: 첫 2자리가 Sector)
-            sector_code = str(row.get('지수업종 대분류 코드', '')).strip() if '지수업종 대분류 코드' in row else ''
+            # 지수업종 대분류 코드 추출
+            sector_code_raw = row.get('지수업종 대분류 코드', '')
+            if pd.isna(sector_code_raw):
+                sector_code = ''
+            else:
+                sector_code = str(sector_code_raw).strip()
+                # 숫자가 아닌 문자 제거 (예: "1011유통" -> "1011")
+                sector_code = re.sub(r'[^0-9]', '', sector_code)
             
             if not symbol or not symbol_name or symbol == 'nan' or symbol_name == 'nan':
                 continue
@@ -117,8 +130,8 @@ def process_korea_stocks():
                 'valid': True
             }
             
-            # 섹터 코드가 있으면 추가
-            if sector_code and sector_code != 'nan' and sector_code:
+            # 섹터 코드가 있으면 추가 (빈 문자열이 아니고 숫자만 포함)
+            if sector_code and sector_code != 'nan' and sector_code and sector_code != '0' and sector_code != '0000':
                 stock_data['sectorCode'] = sector_code
             
             stocks.append(stock_data)
@@ -155,8 +168,17 @@ def process_overseas_stocks():
                 korea_name = str(row.get('Korea name', '')).strip()
                 english_name = str(row.get('English name', '')).strip()
                 exchange_id = row.get('Exchange id', '')
-                # 업종분류코드 추출 (GICS 형식: 첫 2자리가 Sector, 예: 101010 -> 10)
-                sector_code = str(row.get('업종분류코드', '')).strip() if '업종분류코드' in row else ''
+                # 업종분류코드 추출 (GICS 형식: 첫 3자리가 Sector, 예: 101010 -> 101)
+                sector_code_raw = row.get('업종분류코드', '')
+                if pd.isna(sector_code_raw):
+                    sector_code = ''
+                else:
+                    sector_code = str(sector_code_raw).strip()
+                    # 숫자가 아닌 문자 제거
+                    sector_code = re.sub(r'[^0-9]', '', sector_code)
+                    # GICS 코드는 6자리이므로 첫 3자리만 사용 (예: 101010 -> 101)
+                    if len(sector_code) >= 3:
+                        sector_code = sector_code[:3]
                 
                 if not symbol or symbol == 'nan':
                     continue
@@ -180,8 +202,8 @@ def process_overseas_stocks():
                     'valid': True
                 }
                 
-                # 섹터 코드가 있으면 추가
-                if sector_code and sector_code != 'nan' and sector_code:
+                # 섹터 코드가 있으면 추가 (빈 문자열이 아니고 숫자만 포함)
+                if sector_code and sector_code != 'nan' and sector_code and sector_code != '0' and sector_code != '000':
                     stock_data['sectorCode'] = sector_code
                 
                 stocks.append(stock_data)
