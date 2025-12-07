@@ -40,7 +40,6 @@ public class StockImportService {
      * 실험 등에서 사용된 종목은 보존합니다.
      * @param jsonFilePath JSON 파일 경로
      */
-    @Transactional
     public void importStocksFromJson(String jsonFilePath) {
         try {
             File file = new File(jsonFilePath);
@@ -144,69 +143,38 @@ public class StockImportService {
             }
             
             // 모든 종목을 symbol 기준으로 UPSERT 처리
-            // 배치 처리로 시퀀스 접근 최소화 (성능 향상 및 락 경합 감소)
+            // 작은 트랜잭션으로 분리하여 락 경합 최소화
             if (!stocksToSaveMap.isEmpty()) {
                 int processedCount = 0;
                 int updatedCount = 0;
                 int insertedCount = 0;
                 int errorCount = 0;
                 
-                // 배치 크기 설정 (시퀀스 접근 빈도 조절)
+                // 배치 크기 설정 (작은 트랜잭션으로 묶어서 처리)
                 final int BATCH_SIZE = 50;
                 List<Stock> batch = new ArrayList<>();
                 
                 for (Stock stock : stocksToSaveMap.values()) {
-                    try {
-                        // 항상 DB에서 symbol로 확인 (가장 확실한 방법)
-                        Optional<Stock> existingStockOpt = stockRepository.findBySymbol(stock.getSymbol());
-                        
-                        if (existingStockOpt.isPresent()) {
-                            // 기존 종목 업데이트 - 즉시 처리
-                            Stock existing = existingStockOpt.get();
-                            existing.updateSymbolNameIfNull(stock.getSymbolName());
-                            existing.setValid(true);
-                            if (stock.getDomesticSector() != null) {
-                                existing.setDomesticSector(stock.getDomesticSector());
-                            }
-                            if (stock.getOverseasSector() != null) {
-                                existing.setOverseasSector(stock.getOverseasSector());
-                            }
-                            stockRepository.save(existing);
-                            updatedCount++;
-                            processedCount++;
-                        } else {
-                            // 새 종목은 배치에 추가
-                            batch.add(stock);
-                            
-                            // 배치가 가득 차면 일괄 처리
-                            if (batch.size() >= BATCH_SIZE) {
-                                BatchResult batchResult = processBatch(batch);
-                                insertedCount += batchResult.inserted;
-                                updatedCount += batchResult.updated;
-                                errorCount += batchResult.errors;
-                                processedCount += batch.size();
-                                batch.clear();
-                                
-                                // 배치 처리 후 영속성 컨텍스트 정리
-                                entityManager.flush();
-                                entityManager.clear();
-                            }
-                        }
-                    } catch (Exception e) {
-                        errorCount++;
-                        log.error("Unexpected error processing stock: {}", stock.getSymbol(), e);
+                    batch.add(stock);
+                    
+                    // 배치가 가득 차면 작은 트랜잭션으로 일괄 처리
+                    if (batch.size() >= BATCH_SIZE) {
+                        UpsertResult batchResult = processBatchInTransaction(batch);
+                        insertedCount += batchResult.inserted;
+                        updatedCount += batchResult.updated;
+                        errorCount += batchResult.errors;
+                        processedCount += batch.size();
+                        batch.clear();
                     }
                 }
                 
                 // 남은 배치 처리
                 if (!batch.isEmpty()) {
-                    BatchResult batchResult = processBatch(batch);
+                    UpsertResult batchResult = processBatchInTransaction(batch);
                     insertedCount += batchResult.inserted;
                     updatedCount += batchResult.updated;
                     errorCount += batchResult.errors;
                     processedCount += batch.size();
-                    entityManager.flush();
-                    entityManager.clear();
                 }
                 
                 log.info("Processed {} stocks - Inserted: {}, Updated: {}, Errors: {}", 
@@ -410,57 +378,79 @@ public class StockImportService {
     }
 
     /**
-     * 배치 처리 결과를 담는 내부 클래스
+     * UPSERT 결과를 담는 내부 클래스
      */
-    private static class BatchResult {
+    private static class UpsertResult {
         int inserted = 0;
         int updated = 0;
         int errors = 0;
     }
     
     /**
-     * 배치로 새 종목을 저장합니다.
-     * 중복 키 오류가 발생하면 개별 처리합니다.
-     * @return 배치 처리 결과 (inserted, updated, errors)
+     * 작은 트랜잭션으로 배치를 처리합니다.
+     * 각 배치는 독립적인 트랜잭션으로 처리되어 락 경합을 최소화합니다.
      */
-    private BatchResult processBatch(List<Stock> batch) {
-        BatchResult result = new BatchResult();
+    @Transactional
+    private UpsertResult processBatchInTransaction(List<Stock> batch) {
+        UpsertResult result = new UpsertResult();
         
         for (Stock stock : batch) {
             try {
-                stockRepository.save(stock);
-                result.inserted++;
+                // symbol로 기존 종목 확인
+                Optional<Stock> existingOpt = stockRepository.findBySymbol(stock.getSymbol());
+                
+                if (existingOpt.isPresent()) {
+                    // 기존 종목 업데이트
+                    Stock existing = existingOpt.get();
+                    existing.updateSymbolNameIfNull(stock.getSymbolName());
+                    existing.setValid(true);
+                    if (stock.getDomesticSector() != null) {
+                        existing.setDomesticSector(stock.getDomesticSector());
+                    }
+                    if (stock.getOverseasSector() != null) {
+                        existing.setOverseasSector(stock.getOverseasSector());
+                    }
+                    stockRepository.save(existing);
+                    result.updated++;
+                } else {
+                    // 새 종목 삽입 (IDENTITY 전략 사용)
+                    stockRepository.save(stock);
+                    result.inserted++;
+                }
             } catch (DataIntegrityViolationException e) {
                 // 중복 키 오류 발생 시 기존 종목으로 처리
                 entityManager.clear();
                 if (handleDuplicateKeyError(stock, e)) {
                     result.updated++;
-                    log.debug("Updated stock after duplicate key error in batch: {}", stock.getSymbol());
                 } else {
                     result.errors++;
-                    log.warn("Failed to handle duplicate key error for stock in batch: {}", stock.getSymbol());
+                    log.warn("Failed to handle duplicate key error for stock: {}", stock.getSymbol());
                 }
             } catch (Exception e) {
-                // 예외 메시지에 "Duplicate entry" 또는 "Lock wait timeout"이 포함되어 있는지 확인
                 String errorMessage = getRootCauseMessage(e);
-                if (errorMessage != null && (errorMessage.contains("Duplicate entry") || errorMessage.contains("Lock wait timeout"))) {
+                if (errorMessage != null && (errorMessage.contains("Duplicate entry") || 
+                                             errorMessage.contains("Lock wait timeout") || 
+                                             errorMessage.contains("could not read a hi value"))) {
                     entityManager.clear();
                     if (handleDuplicateKeyError(stock, e)) {
                         result.updated++;
-                        log.debug("Updated stock after error in batch: {}", stock.getSymbol());
                     } else {
                         result.errors++;
-                        log.warn("Failed to handle error for stock in batch: {} - {}", stock.getSymbol(), errorMessage);
+                        log.warn("Failed to handle error for stock: {} - {}", stock.getSymbol(), errorMessage);
                     }
                 } else {
                     result.errors++;
-                    log.warn("Failed to save stock in batch: {} - {}", stock.getSymbol(), errorMessage);
+                    log.warn("Failed to save stock: {} - {}", stock.getSymbol(), errorMessage);
                 }
             }
         }
         
+        // 트랜잭션 내에서 flush하여 ID 생성 확정
+        entityManager.flush();
+        
         return result;
     }
+    
 
 }
 
