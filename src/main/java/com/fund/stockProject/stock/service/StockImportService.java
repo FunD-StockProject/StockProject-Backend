@@ -68,8 +68,15 @@ public class StockImportService {
             int preserved = 0;
 
             // 기존 종목들을 symbol로 조회하여 Map으로 변환 (성능 최적화)
-            Map<String, Stock> existingStocksMap = stockRepository.findAll().stream()
-                .collect(Collectors.toMap(Stock::getSymbol, stock -> stock, (existing, replacement) -> existing));
+            // 조회 후 즉시 detach하여 영속성 컨텍스트 충돌 방지
+            Map<String, Stock> existingStocksMap = new HashMap<>();
+            List<Stock> allExistingStocks = stockRepository.findAll();
+            for (Stock stock : allExistingStocks) {
+                if (entityManager.contains(stock)) {
+                    entityManager.detach(stock);
+                }
+                existingStocksMap.put(stock.getSymbol(), stock);
+            }
 
             // 1. 종목 마스터에 있는 종목 처리 (추가/업데이트)
             // symbol을 키로 사용하여 중복 제거 (같은 symbol이 여러 번 나와도 한 번만 처리)
@@ -106,12 +113,9 @@ public class StockImportService {
                     Stock stock;
                     // 기존 종목 확인
                     if (existingStocksMap.containsKey(symbol)) {
-                        // 기존 종목 업데이트 - 영속성 컨텍스트에서 분리하여 충돌 방지
+                        // 기존 종목 업데이트
                         stock = existingStocksMap.get(symbol);
-                        // 엔티티를 detach하여 새로운 세션에서 처리되도록 함
-                        if (entityManager.contains(stock)) {
-                            entityManager.detach(stock);
-                        }
+                        // 이미 detach된 상태이므로 추가 detach 불필요
                         stock.updateSymbolNameIfNull(symbolName);
                         // 종목 마스터에 있으므로 valid = true로 설정
                         setStockValid(stock, true);
@@ -135,36 +139,73 @@ public class StockImportService {
                 }
             }
             
-            // 배치로 저장
+            // 배치로 저장 - 기존 종목과 새 종목을 분리하여 처리
             if (!stocksToSaveMap.isEmpty()) {
-                try {
-                    // 영속성 컨텍스트 정리 (기존 엔티티와의 충돌 방지)
-                    entityManager.flush();
-                    entityManager.clear();
-                    
-                    // 배치 저장 시도
-                    stockRepository.saveAll(new ArrayList<>(stocksToSaveMap.values()));
-                    entityManager.flush();
-                } catch (Exception e) {
-                    log.error("Error during batch save, attempting individual saves: {}", e.getMessage());
-                    // 배치 저장 실패 시 개별 저장으로 폴백
-                    int individualSaved = 0;
-                    int individualFailed = 0;
-                    for (Stock stock : stocksToSaveMap.values()) {
+                List<Stock> newStocks = new ArrayList<>();
+                List<Stock> existingStocks = new ArrayList<>();
+                
+                // 기존 종목과 새 종목 분리
+                for (Stock stock : stocksToSaveMap.values()) {
+                    if (stock.getId() != null) {
+                        existingStocks.add(stock);
+                    } else {
+                        newStocks.add(stock);
+                    }
+                }
+                
+                // 새 종목 저장
+                if (!newStocks.isEmpty()) {
+                    try {
+                        entityManager.flush();
+                        stockRepository.saveAll(newStocks);
+                        entityManager.flush();
+                        log.info("Saved {} new stocks", newStocks.size());
+                    } catch (Exception e) {
+                        log.error("Error saving new stocks: {}", e.getMessage());
+                        throw e;
+                    }
+                }
+                
+                // 기존 종목 업데이트 - 개별 처리로 안전하게
+                if (!existingStocks.isEmpty()) {
+                    int updatedCount = 0;
+                    int failedCount = 0;
+                    for (Stock stock : existingStocks) {
                         try {
-                            entityManager.detach(stock); // 기존 엔티티와의 충돌 방지
-                            stockRepository.save(stock);
-                            individualSaved++;
-                        } catch (Exception ex) {
-                            log.warn("Failed to save individual stock: {} - {}", stock.getSymbol(), ex.getMessage());
-                            individualFailed++;
+                            // ID로 다시 조회하여 영속성 컨텍스트에서 가져옴
+                            Stock managedStock = stockRepository.findById(stock.getId())
+                                    .orElse(null);
+                            if (managedStock != null) {
+                                // 조회한 엔티티에 변경사항 반영
+                                managedStock.updateSymbolNameIfNull(stock.getSymbolName());
+                                managedStock.setValid(stock.getValid());
+                                if (stock.getDomesticSector() != null) {
+                                    managedStock.setDomesticSector(stock.getDomesticSector());
+                                }
+                                if (stock.getOverseasSector() != null) {
+                                    managedStock.setOverseasSector(stock.getOverseasSector());
+                                }
+                                stockRepository.save(managedStock);
+                                updatedCount++;
+                            } else {
+                                log.warn("Stock not found for update: ID={}, Symbol={}", stock.getId(), stock.getSymbol());
+                                failedCount++;
+                            }
+                        } catch (Exception e) {
+                            log.warn("Failed to update stock: ID={}, Symbol={} - {}", 
+                                    stock.getId(), stock.getSymbol(), e.getMessage());
+                            failedCount++;
                         }
                     }
-                    log.info("Individual save completed - Saved: {}, Failed: {}", individualSaved, individualFailed);
+                    entityManager.flush();
+                    log.info("Updated {} existing stocks, {} failed", updatedCount, failedCount);
                 }
             }
 
             // 2. 종목 마스터에 없는 종목 찾기
+            // 영속성 컨텍스트를 정리한 후 조회하여 세션 안전성 보장
+            entityManager.flush();
+            entityManager.clear();
             List<Stock> allStocks = stockRepository.findAll();
             List<Integer> stockIdsToCheck = allStocks.stream()
                 .filter(stock -> !masterSymbols.contains(stock.getSymbol()))
