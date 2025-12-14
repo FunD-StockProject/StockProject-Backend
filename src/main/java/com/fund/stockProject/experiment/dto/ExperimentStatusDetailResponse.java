@@ -10,6 +10,7 @@ import lombok.Getter;
 @Builder
 public class ExperimentStatusDetailResponse {
     private String symbolName; // 종목명
+    private Integer stockId; // 종목 ID
     private double roi; // 최종 수익률
     private String status; // 거래 상태
     private List<TradeInfo> tradeInfos; // 거래 내역
