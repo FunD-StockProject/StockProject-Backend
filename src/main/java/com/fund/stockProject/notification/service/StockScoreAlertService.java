@@ -57,7 +57,10 @@ public class StockScoreAlertService {
                 preference.getStock(), 
                 NotificationType.SCORE_SPIKE,
                 title, 
-                body, 
+                body,
+                oldScore,
+                newScore,
+                delta,
                 scheduledAt
             );
         }
