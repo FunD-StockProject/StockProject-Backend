@@ -162,7 +162,7 @@ public class NotificationController {
 
         Notification testNotification = Notification.builder()
                 .user(user)
-                .notificationType(NotificationType.SCORE_SPIKE)
+                .notificationType(NotificationType.TEST)
                 .title("테스트 알림")
                 .body("이것은 테스트 알림입니다. " + System.currentTimeMillis())
                 .isRead(false)
