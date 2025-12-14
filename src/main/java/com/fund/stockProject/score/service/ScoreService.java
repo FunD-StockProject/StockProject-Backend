@@ -404,12 +404,27 @@ public class ScoreService {
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode jsonNode = objectMapper.readTree(output);
 
+            // 에러 응답 확인
+            if (jsonNode.has("error")) {
+                String errorMessage = jsonNode.get("error").asText();
+                log.error("Python script returned error - symbol: {}, country: {}, error: {}", symbol, country, errorMessage);
+                throw new RuntimeException("Python script returned error: " + errorMessage);
+            }
+
+            // final_score 필드 확인
+            if (!jsonNode.has("final_score")) {
+                log.error("Python script response missing final_score - symbol: {}, country: {}", symbol, country);
+                throw new RuntimeException("Python script response missing final_score");
+            }
+
             int finalScore = jsonNode.get("final_score").asInt();
             List<KeywordDto> topKeywords = new ArrayList<>();
-            for (JsonNode keywordNode : jsonNode.get("top_keywords")) {
-                String word = keywordNode.get("word").asText();
-                int freq = keywordNode.get("freq").asInt();
-                topKeywords.add(new KeywordDto(word, freq));
+            if (jsonNode.has("top_keywords") && jsonNode.get("top_keywords").isArray()) {
+                for (JsonNode keywordNode : jsonNode.get("top_keywords")) {
+                    String word = keywordNode.get("word").asText();
+                    int freq = keywordNode.get("freq").asInt();
+                    topKeywords.add(new KeywordDto(word, freq));
+                }
             }
 
             log.info("Update AI execution completed successfully - symbol: {}, country: {}, score: {}, keywordCount: {}", symbol, country, finalScore, topKeywords.size());
