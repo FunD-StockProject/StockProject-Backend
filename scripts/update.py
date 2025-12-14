@@ -369,48 +369,42 @@ if __name__ == "__main__":
     ]
 
     try:
-        try:
-            texts_with_weights = fetch_texts_from_crawler(symbol, country)
-            if texts_with_weights:
-                # 점수 계산
-                keyword_score = calculate_keyword_score(texts_with_weights, weighted_keywords)
-                pattern_score = calculate_pattern_score(texts_with_weights, positive_patterns, negative_patterns)
-                sentiment_score = calculate_sentiment_score(texts_with_weights, weighted_keywords, positive_patterns, negative_patterns)
-                
-                final_score = (0.6 * keyword_score + 0.2 * sentiment_score + 0.2 * pattern_score)
-                final_score = max(0, min(100, int(round(final_score))))
-                
-                # 키워드 추출
-                top_keywords = extract_top_keywords(texts_with_weights, top_n=10)
-                
-                result = {
-                    "final_score": final_score,
-                    "top_keywords": top_keywords
-                }
-            else:
-                import random
-                random.seed(hash(symbol) % 10000)
-                final_score = random.randint(30, 70)
-                result = {
-                    "final_score": final_score,
-                    "top_keywords": []
-                }
-        except Exception as crawler_error:
-            import random
-            random.seed(hash(symbol) % 10000)
-            final_score = random.randint(30, 70)
-            result = {
-                "final_score": final_score,
-                "top_keywords": []
+        texts_with_weights = fetch_texts_from_crawler(symbol, country)
+        if not texts_with_weights:
+            # 크롤링 데이터가 없으면 에러 반환 (점수 생성하지 않음)
+            error_result = {
+                "error": "No data available from crawler",
+                "symbol": symbol,
+                "country": country
             }
+            print(json.dumps(error_result, ensure_ascii=False, indent=2))
+            sys.exit(1)
+        
+        # 점수 계산
+        keyword_score = calculate_keyword_score(texts_with_weights, weighted_keywords)
+        pattern_score = calculate_pattern_score(texts_with_weights, positive_patterns, negative_patterns)
+        sentiment_score = calculate_sentiment_score(texts_with_weights, weighted_keywords, positive_patterns, negative_patterns)
+        
+        final_score = (0.6 * keyword_score + 0.2 * sentiment_score + 0.2 * pattern_score)
+        final_score = max(0, min(100, int(round(final_score))))
+        
+        # 키워드 추출
+        top_keywords = extract_top_keywords(texts_with_weights, top_n=10)
+        
+        result = {
+            "final_score": final_score,
+            "top_keywords": top_keywords
+        }
 
         print(json.dumps(result, ensure_ascii=False, indent=2))
         sys.exit(0)
 
     except Exception as e:
-        result = {
-            "final_score": 50,
-            "top_keywords": []
+        # 크롤링 실패 시 에러 반환 (점수 생성하지 않음)
+        error_result = {
+            "error": str(e),
+            "symbol": symbol,
+            "country": country
         }
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        print(json.dumps(error_result, ensure_ascii=False, indent=2))
         sys.exit(1)
