@@ -57,8 +57,9 @@ public class NotificationService {
      */
     @Transactional
     public void createScheduledStockNotification(User user, Stock stock, NotificationType type,
-                                               String title, String body, Instant scheduledAt) {
-        createNotification(user, stock, type, title, body, null, null, null, scheduledAt);
+                                               String title, String body, Integer oldScore,
+                                               Integer newScore, Integer changeAbs, Instant scheduledAt) {
+        createNotification(user, stock, type, title, body, oldScore, newScore, changeAbs, scheduledAt);
     }
 
     /**
