@@ -55,6 +55,7 @@ public class SecurityConfig {
             "/auth/logout",
             "/auth/reissue",
             "/auth/find-email",
+            "/auth/nickname",
             "/auth/reset-password",
             "/auth/reset-password/confirm",
             "/auth/oauth2/naver",
