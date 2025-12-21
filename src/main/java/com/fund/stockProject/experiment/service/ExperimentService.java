@@ -198,8 +198,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .average()                            // OptionalDouble 반환
             .orElse(0.0);
 
-        final long count = experimentsByUserId.stream().filter(p -> p.getSellPrice() != null && p.getSellPrice() - p.getBuyPrice() > 0).count(); // 모의투자에 성공한 종목 개수
-        double successRate = experimentsByUserId.size() > 0 ? ((double) count / experimentsByUserId.size()) * 100 : 0.0;
+        // 완료된 실험 중 ROI > 0인 실험 수 계산
+        final long completedCount = experimentsByUserId.stream().filter(p -> "COMPLETE".equals(p.getStatus())).count();
+        final long profitCount = experimentsByUserId.stream().filter(p -> "COMPLETE".equals(p.getStatus()) && p.getRoi() != null && p.getRoi() > 0).count();
+        double successRate = completedCount > 0 ? ((double) profitCount / completedCount) * 100 : 0.0;
 
         return ExperimentStatusResponse.builder()
             .progressExperiments(progressExperimentsInfo) // 진행중인 실험 정보
