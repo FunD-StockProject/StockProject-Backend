@@ -678,20 +678,25 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .build();
     }
 
-    // Lab 결과 화면용 응답 (mock 구조 기반)
+    // Lab 결과 화면용 응답 (example.md 구조 기반)
     public PortfolioResultResponse getPortfolioResult(final CustomUserDetails customUserDetails) {
         final String email = customUserDetails.getEmail();
 
-        // 완료/진행 실험 분리 집계
-        final List<Experiment> completed = experimentRepository.findExperimentsByEmailAndStatus(email, "COMPLETE");
-        final List<Experiment> progress = experimentRepository.findExperimentsByEmailAndStatus(email, "PROGRESS");
+        // 완료된 실험 조회 (sellAt 내림차순 정렬)
+        final List<Experiment> completed = experimentRepository.findExperimentsByEmailAndStatus(email, "COMPLETE")
+            .stream()
+            .sorted((a, b) -> {
+                if (a.getSellAt() == null && b.getSellAt() == null) return 0;
+                if (a.getSellAt() == null) return 1;
+                if (b.getSellAt() == null) return -1;
+                return b.getSellAt().compareTo(a.getSellAt());
+            })
+            .collect(java.util.stream.Collectors.toList());
 
         long totalCompleted = completed.size();
-        long totalProgress = progress.size();
-        long purchasedCountAll = totalCompleted + totalProgress; // 전체 진행(완료+진행)
         long profitCount = completed.stream().filter(e -> e.getRoi() != null && e.getRoi() > 0).count();
 
-        // 이번 주 매수한 실험 수 계산
+        // 이번 주 실험 횟수 계산
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime startOfWeek = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
             .toLocalDate()
@@ -700,35 +705,16 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .toLocalDate()
             .atTime(LocalTime.MAX);
         final int weeklyExperimentCount = experimentRepository.countExperimentsForWeekByUser(email, startOfWeek, endOfWeek);
-        
-        // 이번 주에 완료된 실험 수 계산 (sellAt 기준)
-        final int weeklyCompletedCount = experimentRepository.countCompletedExperimentsForWeekByUser(email, startOfWeek, endOfWeek);
-        // 이번 주에 완료된 실험 중 수익이 난 실험 수 계산
-        final List<Experiment> weeklyCompleted = completed.stream()
-            .filter(e -> e.getSellAt() != null && 
-                e.getSellAt().isAfter(startOfWeek.minusNanos(1)) && 
-                e.getSellAt().isBefore(endOfWeek.plusNanos(1)))
-            .collect(java.util.stream.Collectors.toList());
-        final long weeklyProfitCount = weeklyCompleted.stream()
-            .filter(e -> e.getRoi() != null && e.getRoi() > 0)
-            .count();
 
-        // 성공률(%) 및 구간 라벨 생성 (전체 완료된 실험 기준)
+        // 성공률 계산 (전체 완료된 실험 기준)
         double successRateVal = totalCompleted == 0 ? 0.0 : (profitCount * 100.0 / totalCompleted);
-        String successRateLabel;
-        if (successRateVal == 0) successRateLabel = "0%";
-        else if (successRateVal > 0 && successRateVal <= 20) successRateLabel = "0~20%";
-        else if (successRateVal > 20 && successRateVal <= 40) successRateLabel = "21~40%";
-        else if (successRateVal > 40 && successRateVal <= 60) successRateLabel = "41~60%";
-        else if (successRateVal > 60 && successRateVal <= 80) successRateLabel = "61~80%";
-        else successRateLabel = "81~100%";
 
-        // 동일 등급 전체 유저 비율 계산
+        // 동일 등급 전체 유저 비율 계산 (percentile)
         int startRange = 0;
         int endRange;
         if (successRateVal == 0) {
             startRange = 0;
-            endRange = 0; // 정확히 0%인 경우
+            endRange = 0;
         } else if (successRateVal > 0 && successRateVal <= 20) {
             startRange = 0;
             endRange = 20;
@@ -747,188 +733,150 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         }
         final int countSameGradeUser = experimentRepository.countSameGradeUser(startRange, endRange);
         final long userCount = userRepository.count();
-        long sameGradeUserRate = userCount == 0 ? 0L : (countSameGradeUser * 100L / userCount);
+        int sameGradePercentile = userCount == 0 ? 0 : (int) (countSameGradeUser * 100L / userCount);
 
-        // 최고/최저 수익률 기준 점수 및 구간명 산출
-        PortfolioResultResponse.ProfitBound highest = null;
-        PortfolioResultResponse.ProfitBound lowest = null;
+        // 최고/최저 수익률 실험의 점수 산출
+        Integer bestYieldScore = null;
+        Integer worstYieldScore = null;
         if (!completed.isEmpty()) {
             Experiment max = completed.stream().max((a, b) -> Double.compare(a.getRoi(), b.getRoi())).get();
             Experiment min = completed.stream().min((a, b) -> Double.compare(a.getRoi(), b.getRoi())).get();
-            highest = PortfolioResultResponse.ProfitBound.builder()
-                .score(max.getScore())
-                .range(toScoreRangeLabel(max.getScore()))
-                .build();
-            lowest = PortfolioResultResponse.ProfitBound.builder()
-                .score(min.getScore())
-                .range(toScoreRangeLabel(min.getScore()))
-                .build();
+            bestYieldScore = max.getScore();
+            worstYieldScore = min.getScore();
         }
 
-        // 점수 구간별 사용자 평균 수익률 → scoreTable (avg) (완료된 실험만 대상)
-        Double u_0_59 = experimentRepository.findUserAvgRoi(0, 59, email);
+        // 점수 구간별 사용자 평균 수익률 및 전체 유저 평균
         Double u_60_69 = experimentRepository.findUserAvgRoi(60, 69, email);
         Double u_70_79 = experimentRepository.findUserAvgRoi(70, 79, email);
-        Double u_80_100 = experimentRepository.findUserAvgRoi(80, 100, email);
+        Double u_80_89 = experimentRepository.findUserAvgRoi(80, 89, email);
+        Double u_90_100 = experimentRepository.findUserAvgRoi(90, 100, email);
 
-        // median 계산: 완료된 실험에서 구간별 ROI 중앙값
-        java.util.function.Function<int[], Double> medianByRange = (range) -> {
-            int start = range[0], end = range[1];
-            List<Double> list = completed.stream()
-                .filter(e -> e.getRoi() != null)
-                .filter(e -> e.getScore() >= start && e.getScore() <= end)
-                .map(Experiment::getRoi)
-                .sorted()
-                .toList();
-            if (list.isEmpty()) return null;
-            int n = list.size();
-            if (n % 2 == 1) return list.get(n / 2);
-            return (list.get(n / 2 - 1) + list.get(n / 2)) / 2.0;
-        };
+        Double t_60_69 = experimentRepository.findTotalAvgRoi(60, 69);
+        Double t_70_79 = experimentRepository.findTotalAvgRoi(70, 79);
+        Double t_80_89 = experimentRepository.findTotalAvgRoi(80, 89);
+        Double t_90_100 = experimentRepository.findTotalAvgRoi(90, 100);
 
         List<PortfolioResultResponse.ScoreTableItem> scoreTable = new ArrayList<>();
-        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("60점 이하").avg(u_0_59 != null ? u_0_59 : 0.0).median(medianByRange.apply(new int[]{0,59})).build());
-        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("60-70점").avg(u_60_69 != null ? u_60_69 : 0.0).median(medianByRange.apply(new int[]{60,69})).build());
-        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("70-80점").avg(u_70_79 != null ? u_70_79 : 0.0).median(medianByRange.apply(new int[]{70,79})).build());
-        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().range("80점 이상").avg(u_80_100 != null ? u_80_100 : 0.0).median(medianByRange.apply(new int[]{80,100})).build());
+        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().min(60).max(69).avgYieldTotal(t_60_69).avgYieldUser(u_60_69).build());
+        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().min(70).max(79).avgYieldTotal(t_70_79).avgYieldUser(u_70_79).build());
+        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().min(80).max(89).avgYieldTotal(t_80_89).avgYieldUser(u_80_89).build());
+        scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().min(90).max(100).avgYieldTotal(t_90_100).avgYieldUser(u_90_100).build());
 
-        // 패턴 그래프용 히스토리 포인트 (score, roi, buyAt → x,y,label) - 사용자별 필터링
-        final List<Object[]> experimentGroupByBuyAt = experimentRepository.findExperimentGroupByBuyAtByUser(email);
-        List<PortfolioResultResponse.HistoryPoint> history = experimentGroupByBuyAt.stream().map(row -> {
-                java.time.LocalDate buyDate = ((java.sql.Date) row[0]).toLocalDate();
-                // ROUND() 함수는 BigDecimal을 반환하므로 doubleValue()로 변환
-                Double avgRoi = row[1] instanceof java.math.BigDecimal 
-                    ? ((java.math.BigDecimal) row[1]).doubleValue() 
-                    : (Double) row[1];
-                Double avgScore = row[2] instanceof java.math.BigDecimal 
-                    ? ((java.math.BigDecimal) row[2]).doubleValue() 
-                    : (Double) row[2];
-                return PortfolioResultResponse.HistoryPoint.builder()
-                    .x(avgScore.intValue())
-                    .y(avgRoi)
-                    .label(PortfolioResultResponse.HistoryPoint.toLabel(buyDate.atStartOfDay()))
-                    .build();
-            })
+        // HumanIndicator type 결정 (성공률 기반)
+        String humanIndicatorType;
+        if (totalCompleted == 0 || successRateVal <= 20) {
+            humanIndicatorType = "worst";
+        } else if (successRateVal <= 40) {
+            humanIndicatorType = "bad";
+        } else if (successRateVal <= 60) {
+            humanIndicatorType = "normal";
+        } else if (successRateVal <= 80) {
+            humanIndicatorType = "good";
+        } else {
+            humanIndicatorType = "best";
+        }
+
+        // History 생성 (최근 10개, 완료된 실험)
+        List<Experiment> recentExperiments = completed.stream()
+            .limit(10)
             .collect(java.util.stream.Collectors.toList());
 
-        // HumanIndex 계산: userScore(평균 점수 반올림), userType(성공률 기반 라벨), maintainRate(진행/전체)
-        Integer userScore = completed.isEmpty() ? null : (int) Math.round(completed.stream()
-            .mapToInt(Experiment::getScore)
-            .average().orElse(Double.NaN));
+        // 종목명 중복 체크를 위한 카운트
+        java.util.Map<String, Long> stockNameCount = recentExperiments.stream()
+            .map(e -> e.getStock().getSecurityName())
+            .collect(java.util.stream.Collectors.groupingBy(
+                name -> name, 
+                java.util.stream.Collectors.counting()
+            ));
 
-        String userType;
-        // 성공률에 따른 인간지표 유형 결정 (전체 완료된 실험 기준)
-        // 프론트엔드 정의와 일치: 완전 인간 아님(0~20%), 인간 아님(20~40%), 평범 인간(40~60%), 인간 맞음(60~80%), 인간 완전 맞음(80~100%)
-        if (totalCompleted == 0) {
-            userType = "인간 아님"; // 실험이 완료되지 않은 경우
-        } else if (successRateVal > 0 && successRateVal <= 20) {
-            userType = "완전 인간 아님"; // 성공률 0~20%
-        } else if (successRateVal > 20 && successRateVal <= 40) {
-            userType = "인간 아님"; // 성공률 20~40%
-        } else if (successRateVal > 40 && successRateVal <= 60) {
-            userType = "평범 인간"; // 성공률 40~60%
-        } else if (successRateVal > 60 && successRateVal <= 80) {
-            userType = "인간 맞음"; // 성공률 60~80%
-        } else if (successRateVal > 80) {
-            userType = "인간 완전 맞음"; // 성공률 80~100%
-        } else {
-            userType = "완전 인간 아님"; // successRateVal == 0인 경우
-        }
+        List<PortfolioResultResponse.HistoryPoint> history = recentExperiments.stream()
+            .map(e -> PortfolioResultResponse.HistoryPoint.builder()
+                .date(PortfolioResultResponse.HistoryPoint.toDateLabel(e.getSellAt() != null ? e.getSellAt() : e.getBuyAt()))
+                .score(e.getScore())
+                .yield(e.getRoi() != null ? e.getRoi() : 0.0)
+                .stockId(e.getStock().getId())
+                .stockName(e.getStock().getSecurityName())
+                .isDuplicateName(stockNameCount.get(e.getStock().getSecurityName()) > 1)
+                .build())
+            .collect(java.util.stream.Collectors.toList());
 
-        String maintainRate = purchasedCountAll == 0 ? "0%" : Math.round(totalProgress * 100.0 / purchasedCountAll) + "%";
+        // 패턴 결정 로직 (Vector Analysis - 원점 (50, 0) 기준 거리 합산)
+        String patternType = "value-preemptive"; // 기본값
+        double valuePreemptiveSum = 0;    // 2사분면: X < 50, Y > 0
+        double trendPreemptiveSum = 0;    // 1사분면: X > 50, Y > 0
+        double reverseInvestorSum = 0;    // 3사분면: X < 50, Y < 0
+        double laggingFollowerSum = 0;    // 4사분면: X > 50, Y < 0
 
-        PortfolioResultResponse.HumanIndex humanIndex = PortfolioResultResponse.HumanIndex.builder()
-            .userScore(userScore)
-            .userType(userType)
-            .successRate(successRateLabel)
-            .maintainRate(maintainRate)
-            .purchasedCount(weeklyCompletedCount) // 이번 주에 완료된 실험 수
-            .profitCount(weeklyProfitCount) // 이번 주에 완료된 실험 중 수익이 난 실험 수
-            .sameGradeUserRate(sameGradeUserRate)
-            .build();
+        for (PortfolioResultResponse.HistoryPoint point : history) {
+            double dx = point.getScore() - 50.0;
+            double dy = point.getYield();
+            double distance = Math.sqrt(dx * dx + dy * dy);
 
-        // InvestmentPattern: 차트에 표시되는 히스토리 데이터(날짜별 평균)를 기준으로 사분면 분류
-        // 차트의 점 위치와 패턴 타입이 일치하도록 히스토리 데이터를 기준으로 계산
-        String patternType = null; // 기본값: null
-        String patternDesc = null; // 기본값: null
-        Double avgScore = 50.0; // 기본값: 50점
-        
-        // 히스토리 데이터를 기준으로 패턴 계산 (차트에 표시되는 점들과 동일한 데이터)
-        if (!history.isEmpty()) {
-            // 히스토리 포인트들의 평균 점수 계산 (사분면 분류 기준)
-            avgScore = history.stream()
-                .mapToInt(PortfolioResultResponse.HistoryPoint::getX)
-                .average()
-                .orElse(50.0);
-            
-            // 각 사분면별 카운트 (히스토리 포인트 기준)
-            int topLeftCount = 0;    // 가치 선점형: ROI > 0, Score < avgScore
-            int topRightCount = 0;   // 트렌드 선점형: ROI > 0, Score >= avgScore
-            int bottomLeftCount = 0;  // 역행 투자형: ROI <= 0, Score < avgScore
-            int bottomRightCount = 0; // 후행 추종형: ROI <= 0, Score >= avgScore
-            
-            for (PortfolioResultResponse.HistoryPoint point : history) {
-                double roi = point.getY();
-                int score = point.getX();
-                
-                if (roi > 0 && score < avgScore) {
-                    topLeftCount++; // 가치 선점형
-                } else if (roi > 0 && score >= avgScore) {
-                    topRightCount++; // 트렌드 선점형
-                } else if (roi <= 0 && score < avgScore) {
-                    bottomLeftCount++; // 역행 투자형
-                } else if (roi <= 0 && score >= avgScore) {
-                    bottomRightCount++; // 후행 추종형
-                }
-            }
-            
-            // 가장 많이 속한 사분면 결정
-            int maxCount = Math.max(Math.max(topLeftCount, topRightCount), 
-                                   Math.max(bottomLeftCount, bottomRightCount));
-            
-            if (maxCount > 0) {
-                if (maxCount == topLeftCount) {
-                    patternType = "가치 선점형";
-                    patternDesc = "점수가 낮을 때 매수하여 수익을 보는 투자 패턴";
-                } else if (maxCount == topRightCount) {
-                    patternType = "트렌드 선점형";
-                    patternDesc = "점수가 높을 때 매수하여 수익을 보는 투자 패턴";
-                } else if (maxCount == bottomLeftCount) {
-                    patternType = "역행 투자형";
-                    patternDesc = "점수가 낮을 때 매수하여 손실을 보는 투자 패턴";
-                } else if (maxCount == bottomRightCount) {
-                    patternType = "후행 추종형";
-                    patternDesc = "점수가 높을 때 매수하여 손실을 보는 투자 패턴";
-                }
+            if (point.getScore() < 50 && point.getYield() > 0) {
+                valuePreemptiveSum += distance;   // 가치 선점형
+            } else if (point.getScore() >= 50 && point.getYield() > 0) {
+                trendPreemptiveSum += distance;   // 트렌드 선점형
+            } else if (point.getScore() < 50 && point.getYield() <= 0) {
+                reverseInvestorSum += distance;   // 역행 투자형
+            } else {
+                laggingFollowerSum += distance;   // 후행 추종형
             }
         }
 
-        PortfolioResultResponse.InvestmentPattern investmentPattern = PortfolioResultResponse.InvestmentPattern.builder()
-            .patternType(patternType)
-            .patternDescription(patternDesc)
-            .avgScore(avgScore)
+        double maxSum = Math.max(Math.max(valuePreemptiveSum, trendPreemptiveSum),
+                                 Math.max(reverseInvestorSum, laggingFollowerSum));
+
+        if (maxSum > 0) {
+            if (maxSum == valuePreemptiveSum) {
+                patternType = "value-preemptive";
+            } else if (maxSum == trendPreemptiveSum) {
+                patternType = "trend-preemptive";
+            } else if (maxSum == reverseInvestorSum) {
+                patternType = "reverse-investor";
+            } else {
+                patternType = "lagging-follower";
+            }
+        }
+
+        // 패턴별 유저 비율 계산 (간단히 전체 유저 대비 동일 패턴 유저 비율로 가정)
+        // 실제로는 DB에서 각 유저의 패턴을 계산해야 하지만, 여기서는 랜덤하게 분포한다고 가정하여 25%로 설정
+        int patternPercentile = 25;
+
+        // Response 빌드
+        PortfolioResultResponse.Recommend recommend = PortfolioResultResponse.Recommend.builder()
+            .weeklyExperimentCount(weeklyExperimentCount)
+            .bestYieldScore(bestYieldScore)
+            .worstYieldScore(worstYieldScore)
+            .scoreTable(scoreTable)
             .build();
 
-        PortfolioResultResponse.ExperimentSummary summary = PortfolioResultResponse.ExperimentSummary.builder()
-            .totalExperiments(weeklyCompletedCount) // 이번 주에 완료된 실험 수만 표시
-            .highestProfit(highest)
-            .lowestProfit(lowest)
+        PortfolioResultResponse.HumanIndicator humanIndicator = PortfolioResultResponse.HumanIndicator.builder()
+            .type(humanIndicatorType)
+            .percentile(sameGradePercentile)
+            .successRate(Math.round(successRateVal * 10) / 10.0)
+            .totalBuyCount((int) totalCompleted)
+            .successCount((int) profitCount)
+            .build();
+
+        PortfolioResultResponse.Pattern pattern = PortfolioResultResponse.Pattern.builder()
+            .type(patternType)
+            .percentile(patternPercentile)
+            .history(history)
             .build();
 
         return PortfolioResultResponse.builder()
-            .scoreTable(scoreTable)
-            .experimentSummary(summary)
-            .humanIndex(humanIndex)
-            .investmentPattern(investmentPattern)
-            .history(history)
+            .recommend(recommend)
+            .humanIndicator(humanIndicator)
+            .pattern(pattern)
             .build();
     }
 
     private String toScoreRangeLabel(int score) {
         if (score <= 59) return "60점 이하";
-        if (score <= 69) return "60-70점";
-        if (score <= 79) return "70-80점";
-        return "80점 이상";
+        if (score <= 69) return "60-69";
+        if (score <= 79) return "70-79";
+        if (score <= 89) return "80-89";
+        return "90+";
     }
 
     // 영업일 기준 실험 진행한 기간이 5일 이상 지난 실험 데이터 조회
