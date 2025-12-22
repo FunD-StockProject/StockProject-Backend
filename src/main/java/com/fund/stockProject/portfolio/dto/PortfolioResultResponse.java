@@ -15,63 +15,52 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class PortfolioResultResponse {
 
-    private List<ScoreTableItem> scoreTable;
-    private ExperimentSummary experimentSummary;
-    private HumanIndex humanIndex;
-    private InvestmentPattern investmentPattern;
-    private List<HistoryPoint> history;
+    private Recommend recommend;
+    private HumanIndicator humanIndicator;
+    private Pattern pattern;
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Recommend {
+        private int weeklyExperimentCount;  // 이번 주 실험 진행 횟수
+        private Integer bestYieldScore;    // 가장 높은 수익률 실험의 점수
+        private Integer worstYieldScore;   // 가장 낮은 수익률 실험의 점수
+        private List<ScoreTableItem> scoreTable;  // 점수대별 통계
+    }
 
     @Getter
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ScoreTableItem {
-        private String range;
-        private Double avg;   // 사용자 평균
-        private Double median; // 스펙 미정: 일단 null 유지
+        private int min;              // 구간 최소 점수
+        private int max;              // 구간 최대 점수
+        private Double avgYieldTotal; // 전체 유저 평균
+        private Double avgYieldUser;  // 내 평균
     }
 
     @Getter
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ExperimentSummary {
-        private long totalExperiments;
-        private ProfitBound highestProfit;
-        private ProfitBound lowestProfit;
+    public static class HumanIndicator {
+        private String type;          // 'worst' | 'bad' | 'normal' | 'good' | 'best'
+        private int percentile;       // 상위 %
+        private double successRate;   // 성공률
+        private int totalBuyCount;    // 종목 구매 횟수
+        private int successCount;     // 오르는 종목 개수
     }
 
     @Getter
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ProfitBound {
-        private Integer score;
-        private String range;
-    }
-
-    @Getter
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class HumanIndex {
-        private Integer userScore; // 미정: null
-        private String userType;   // 미정: null
-        private String successRate; // 예: "0~20%"
-        private String maintainRate; // 미정: null
-        private long purchasedCount;
-        private long profitCount;
-        private Long sameGradeUserRate; // 전체 유저 중 동일 등급 유저 비율 (%)
-    }
-
-    @Getter
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class InvestmentPattern {
-        private String patternType;        // 미정: null
-        private String patternDescription; // 미정: null
-        private Double avgScore;           // 사용자 평균 점수 (사분면 분류 기준)
+    public static class Pattern {
+        private String type;          // 패턴 이름 키 (value-preemptive 등)
+        private int percentile;       // 해당 타입 유저 비율
+        private List<HistoryPoint> history;  // 차트에 찍을 점들 (최대 10개)
     }
 
     @Getter
@@ -79,12 +68,15 @@ public class PortfolioResultResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class HistoryPoint {
-        private int x;      // score
-        private double y;   // roi
-        private String label; // MMdd
+        private String date;          // MM.DD
+        private int score;            // X축 (0~100)
+        private double yield;         // Y축
+        private Integer stockId;      // 종목 ID
+        private String stockName;     // 종목명
+        private boolean isDuplicateName;  // 리스트 내 이름 중복 여부
 
-        public static String toLabel(LocalDateTime dateTime) {
-            return dateTime.format(DateTimeFormatter.ofPattern("MMdd"));
+        public static String toDateLabel(LocalDateTime dateTime) {
+            return dateTime.format(DateTimeFormatter.ofPattern("MM.dd"));
         }
     }
 }
