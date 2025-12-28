@@ -14,8 +14,8 @@ public class BookmarkInfoResponse {
     @Schema(description = "종목 이름", example = "테슬라")
     private final String name;
 
-    @Schema(description = "현재 가격", example = "20300")
-    private final Integer price;
+    @Schema(description = "현재 가격", example = "20300.12")
+    private final Double price;
 
     @Schema(description = "전일 대비 등락률(%)", example = "-2.91")
     private final Double priceDiffPerCent;
@@ -36,7 +36,7 @@ public class BookmarkInfoResponse {
     private final COUNTRY country;
 
     @Builder
-    public BookmarkInfoResponse(Integer stockId, String name, Integer price, Double priceDiffPerCent, 
+    public BookmarkInfoResponse(Integer stockId, String name, Double price, Double priceDiffPerCent, 
                                Integer score, Integer diff, Boolean isNotificationOn, 
                                String symbolName, COUNTRY country) {
         this.stockId = stockId;

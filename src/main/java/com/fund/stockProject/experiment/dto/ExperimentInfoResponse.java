@@ -15,7 +15,7 @@ public class ExperimentInfoResponse {
 
     private LocalDateTime buyAt;
 
-    private Integer buyPrice;
+    private Double buyPrice;
 
     private Double roi;
 
@@ -27,7 +27,7 @@ public class ExperimentInfoResponse {
     
     private Integer currentScore; // 현재 시점 점수
     
-    private Integer currentPrice; // 현재 가격
+    private Double currentPrice; // 현재 가격
     
     private Integer stockId; // 종목 ID
 }
