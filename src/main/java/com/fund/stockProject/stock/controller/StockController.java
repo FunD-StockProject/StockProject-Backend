@@ -9,6 +9,7 @@ import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.service.StockService;
 import com.fund.stockProject.stock.service.SecurityService;
 import com.fund.stockProject.shortview.dto.ShortViewResponse;
+import com.fund.stockProject.common.dto.PageResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -156,10 +157,12 @@ public class StockController {
     }
 
     @GetMapping("/sector/overseas/{sector}/recommend")
-    @Operation(summary = "해외 섹터별 주식 추천", description = "특정 해외 섹터의 주식을 점수 기반으로 추천합니다. 실시간 시세 조회 실패 시 가격 필드는 null로 반환됩니다.")
-    public ResponseEntity<ShortViewResponse> getRecommendationByOverseasSector(
+    @Operation(summary = "해외 섹터별 주식 추천 (페이징)", description = "특정 해외 섹터의 주식을 점수 기반으로 추천합니다. 기본 정렬은 인간지표(score) 내림차순이며, 각 항목의 가격은 가능하면 실시간으로 조회해 포함하고 실패 시 null로 반환됩니다.")
+        public ResponseEntity<PageResponse<ShortViewResponse>> getRecommendationByOverseasSector(
             @io.swagger.v3.oas.annotations.Parameter(description = "추천할 해외 섹터", example = "FINANCIALS", required = true)
-            @PathVariable String sector
+            @PathVariable String sector,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "20") int size
     ) {
         try {
             // OverseasSector enum으로 변환
@@ -170,25 +173,13 @@ public class StockController {
                 log.warn("잘못된 OverseasSector 값: {}", sector);
                 return ResponseEntity.badRequest().build();
             }
+            log.info("OverseasSector({})별 추천(paged) 요청: page={}, size={}", sectorEnum, page, size);
 
-            log.info("OverseasSector({})별 추천을 요청했습니다.", sectorEnum);
+            int safeSize = Math.max(1, Math.min(size, 100));
+            int safePage = Math.max(0, page);
 
-            Stock recommendedStock = stockService.getRecommendedStockByOverseasSector(sectorEnum);
-            if (recommendedStock != null) {
-                log.info("OverseasSector({})에서 주식({})을 추천했습니다.", sectorEnum, recommendedStock.getSymbolName());
-                
-                // 실시간 가격 정보를 동기적으로 가져오기
-                try {
-                    var stockInfo = securityService.getRealTimeStockPrice(recommendedStock).block();
-                    return ResponseEntity.ok(ShortViewResponse.fromEntityWithPrice(recommendedStock, stockInfo));
-                } catch (Exception e) {
-                    log.warn("실시간 가격 조회 실패, 기본 정보로 응답합니다. stock_id: {}, error: {}", 
-                            recommendedStock.getId(), e.getMessage());
-                    return ResponseEntity.ok(ShortViewResponse.fromEntity(recommendedStock));
-                }
-            } else {
-                return ResponseEntity.noContent().build();
-            }
+            var pageResp = stockService.getRecommendedStocksByOverseasSectorPaged(sectorEnum, safePage, safeSize);
+            return ResponseEntity.ok(pageResp);
         } catch (Exception e) {
             log.error("OverseasSector별 추천 중 오류 발생: {}", sector, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
