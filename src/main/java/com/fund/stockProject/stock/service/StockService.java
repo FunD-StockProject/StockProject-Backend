@@ -16,6 +16,8 @@ import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.domain.DomesticSector;
 import com.fund.stockProject.stock.domain.OverseasSector;
 import com.fund.stockProject.stock.dto.response.*;
+import com.fund.stockProject.common.dto.PageResponse;
+import com.fund.stockProject.shortview.dto.ShortViewResponse;
 import com.fund.stockProject.stock.dto.response.StockChartResponse.PriceInfo;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockQueryRepository;
@@ -1076,6 +1078,88 @@ public class StockService {
         // 가중치 기반 랜덤 선택
         Random random = new Random(System.currentTimeMillis());
         return selectWeightedRandom(stocksWithWeight, random);
+    }
+
+    /**
+     * 해외 섹터 추천을 페이징으로 제공합니다. 정렬 기준은 인간지표(점수) 내림차순입니다.
+     * 가격은 실시간 조회 비용 때문에 null로 반환하며, 프론트에서 필요시 별도 실시간 조회하도록 구성합니다.
+     */
+        public PageResponse<ShortViewResponse> getRecommendedStocksByOverseasSectorPaged(
+            OverseasSector sector, int page, int size) {
+        if (sector == null || sector == OverseasSector.UNKNOWN) {
+            return PageResponse.<ShortViewResponse>builder()
+                .items(java.util.List.of())
+                .page(page)
+                .size(size)
+                .totalElements(0)
+                .totalPages(0)
+                .build();
+        }
+
+        List<Stock> validStocks = stockRepository.findValidStocksByOverseasSector(sector);
+        if (validStocks.isEmpty()) {
+            return PageResponse.<ShortViewResponse>builder()
+                .items(java.util.List.of())
+                .page(page)
+                .size(size)
+                .totalElements(0)
+                .totalPages(0)
+                .build();
+        }
+
+        List<Integer> candidateStockIds = validStocks.stream().map(Stock::getId).toList();
+        LocalDate today = LocalDate.now();
+        List<Score> todayScores = scoreRepository.findTodayScoresByStockIds(candidateStockIds, today);
+        List<Score> latestScores = scoreRepository.findLatestScoresByStockIds(candidateStockIds);
+
+        Map<Integer, Score> scoreMap = new HashMap<>();
+        todayScores.forEach(s -> scoreMap.put(s.getStockId(), s));
+        latestScores.forEach(s -> scoreMap.putIfAbsent(s.getStockId(), s));
+
+        // Filter stocks with valid score (not 9999)
+        List<Stock> stocksWithScore = validStocks.stream()
+            .filter(stock -> {
+                Score sc = scoreMap.get(stock.getId());
+                if (sc == null) return false;
+                int val = getScoreByCountry(sc, stock.getExchangeNum());
+                return val != 9999;
+            })
+            .toList();
+
+        // sort by score desc
+        List<Stock> sorted = stocksWithScore.stream()
+            .sorted((a, b) -> {
+                int sa = getScoreByCountry(scoreMap.get(a.getId()), a.getExchangeNum());
+                int sb = getScoreByCountry(scoreMap.get(b.getId()), b.getExchangeNum());
+                return Integer.compare(sb, sa);
+            })
+            .toList();
+
+        final int total = sorted.size();
+        final int totalPages = (int) Math.ceil((double) total / size);
+        final int from = Math.min(page * size, total);
+        final int to = Math.min(from + size, total);
+
+        List<ShortViewResponse> items = sorted.subList(from, to).stream()
+            .map(stock -> {
+                try {
+                    var stockInfo = securityService.getRealTimeStockPrice(stock).block();
+                    if (stockInfo != null && stockInfo.getPrice() != null) {
+                        return ShortViewResponse.fromEntityWithPrice(stock, stockInfo);
+                    }
+                } catch (Exception e) {
+                    log.debug("실시간 가격 조회 실패(무시). stockId={}, error={}", stock.getId(), e.getMessage());
+                }
+                return ShortViewResponse.fromEntity(stock);
+            })
+            .toList();
+        return PageResponse.<ShortViewResponse>builder()
+                .items(items)
+                .page(page)
+                .size(size)
+                .totalElements(total)
+                .totalPages(totalPages)
+                .build();
     }
 
     /**
