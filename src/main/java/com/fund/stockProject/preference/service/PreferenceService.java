@@ -148,7 +148,7 @@ public class PreferenceService {
                 BookmarkInfoResponse bookmarkInfoResponse = BookmarkInfoResponse.builder()
                         .stockId(stock.getId())
                         .name(stock.getSecurityName())
-                        .price(stockInfoResponse.getPrice() != null ? stockInfoResponse.getPrice().intValue() : null)
+                    .price(stockInfoResponse.getPrice() != null ? stockInfoResponse.getPrice() : null)
                         .priceDiffPerCent(stockInfoResponse.getPriceDiffPerCent())
                         .score(country == COUNTRY.KOREA ? stock.getScores().get(0).getScoreKorea() : stock.getScores().get(0).getScoreOversea())
                         .diff(stock.getScores().get(0).getDiff())
