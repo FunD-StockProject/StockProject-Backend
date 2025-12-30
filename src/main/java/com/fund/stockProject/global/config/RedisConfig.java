@@ -28,11 +28,7 @@ public class RedisConfig {
     public ObjectMapper redisCacheObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
-        mapper.activateDefaultTyping(
-            LaissezFaireSubTypeValidator.instance,
-            ObjectMapper.DefaultTyping.NON_FINAL,
-            JsonTypeInfo.As.PROPERTY
-        );
+        // 타입 정보를 포함하지 않도록 설정 (클린한 JSON)
         return mapper;
     }
 
