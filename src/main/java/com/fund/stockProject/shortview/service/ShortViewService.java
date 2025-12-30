@@ -14,6 +14,8 @@ import com.fund.stockProject.stock.service.SecurityService;
 import com.fund.stockProject.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -291,10 +293,13 @@ public class ShortViewService {
      * 사용자에게 추천할 주식들을 5개 반환합니다.
      * 가중치 기반 랜덤 선택을 사용하여 다양성을 확보하고, 중복을 방지합니다.
      * 이전 추천과의 중복을 완전히 방지합니다.
-     * 
+     *
+     * Redis 캐시: 5분간 동일한 추천 결과 반환 (성능 최적화)
+     *
      * @param user 현재 로그인한 사용자
      * @return 추천된 주식(Stock) 엔티티 리스트 (최대 5개)
      */
+    @Cacheable(value = "shortview", key = "#user.id")
     public List<Stock> getRecommendedStocks(User user) {
         final int RECOMMEND_COUNT = 5;
         log.info("사용자(id:{})에게 가중치 기반 주식 추천을 시작합니다. (추천 개수: {})", user.getId(), RECOMMEND_COUNT);
@@ -375,6 +380,19 @@ public class ShortViewService {
         return recommendedStocks;
     }
     
+    /**
+     * 사용자의 숏뷰 추천 캐시를 무효화합니다.
+     * 사용자가 "다시 보지 않음"으로 종목을 설정하거나, 선호도를 변경했을 때 호출됩니다.
+     *
+     * @param userId 사용자 ID
+     */
+    @CacheEvict(value = "shortview", key = "#userId")
+    public void evictUserRecommendationCache(Integer userId) {
+        log.info("사용자(id:{})의 숏뷰 추천 캐시를 무효화했습니다.", userId);
+        // 메모리 캐시도 함께 제거
+        recentRecommendations.remove(userId);
+    }
+
     /**
      * 사용자의 최근 추천 종목을 메모리 캐시에 저장합니다.
      * 최대 개수를 초과하면 일부 항목을 제거합니다.

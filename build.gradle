@@ -88,6 +88,10 @@ dependencies {
 
 	// FCM 연동을 위해
 	implementation 'com.google.firebase:firebase-admin:9.4.2'
+
+	// Redis 캐시
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	implementation 'org.springframework.boot:spring-boot-starter-cache'
 }
 
 tasks.named('test') {

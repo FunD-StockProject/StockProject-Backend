@@ -36,6 +36,22 @@ spring:
     scheduling:
       pool:
         size: 2
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000
+      cache-null-values: false
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 10
+          min-idle: 2
+          max-wait: 2000ms
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ENC(d/6PmtvqBpZOSgQTwJTh14o25ySJAidbHTVXOS8KywU9Pl7/USA26oXGGtrR45KkRutCPQNY9IstlOXmFSzrTU9mP1xJwttEmugCk16ZT/7JPxqf46XQcEk0HMfcLFLnFOQ+UUt7V9LTN9ZZoEbWylIWcjSFn8aSkxGeHZiTeN+TD0CCs1mBMrCKt7KlZQFpRBUnxE6i739NfcWkHhbLRA==)

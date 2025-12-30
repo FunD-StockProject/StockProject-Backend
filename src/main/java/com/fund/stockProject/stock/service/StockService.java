@@ -41,6 +41,7 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
@@ -65,6 +66,7 @@ public class StockService {
 
     private final int LIMITS = 9;
 
+    @Cacheable(value = "searchResult", key = "#searchKeyword + '_' + #country", unless = "#result == null")
     public Mono<StockInfoResponse> searchStockBySymbolName(final String searchKeyword,
         final String country) {
         List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ,
