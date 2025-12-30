@@ -8,6 +8,7 @@ import com.fund.stockProject.keyword.entity.Keyword;
 import com.fund.stockProject.keyword.entity.StockKeyword;
 import com.fund.stockProject.keyword.repository.KeywordRepository;
 import com.fund.stockProject.score.entity.Score;
+import com.fund.stockProject.searchkeyword.service.SearchKeywordService;
 import com.fund.stockProject.score.repository.ScoreRepository;
 import com.fund.stockProject.score.service.ScoreService;
 import com.fund.stockProject.stock.domain.CATEGORY;
@@ -60,6 +61,7 @@ public class StockService {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
     private final KeywordRepository keywordRepository;
+    private final SearchKeywordService searchKeywordService;
 
     private final int LIMITS = 9;
 
@@ -75,6 +77,9 @@ public class StockService {
 
         if (bySymbolNameAndCountryWithEnums.isPresent()) {
             final Stock stock = bySymbolNameAndCountryWithEnums.get();
+
+            COUNTRY countryEnum = COUNTRY.valueOf(country);
+            searchKeywordService.saveSearchKeyword(searchKeyword, countryEnum);
 
             return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
                 stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),

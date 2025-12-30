@@ -40,6 +40,10 @@ public class NotificationService {
     public void createImmediateStockNotification(User user, Stock stock, NotificationType type, 
                                                String title, String body, Integer oldScore, 
                                                Integer newScore, Integer changeAbs) {
+        // Defensive: prevent creating SCORE_SPIKE notifications with zero or null change
+        if (type == NotificationType.SCORE_SPIKE && (changeAbs == null || changeAbs == 0)) {
+            return;
+        }
         createNotification(user, stock, type, title, body, oldScore, newScore, changeAbs, null);
     }
 
@@ -59,6 +63,10 @@ public class NotificationService {
     public void createScheduledStockNotification(User user, Stock stock, NotificationType type,
                                                String title, String body, Integer oldScore,
                                                Integer newScore, Integer changeAbs, Instant scheduledAt) {
+        // Defensive: prevent scheduling SCORE_SPIKE notifications with zero or null change
+        if (type == NotificationType.SCORE_SPIKE && (changeAbs == null || changeAbs == 0)) {
+            return;
+        }
         createNotification(user, stock, type, title, body, oldScore, newScore, changeAbs, scheduledAt);
     }
 
