@@ -26,6 +26,7 @@ import com.fund.stockProject.stock.dto.response.StockKoreaVolumeRankResponse;
 import com.fund.stockProject.stock.dto.response.StockOverseaVolumeRankResponse;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import reactor.core.publisher.Mono;
 
 @Service
@@ -146,7 +147,9 @@ public class SecurityService {
 
     /**
      * 국내, 해외 주식 정보 조회
+     * Redis 캐시: 30초간 동일한 결과 반환 (실시간 가격 변동 고려)
      */
+    @Cacheable(value = "stockPrice", key = "#symbol + '_' + #exchangenum.name()", unless = "#result == null")
     public Mono<StockInfoResponse> getSecurityStockInfoKorea(Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum, COUNTRY country) {
         if (country == COUNTRY.KOREA) {
             return webClient.get()

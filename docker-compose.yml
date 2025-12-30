@@ -1,7 +1,25 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: stockproject-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   stockproject-backend:
     image: muuigong/stock-app:latest
     container_name: stockproject-backend
+    depends_on:
+      redis:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8080:8080"   # 내부 HTTP만 노출
     env_file:
@@ -12,9 +30,15 @@ services:
       # ← application.yml의 server.* 를 강제 덮어쓰기
       - SERVER_PORT=8080
       - SERVER_SSL_ENABLED=false
+      # Redis 연결 설정
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
       # (대안) SPRING_APPLICATION_JSON 써도 됨
       # - SPRING_APPLICATION_JSON={"server":{"port":8080,"ssl":{"enabled":false}}}
     volumes:
       - ./logs:/app/logs
       - ./config:/app/config  # FCM credentials 및 기타 설정 파일 마운트
     restart: unless-stopped
+
+volumes:
+  redis-data:
