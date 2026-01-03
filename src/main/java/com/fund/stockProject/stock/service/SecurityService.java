@@ -26,6 +26,8 @@ import com.fund.stockProject.stock.dto.response.StockKoreaVolumeRankResponse;
 import com.fund.stockProject.stock.dto.response.StockOverseaVolumeRankResponse;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import reactor.core.publisher.Mono;
 
@@ -38,6 +40,8 @@ public class SecurityService {
     private final SecurityHttpConfig securityHttpConfig;
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
+    private final CacheManager cacheManager;
+    private static final String STOCK_PRICE_CACHE = "stockPrice";
 
     /**
      * 국내, 해외 주식 정보 조회
@@ -1011,6 +1015,11 @@ public class SecurityService {
     }
 
     public Mono<StockInfoResponse> getRealTimeStockPrice(Stock stock) {
+        StockInfoResponse cached = getCachedRealTimeStockPrice(stock);
+        if (cached != null) {
+            return Mono.just(cached);
+        }
+
         return getSecurityStockInfoKorea(
                 stock.getId(),
                 stock.getSymbolName(),
@@ -1018,7 +1027,44 @@ public class SecurityService {
                 stock.getSymbol(),
                 stock.getExchangeNum(),
                 getCountryFromExchangeNum(stock.getExchangeNum())
-        );
+        ).doOnNext(response -> putStockPriceCache(stock, response));
+    }
+
+    public StockInfoResponse getCachedRealTimeStockPrice(Stock stock) {
+        Cache cache = cacheManager.getCache(STOCK_PRICE_CACHE);
+        if (cache == null || stock == null || stock.getSymbol() == null || stock.getExchangeNum() == null) {
+            return null;
+        }
+
+        String cacheKey = buildStockPriceCacheKey(stock);
+        if (cacheKey == null) {
+            return null;
+        }
+
+        return cache.get(cacheKey, StockInfoResponse.class);
+    }
+
+    private void putStockPriceCache(Stock stock, StockInfoResponse response) {
+        if (response == null || response.getPrice() == null || response.getPrice() <= 0) {
+            return;
+        }
+
+        Cache cache = cacheManager.getCache(STOCK_PRICE_CACHE);
+        if (cache == null) {
+            return;
+        }
+
+        String cacheKey = buildStockPriceCacheKey(stock);
+        if (cacheKey != null) {
+            cache.put(cacheKey, response);
+        }
+    }
+
+    private String buildStockPriceCacheKey(Stock stock) {
+        if (stock == null || stock.getSymbol() == null || stock.getExchangeNum() == null) {
+            return null;
+        }
+        return stock.getSymbol() + "_" + stock.getExchangeNum().name();
     }
 
     /**

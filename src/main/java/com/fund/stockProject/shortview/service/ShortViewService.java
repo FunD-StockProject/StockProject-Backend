@@ -500,4 +500,8 @@ public class ShortViewService {
     public Mono<StockInfoResponse> getRealTimeStockPrice(Stock stock) {
         return securityService.getRealTimeStockPrice(stock);
     }
+
+    public StockInfoResponse getCachedRealTimeStockPrice(Stock stock) {
+        return securityService.getCachedRealTimeStockPrice(stock);
+    }
 }
