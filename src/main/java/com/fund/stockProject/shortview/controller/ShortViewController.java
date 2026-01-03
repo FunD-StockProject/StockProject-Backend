@@ -53,12 +53,13 @@ public class ShortViewController {
             User currentUser = userDetails.getUser();
             log.info("회원(id:{})이 추천을 요청했습니다.", currentUser.getId());
             
-            List<Stock> recommendedStocks = shortViewService.getRecommendedStocks(currentUser);
+            List<Integer> recommendedStockIds = shortViewService.getRecommendedStockIds(currentUser);
             
-            if (recommendedStocks.isEmpty()) {
+            if (recommendedStockIds.isEmpty()) {
                 return ResponseEntity.noContent().build();
             }
             
+            List<Stock> recommendedStocks = shortViewService.getStocksByIds(recommendedStockIds);
             log.info("회원(id:{})에게 주식 {}개를 추천했습니다.", currentUser.getId(), recommendedStocks.size());
             
             // 각 주식에 대해 실시간 가격 정보 조회

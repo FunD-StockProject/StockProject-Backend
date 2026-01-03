@@ -290,17 +290,17 @@ public class ShortViewService {
     }
 
     /**
-     * 사용자에게 추천할 주식들을 5개 반환합니다.
+     * 사용자에게 추천할 주식 ID를 5개 반환합니다.
      * 가중치 기반 랜덤 선택을 사용하여 다양성을 확보하고, 중복을 방지합니다.
      * 이전 추천과의 중복을 완전히 방지합니다.
      *
      * Redis 캐시: 5분간 동일한 추천 결과 반환 (성능 최적화)
      *
      * @param user 현재 로그인한 사용자
-     * @return 추천된 주식(Stock) 엔티티 리스트 (최대 5개)
+     * @return 추천된 주식 ID 리스트 (최대 5개)
      */
     @Cacheable(value = "shortview", key = "#user.id")
-    public List<Stock> getRecommendedStocks(User user) {
+    public List<Integer> getRecommendedStockIds(User user) {
         final int RECOMMEND_COUNT = 5;
         log.info("사용자(id:{})에게 가중치 기반 주식 추천을 시작합니다. (추천 개수: {})", user.getId(), RECOMMEND_COUNT);
         
@@ -371,13 +371,38 @@ public class ShortViewService {
         // 가중치 기반 랜덤 선택으로 중복 없이 여러 개 선택
         Random random = new Random(System.currentTimeMillis() + user.getId());
         List<Stock> recommendedStocks = selectMultipleWeightedRandom(stocksWithWeight, random, RECOMMEND_COUNT);
-        
+
         // 추천한 종목을 메모리 캐시에 저장 (이전 추천과 중복 방지)
-        saveRecentRecommendations(user.getId(), recommendedStocks);
-        
-        log.info("사용자(id:{})에게 주식 {}개 가중치 기반 추천 완료", user.getId(), recommendedStocks.size());
-        
-        return recommendedStocks;
+        List<Integer> recommendedStockIds = recommendedStocks.stream()
+                .map(Stock::getId)
+                .collect(Collectors.toList());
+        saveRecentRecommendations(user.getId(), recommendedStockIds);
+
+        log.info("사용자(id:{})에게 주식 {}개 가중치 기반 추천 완료", user.getId(), recommendedStockIds.size());
+
+        return recommendedStockIds;
+    }
+
+    /**
+     * 추천된 주식 ID를 실제 주식 엔티티 목록으로 변환합니다.
+     */
+    public List<Stock> getStocksByIds(List<Integer> stockIds) {
+        if (stockIds == null || stockIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Stock> stocks = stockRepository.findAllById(stockIds);
+        Map<Integer, Stock> stockMap = stocks.stream()
+                .collect(Collectors.toMap(Stock::getId, stock -> stock));
+
+        List<Stock> ordered = new ArrayList<>();
+        for (Integer id : stockIds) {
+            Stock stock = stockMap.get(id);
+            if (stock != null) {
+                ordered.add(stock);
+            }
+        }
+        return ordered;
     }
     
     /**
@@ -397,12 +422,12 @@ public class ShortViewService {
      * 사용자의 최근 추천 종목을 메모리 캐시에 저장합니다.
      * 최대 개수를 초과하면 일부 항목을 제거합니다.
      */
-    private void saveRecentRecommendations(Integer userId, List<Stock> recommendedStocks) {
+    private void saveRecentRecommendations(Integer userId, List<Integer> recommendedStockIds) {
         Set<Integer> recentStocks = recentRecommendations.computeIfAbsent(userId, k -> new HashSet<>());
-        
+
         // 새로 추천한 종목 추가
-        for (Stock stock : recommendedStocks) {
-            recentStocks.add(stock.getId());
+        for (Integer stockId : recommendedStockIds) {
+            recentStocks.add(stockId);
         }
         
         // 최대 개수 초과 시 오래된 항목 일부 제거 (간단한 처리)
