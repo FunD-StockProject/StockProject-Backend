@@ -1,5 +1,6 @@
 package com.fund.stockProject.keyword.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fund.stockProject.stock.entity.Stock;
 
 import jakarta.persistence.Entity;
@@ -24,6 +25,7 @@ public class StockKeyword {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "stock_id", nullable = false)
+    @JsonIgnore
     private Stock stock;
 
     @ManyToOne(fetch = FetchType.LAZY)

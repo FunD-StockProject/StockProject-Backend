@@ -1,5 +1,6 @@
 package com.fund.stockProject.score.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fund.stockProject.global.entity.Core;
 import com.fund.stockProject.stock.entity.Stock;
 import jakarta.persistence.*;
@@ -25,6 +26,7 @@ public class Score extends Core {
 
     @ManyToOne
     @JoinColumn(name = "stock_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @JsonIgnore
     private Stock stock;
 
     @Column(nullable = false)
