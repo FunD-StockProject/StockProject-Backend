@@ -76,37 +76,61 @@ public class ShortViewController {
             var latestScoreMap = shortViewService.getLatestScoresByStockIds(recommendedIds);
             var keywordsByStockId = shortViewService.getKeywordsByStockIds(recommendedIds, 3);
 
-            int priceConcurrency = 8;
-            List<ShortViewResponse> responses = Flux.fromIterable(recommendedStocks)
-                    .flatMap(stock ->
-                            shortViewService.getRealTimeStockPrice(stock)
-                                    .timeout(Duration.ofMillis(800))
-                                    .filter(stockInfo -> {
-                                        boolean valid = isValidPriceInfo(stockInfo);
-                                        if (!valid) {
-                                            log.warn("유효하지 않은 가격 정보로 제외합니다. stock_id: {}", stock.getId());
-                                        }
-                                        return valid;
-                                    })
-                                    .map(stockInfo -> ShortViewResponse.fromEntityWithPrice(
-                                            stock,
-                                            stockInfo,
-                                            latestScoreMap.get(stock.getId()),
-                                            keywordsByStockId.getOrDefault(stock.getId(), List.of())
-                                    ))
-                                    .onErrorResume(e -> {
-                                        log.warn("실시간 가격 조회 실패로 제외합니다. stock_id: {}, error: {}", 
-                                                stock.getId(), e.getMessage());
-                                        return Mono.empty();
-                                    }),
-                            priceConcurrency
-                    )
-                    .take(recommendTargetCount)
-                    .collectList()
-                    .block();
+            List<ShortViewResponse> responses = new ArrayList<>();
+            List<Stock> remainingStocks = new ArrayList<>();
 
-            if (responses == null) {
-                responses = new ArrayList<>();
+            for (Stock stock : recommendedStocks) {
+                StockInfoResponse cachedInfo = shortViewService.getCachedRealTimeStockPrice(stock);
+                if (isValidPriceInfo(cachedInfo)) {
+                    responses.add(ShortViewResponse.fromEntityWithPrice(
+                            stock,
+                            cachedInfo,
+                            latestScoreMap.get(stock.getId()),
+                            keywordsByStockId.getOrDefault(stock.getId(), List.of())
+                    ));
+                    if (responses.size() >= recommendTargetCount) {
+                        break;
+                    }
+                } else {
+                    remainingStocks.add(stock);
+                }
+            }
+
+            int neededCount = recommendTargetCount - responses.size();
+            if (neededCount > 0 && !remainingStocks.isEmpty()) {
+                int priceConcurrency = 8;
+                List<ShortViewResponse> fetched = Flux.fromIterable(remainingStocks)
+                        .flatMap(stock ->
+                                shortViewService.getRealTimeStockPrice(stock)
+                                        .timeout(Duration.ofMillis(600))
+                                        .filter(stockInfo -> {
+                                            boolean valid = isValidPriceInfo(stockInfo);
+                                            if (!valid) {
+                                                log.warn("유효하지 않은 가격 정보로 제외합니다. stock_id: {}", stock.getId());
+                                            }
+                                            return valid;
+                                        })
+                                        .map(stockInfo -> ShortViewResponse.fromEntityWithPrice(
+                                                stock,
+                                                stockInfo,
+                                                latestScoreMap.get(stock.getId()),
+                                                keywordsByStockId.getOrDefault(stock.getId(), List.of())
+                                        ))
+                                        .onErrorResume(e -> {
+                                            log.warn("실시간 가격 조회 실패로 제외합니다. stock_id: {}, error: {}", 
+                                                    stock.getId(), e.getMessage());
+                                            return Mono.empty();
+                                        }),
+                                priceConcurrency
+                        )
+                        .take(neededCount)
+                        .take(Duration.ofMillis(1200))
+                        .collectList()
+                        .block();
+
+                if (fetched != null) {
+                    responses.addAll(fetched);
+                }
             }
 
             if (responses.isEmpty()) {
