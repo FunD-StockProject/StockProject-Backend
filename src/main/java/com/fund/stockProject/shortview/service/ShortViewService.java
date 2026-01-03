@@ -4,6 +4,7 @@ import com.fund.stockProject.preference.domain.PreferenceType;
 import com.fund.stockProject.preference.repository.PreferenceRepository;
 import com.fund.stockProject.score.entity.Score;
 import com.fund.stockProject.score.repository.ScoreRepository;
+import com.fund.stockProject.keyword.repository.KeywordRepository;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.domain.DomesticSector;
 import com.fund.stockProject.stock.domain.OverseasSector;
@@ -23,6 +24,7 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import reactor.core.publisher.Mono;
 
 /**
  * 🚀 숏뷰 주식 추천 서비스
@@ -43,6 +45,7 @@ public class ShortViewService {
     private final SecurityService securityService;
     private final PreferenceRepository preferenceRepository;
     private final ScoreRepository scoreRepository;
+    private final KeywordRepository keywordRepository;
     
     // 사용자별 최근 본 추천 종목 ID 저장 (메모리 캐시)
     // userId -> Set<stockId> (최근 50개까지 저장)
@@ -404,6 +407,51 @@ public class ShortViewService {
         }
         return ordered;
     }
+
+    public Map<Integer, Score> getLatestScoresByStockIds(List<Integer> stockIds) {
+        if (stockIds == null || stockIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<Score> scores = scoreRepository.findLatestScoresByStockIds(stockIds);
+        Map<Integer, Score> scoreMap = new HashMap<>();
+        for (Score score : scores) {
+            scoreMap.putIfAbsent(score.getStockId(), score);
+        }
+        return scoreMap;
+    }
+
+    public Map<Integer, List<String>> getKeywordsByStockIds(List<Integer> stockIds, int limit) {
+        if (stockIds == null || stockIds.isEmpty() || limit <= 0) {
+            return Collections.emptyMap();
+        }
+
+        List<com.fund.stockProject.keyword.entity.StockKeyword> stockKeywords =
+                keywordRepository.findKeywordsByStockIds(stockIds);
+
+        Map<Integer, List<String>> keywordsByStockId = new HashMap<>();
+        Map<Integer, Set<String>> seenByStockId = new HashMap<>();
+
+        for (com.fund.stockProject.keyword.entity.StockKeyword stockKeyword : stockKeywords) {
+            Integer stockId = stockKeyword.getStock().getId();
+            List<String> keywords = keywordsByStockId.computeIfAbsent(stockId, key -> new ArrayList<>());
+            if (keywords.size() >= limit) {
+                continue;
+            }
+
+            String keywordName = stockKeyword.getKeyword().getName();
+            if (keywordName == null || keywordName.isBlank()) {
+                continue;
+            }
+
+            Set<String> seen = seenByStockId.computeIfAbsent(stockId, key -> new HashSet<>());
+            if (seen.add(keywordName)) {
+                keywords.add(keywordName);
+            }
+        }
+
+        return keywordsByStockId;
+    }
     
     /**
      * 사용자의 숏뷰 추천 캐시를 무효화합니다.
@@ -447,5 +495,9 @@ public class ShortViewService {
      */
     public StockInfoResponse getRealTimeStockPriceSync(Stock stock) {
         return securityService.getRealTimeStockPrice(stock).block();
+    }
+
+    public Mono<StockInfoResponse> getRealTimeStockPrice(Stock stock) {
+        return securityService.getRealTimeStockPrice(stock);
     }
 }
