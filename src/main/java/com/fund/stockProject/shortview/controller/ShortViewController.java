@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,6 +29,8 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.Parameter;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Slf4j
 @Tag(name = "숏뷰 (ShortView)", description = "숏뷰 추천 종목 API")
@@ -66,24 +69,44 @@ public class ShortViewController {
             List<Stock> recommendedStocks = shortViewService.getStocksByIds(recommendedStockIds);
             Collections.shuffle(recommendedStocks);
             log.info("회원(id:{})에게 주식 {}개를 추천했습니다.", currentUser.getId(), recommendedStocks.size());
-            
-            // 각 주식에 대해 실시간 가격 정보 조회 (가격 정보가 유효한 경우만 응답에 포함)
-            List<ShortViewResponse> responses = new ArrayList<>();
-            for (Stock stock : recommendedStocks) {
-                try {
-                    var stockInfo = shortViewService.getRealTimeStockPriceSync(stock);
-                    if (!isValidPriceInfo(stockInfo)) {
-                        log.warn("유효하지 않은 가격 정보로 제외합니다. stock_id: {}", stock.getId());
-                        continue;
-                    }
-                    responses.add(ShortViewResponse.fromEntityWithPrice(stock, stockInfo));
-                    if (responses.size() >= recommendTargetCount) {
-                        break;
-                    }
-                } catch (Exception e) {
-                    log.warn("실시간 가격 조회 실패로 제외합니다. stock_id: {}, error: {}", 
-                            stock.getId(), e.getMessage());
-                }
+
+            List<Integer> recommendedIds = recommendedStocks.stream()
+                    .map(Stock::getId)
+                    .toList();
+            var latestScoreMap = shortViewService.getLatestScoresByStockIds(recommendedIds);
+            var keywordsByStockId = shortViewService.getKeywordsByStockIds(recommendedIds, 3);
+
+            int priceConcurrency = 8;
+            List<ShortViewResponse> responses = Flux.fromIterable(recommendedStocks)
+                    .flatMap(stock ->
+                            shortViewService.getRealTimeStockPrice(stock)
+                                    .timeout(Duration.ofMillis(800))
+                                    .filter(stockInfo -> {
+                                        boolean valid = isValidPriceInfo(stockInfo);
+                                        if (!valid) {
+                                            log.warn("유효하지 않은 가격 정보로 제외합니다. stock_id: {}", stock.getId());
+                                        }
+                                        return valid;
+                                    })
+                                    .map(stockInfo -> ShortViewResponse.fromEntityWithPrice(
+                                            stock,
+                                            stockInfo,
+                                            latestScoreMap.get(stock.getId()),
+                                            keywordsByStockId.getOrDefault(stock.getId(), List.of())
+                                    ))
+                                    .onErrorResume(e -> {
+                                        log.warn("실시간 가격 조회 실패로 제외합니다. stock_id: {}, error: {}", 
+                                                stock.getId(), e.getMessage());
+                                        return Mono.empty();
+                                    }),
+                            priceConcurrency
+                    )
+                    .take(recommendTargetCount)
+                    .collectList()
+                    .block();
+
+            if (responses == null) {
+                responses = new ArrayList<>();
             }
 
             if (responses.isEmpty()) {

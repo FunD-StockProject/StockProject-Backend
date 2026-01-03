@@ -4,6 +4,7 @@ import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockInfoResponse;
 import com.fund.stockProject.stock.entity.Stock;
+import com.fund.stockProject.score.entity.Score;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
@@ -90,6 +91,38 @@ public class ShortViewResponse {
 
         COUNTRY country = getCountryFromExchangeNum(stock.getExchangeNum());
         
+        return ShortViewResponse.builder()
+                .stockId(stock.getId())
+                .imageUrl(stock.getImageUrl())
+                .stockName(stock.getSymbolName())
+                .price(stockInfo.getPrice())
+                .priceDiff(stockInfo.getPriceDiff())
+                .priceDiffPerCent(stockInfo.getPriceDiffPerCent())
+                .score(score)
+                .diff(scoreDiff)
+                .keywords(keywordList)
+                .country(country)
+                .build();
+    }
+
+    /**
+     * Stock 엔티티와 실시간 가격, 최신 점수/키워드 정보를 결합하여 DTO로 변환합니다.
+     */
+    public static ShortViewResponse fromEntityWithPrice(Stock stock, StockInfoResponse stockInfo, Score latestScore,
+                                                       List<String> keywords) {
+        int score = 0;
+        int scoreDiff = 0;
+        if (latestScore != null) {
+            score = isKoreaStock(stock) ? latestScore.getScoreKorea() : latestScore.getScoreOversea();
+            scoreDiff = latestScore.getDiff();
+        }
+
+        List<String> keywordList = keywords == null ? List.of() : keywords.stream()
+                .limit(3)
+                .collect(Collectors.toList());
+
+        COUNTRY country = getCountryFromExchangeNum(stock.getExchangeNum());
+
         return ShortViewResponse.builder()
                 .stockId(stock.getId())
                 .imageUrl(stock.getImageUrl())
