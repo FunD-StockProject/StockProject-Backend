@@ -9,6 +9,7 @@ import com.fund.stockProject.preference.dto.BookmarkInfoResponse;
 import com.fund.stockProject.preference.dto.StockPreferenceResponse;
 import com.fund.stockProject.preference.entity.Preference;
 import com.fund.stockProject.preference.repository.PreferenceRepository;
+import com.fund.stockProject.shortview.service.ShortViewService;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.EXCHANGENUM;
 import com.fund.stockProject.stock.dto.response.StockInfoResponse;
@@ -29,6 +30,7 @@ public class PreferenceService {
     private final UserRepository userRepository;
     private final StockRepository stockRepository;
     private final SecurityService securityService;
+    private final ShortViewService shortViewService;
 
     @Transactional
     public void addBookmark(Integer stockId) {
@@ -78,10 +80,12 @@ public class PreferenceService {
 
     public void hideStock(Integer stockId) {
         setPreference(stockId, PreferenceType.NEVER_SHOW);
+        shortViewService.evictUserRecommendationCache(getCurrentUserId());
     }
 
     public void showStock(Integer stockId) {
         removePreference(stockId, PreferenceType.NEVER_SHOW);
+        shortViewService.evictUserRecommendationCache(getCurrentUserId());
     }
 
     /**
