@@ -48,6 +48,7 @@ public class ShortViewService {
     // userId -> Set<stockId> (최근 50개까지 저장)
     private static final Map<Integer, Set<Integer>> recentRecommendations = new ConcurrentHashMap<>();
     private static final int MAX_RECENT_RECOMMENDATIONS = 50; // 최근 50개까지만 저장
+    private static final int RECOMMEND_POOL_SIZE = 20; // 필터링 대비 후보 풀
 
     /**
      * 사용자에게 추천할 주식 엔티티를 반환하는 메인 메서드입니다.
@@ -290,19 +291,18 @@ public class ShortViewService {
     }
 
     /**
-     * 사용자에게 추천할 주식 ID를 5개 반환합니다.
+     * 사용자에게 추천할 주식 ID를 반환합니다.
      * 가중치 기반 랜덤 선택을 사용하여 다양성을 확보하고, 중복을 방지합니다.
      * 이전 추천과의 중복을 완전히 방지합니다.
      *
      * Redis 캐시: 5분간 동일한 추천 결과 반환 (성능 최적화)
      *
      * @param user 현재 로그인한 사용자
-     * @return 추천된 주식 ID 리스트 (최대 5개)
+     * @return 추천된 주식 ID 리스트 (최대 RECOMMEND_POOL_SIZE개)
      */
     @Cacheable(value = "shortview", key = "#user.id")
     public List<Integer> getRecommendedStockIds(User user) {
-        final int RECOMMEND_COUNT = 5;
-        log.info("사용자(id:{})에게 가중치 기반 주식 추천을 시작합니다. (추천 개수: {})", user.getId(), RECOMMEND_COUNT);
+        log.info("사용자(id:{})에게 가중치 기반 주식 추천을 시작합니다. (추천 개수: {})", user.getId(), RECOMMEND_POOL_SIZE);
         
         // 사용자가 "다시 보지 않음"으로 설정한 종목 ID 목록 조회 (성능 최적화: stockId만 직접 조회)
         Set<Integer> hiddenStockIds = new HashSet<>(
@@ -370,7 +370,7 @@ public class ShortViewService {
         
         // 가중치 기반 랜덤 선택으로 중복 없이 여러 개 선택
         Random random = new Random(System.currentTimeMillis() + user.getId());
-        List<Stock> recommendedStocks = selectMultipleWeightedRandom(stocksWithWeight, random, RECOMMEND_COUNT);
+        List<Stock> recommendedStocks = selectMultipleWeightedRandom(stocksWithWeight, random, RECOMMEND_POOL_SIZE);
 
         // 추천한 종목을 메모리 캐시에 저장 (이전 추천과 중복 방지)
         List<Integer> recommendedStockIds = recommendedStocks.stream()

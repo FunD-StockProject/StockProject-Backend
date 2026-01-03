@@ -1,5 +1,6 @@
 package com.fund.stockProject.shortview.controller;
 
+import com.fund.stockProject.stock.dto.response.StockInfoResponse;
 import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.user.entity.User;
 import com.fund.stockProject.security.principle.CustomUserDetails;
@@ -14,6 +15,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -53,6 +56,7 @@ public class ShortViewController {
             User currentUser = userDetails.getUser();
             log.info("회원(id:{})이 추천을 요청했습니다.", currentUser.getId());
             
+            final int recommendTargetCount = 5;
             List<Integer> recommendedStockIds = shortViewService.getRecommendedStockIds(currentUser);
             
             if (recommendedStockIds.isEmpty()) {
@@ -60,26 +64,55 @@ public class ShortViewController {
             }
             
             List<Stock> recommendedStocks = shortViewService.getStocksByIds(recommendedStockIds);
+            Collections.shuffle(recommendedStocks);
             log.info("회원(id:{})에게 주식 {}개를 추천했습니다.", currentUser.getId(), recommendedStocks.size());
             
-            // 각 주식에 대해 실시간 가격 정보 조회
-            List<ShortViewResponse> responses = recommendedStocks.stream()
-                    .map(stock -> {
-                        try {
-                            var stockInfo = shortViewService.getRealTimeStockPriceSync(stock);
-                            return ShortViewResponse.fromEntityWithPrice(stock, stockInfo);
-                        } catch (Exception e) {
-                            log.warn("실시간 가격 조회 실패, 기본 정보로 응답합니다. stock_id: {}, error: {}", 
-                                    stock.getId(), e.getMessage());
-                            return ShortViewResponse.fromEntity(stock);
-                        }
-                    })
-                    .collect(java.util.stream.Collectors.toList());
+            // 각 주식에 대해 실시간 가격 정보 조회 (가격 정보가 유효한 경우만 응답에 포함)
+            List<ShortViewResponse> responses = new ArrayList<>();
+            for (Stock stock : recommendedStocks) {
+                try {
+                    var stockInfo = shortViewService.getRealTimeStockPriceSync(stock);
+                    if (!isValidPriceInfo(stockInfo)) {
+                        log.warn("유효하지 않은 가격 정보로 제외합니다. stock_id: {}", stock.getId());
+                        continue;
+                    }
+                    responses.add(ShortViewResponse.fromEntityWithPrice(stock, stockInfo));
+                    if (responses.size() >= recommendTargetCount) {
+                        break;
+                    }
+                } catch (Exception e) {
+                    log.warn("실시간 가격 조회 실패로 제외합니다. stock_id: {}, error: {}", 
+                            stock.getId(), e.getMessage());
+                }
+            }
+
+            if (responses.isEmpty()) {
+                return ResponseEntity.noContent().build();
+            }
             
             return ResponseEntity.ok(responses);
         }
 
         // 비회원인 경우 401 Unauthorized 반환
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+
+    private boolean isValidPriceInfo(StockInfoResponse stockInfo) {
+        if (stockInfo == null) {
+            return false;
+        }
+        Double price = stockInfo.getPrice();
+        Double priceDiff = stockInfo.getPriceDiff();
+        Double priceDiffPerCent = stockInfo.getPriceDiffPerCent();
+        if (price == null || price <= 0 || !Double.isFinite(price)) {
+            return false;
+        }
+        if (priceDiff == null || !Double.isFinite(priceDiff)) {
+            return false;
+        }
+        if (priceDiffPerCent == null || !Double.isFinite(priceDiffPerCent)) {
+            return false;
+        }
+        return true;
     }
 }
