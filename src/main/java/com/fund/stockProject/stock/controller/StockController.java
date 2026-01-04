@@ -5,9 +5,7 @@ import com.fund.stockProject.stock.domain.COUNTRY;
 import com.fund.stockProject.stock.domain.DomesticSector;
 import com.fund.stockProject.stock.domain.OverseasSector;
 import com.fund.stockProject.stock.dto.response.*;
-import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.service.StockService;
-import com.fund.stockProject.stock.service.SecurityService;
 import com.fund.stockProject.shortview.dto.ShortViewResponse;
 import com.fund.stockProject.common.dto.PageResponse;
 
@@ -39,7 +37,6 @@ import reactor.core.publisher.Mono;
 public class StockController {
 
     private final StockService stockService;
-    private final SecurityService securityService;
 
     @GetMapping("/search/{searchKeyword}/{country}")
     @Operation(summary = "주식 종목 검색 API", description = "주식 종목 및 인간지표 데이터 검색")
@@ -116,10 +113,12 @@ public class StockController {
     }
 
     @GetMapping("/sector/domestic/{sector}/recommend")
-    @Operation(summary = "국내 섹터별 주식 추천", description = "특정 국내 섹터의 주식을 점수 기반으로 추천합니다. 실시간 시세 조회 실패 시 가격 필드는 null로 반환됩니다.")
-    public ResponseEntity<ShortViewResponse> getRecommendationByDomesticSector(
+    @Operation(summary = "국내 섹터별 주식 추천 (페이징)", description = "특정 국내 섹터의 주식을 점수 기반으로 추천합니다. 기본 정렬은 인간지표(score) 내림차순이며, 각 항목의 가격은 가능하면 실시간으로 조회해 포함하고 실패 시 null로 반환됩니다.")
+    public ResponseEntity<PageResponse<ShortViewResponse>> getRecommendationByDomesticSector(
             @io.swagger.v3.oas.annotations.Parameter(description = "추천할 국내 섹터", example = "RETAIL", required = true)
-            @PathVariable String sector
+            @PathVariable String sector,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "20") int size
     ) {
         try {
             // DomesticSector enum으로 변환
@@ -131,25 +130,13 @@ public class StockController {
                 return ResponseEntity.badRequest().build();
             }
 
-            log.info("DomesticSector({})별 추천을 요청했습니다.", sectorEnum);
+            log.info("DomesticSector({})별 추천(paged) 요청: page={}, size={}", sectorEnum, page, size);
 
-            Stock recommendedStock = stockService.getRecommendedStockByDomesticSector(sectorEnum);
-            if (recommendedStock != null) {
-                log.info("DomesticSector({})에서 주식({})을 추천했습니다.", sectorEnum, recommendedStock.getSymbolName());
-                
-                // 실시간 가격 정보를 동기적으로 가져오기
-                try {
-                    var stockInfo = securityService.getRealTimeStockPrice(recommendedStock).block();
-                    return ResponseEntity.ok(ShortViewResponse.fromEntityWithPrice(recommendedStock, stockInfo));
-                } catch (Exception e) {
-                    log.warn("실시간 가격 조회 실패, 기본 정보로 응답합니다. stock_id: {}, error: {}", 
-                            recommendedStock.getId(), e.getMessage());
-                    return ResponseEntity.ok(ShortViewResponse.fromEntity(recommendedStock));
-                }
-            } else {
-                log.warn("DomesticSector({})에 대한 추천 주식을 찾을 수 없습니다. (유효한 주식이 없거나 점수가 없음)", sectorEnum);
-                return ResponseEntity.noContent().build();
-            }
+            int safeSize = Math.max(1, Math.min(size, 100));
+            int safePage = Math.max(0, page);
+
+            var pageResp = stockService.getRecommendedStocksByDomesticSectorPaged(sectorEnum, safePage, safeSize);
+            return ResponseEntity.ok(pageResp);
         } catch (Exception e) {
             log.error("DomesticSector별 추천 중 오류 발생: {}", sector, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
