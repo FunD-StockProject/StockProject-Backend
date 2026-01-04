@@ -1025,6 +1025,88 @@ public class StockService {
     }
 
     /**
+     * 국내 섹터 추천을 페이징으로 제공합니다. 정렬 기준은 인간지표(점수) 내림차순입니다.
+     * 가격은 가능하면 실시간으로 조회해 포함하고 실패 시 null로 반환됩니다.
+     */
+    public PageResponse<ShortViewResponse> getRecommendedStocksByDomesticSectorPaged(
+        DomesticSector sector, int page, int size) {
+        if (sector == null || sector == DomesticSector.UNKNOWN) {
+            return PageResponse.<ShortViewResponse>builder()
+                .items(java.util.List.of())
+                .page(page)
+                .size(size)
+                .totalElements(0)
+                .totalPages(0)
+                .build();
+        }
+
+        List<Stock> validStocks = stockRepository.findValidStocksByDomesticSector(sector);
+        if (validStocks.isEmpty()) {
+            return PageResponse.<ShortViewResponse>builder()
+                .items(java.util.List.of())
+                .page(page)
+                .size(size)
+                .totalElements(0)
+                .totalPages(0)
+                .build();
+        }
+
+        List<Integer> candidateStockIds = validStocks.stream().map(Stock::getId).toList();
+        LocalDate today = LocalDate.now();
+        List<Score> todayScores = scoreRepository.findTodayScoresByStockIds(candidateStockIds, today);
+        List<Score> latestScores = scoreRepository.findLatestScoresByStockIds(candidateStockIds);
+
+        Map<Integer, Score> scoreMap = new HashMap<>();
+        todayScores.forEach(s -> scoreMap.put(s.getStockId(), s));
+        latestScores.forEach(s -> scoreMap.putIfAbsent(s.getStockId(), s));
+
+        // Filter stocks with valid score (not 9999)
+        List<Stock> stocksWithScore = validStocks.stream()
+            .filter(stock -> {
+                Score sc = scoreMap.get(stock.getId());
+                if (sc == null) return false;
+                int val = getScoreByCountry(sc, stock.getExchangeNum());
+                return val != 9999;
+            })
+            .toList();
+
+        // sort by score desc
+        List<Stock> sorted = stocksWithScore.stream()
+            .sorted((a, b) -> {
+                int sa = getScoreByCountry(scoreMap.get(a.getId()), a.getExchangeNum());
+                int sb = getScoreByCountry(scoreMap.get(b.getId()), b.getExchangeNum());
+                return Integer.compare(sb, sa);
+            })
+            .toList();
+
+        final int total = sorted.size();
+        final int totalPages = (int) Math.ceil((double) total / size);
+        final int from = Math.min(page * size, total);
+        final int to = Math.min(from + size, total);
+
+        List<ShortViewResponse> items = sorted.subList(from, to).stream()
+            .map(stock -> {
+                try {
+                    var stockInfo = securityService.getRealTimeStockPrice(stock).block();
+                    if (stockInfo != null && stockInfo.getPrice() != null) {
+                        return ShortViewResponse.fromEntityWithPrice(stock, stockInfo);
+                    }
+                } catch (Exception e) {
+                    log.debug("실시간 가격 조회 실패(무시). stockId={}, error={}", stock.getId(), e.getMessage());
+                }
+                return ShortViewResponse.fromEntity(stock);
+            })
+            .toList();
+        return PageResponse.<ShortViewResponse>builder()
+                .items(items)
+                .page(page)
+                .size(size)
+                .totalElements(total)
+                .totalPages(totalPages)
+                .build();
+    }
+
+    /**
      * 특정 OverseasSector의 주식을 추천합니다.
      * 점수 기반 가중치 랜덤 추천을 사용합니다.
      * 
