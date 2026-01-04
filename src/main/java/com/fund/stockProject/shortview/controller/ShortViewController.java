@@ -96,13 +96,16 @@ public class ShortViewController {
                 }
             }
 
-            int neededCount = recommendTargetCount - responses.size();
-            if (neededCount > 0 && !remainingStocks.isEmpty()) {
+            if (responses.size() < recommendTargetCount && !remainingStocks.isEmpty()) {
+                int neededCount = recommendTargetCount - responses.size();
                 int priceConcurrency = 8;
+                Duration perCallTimeout = Duration.ofMillis(600);
+                Duration overallTimeout = Duration.ofMillis(900);
+
                 List<ShortViewResponse> fetched = Flux.fromIterable(remainingStocks)
                         .flatMap(stock ->
                                 shortViewService.getRealTimeStockPrice(stock)
-                                        .timeout(Duration.ofMillis(600))
+                                        .timeout(perCallTimeout)
                                         .filter(stockInfo -> {
                                             boolean valid = isValidPriceInfo(stockInfo);
                                             if (!valid) {
@@ -124,12 +127,16 @@ public class ShortViewController {
                                 priceConcurrency
                         )
                         .take(neededCount)
-                        .take(Duration.ofMillis(1200))
+                        .take(overallTimeout)
                         .collectList()
                         .block();
 
                 if (fetched != null) {
                     responses.addAll(fetched);
+                }
+
+                if (responses.size() < recommendTargetCount) {
+                    shortViewService.prefetchRealTimePrices(remainingStocks);
                 }
             }
 
