@@ -10,6 +10,7 @@ import com.fund.stockProject.stock.entity.Stock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1041,7 +1042,19 @@ public class SecurityService {
             return null;
         }
 
-        return cache.get(cacheKey, StockInfoResponse.class);
+        Cache.ValueWrapper wrapper = cache.get(cacheKey);
+        if (wrapper == null) {
+            return null;
+        }
+
+        Object value = wrapper.get();
+        if (value instanceof StockInfoResponse) {
+            return (StockInfoResponse) value;
+        }
+        if (value instanceof Map) {
+            return objectMapper.convertValue(value, StockInfoResponse.class);
+        }
+        return null;
     }
 
     private void putStockPriceCache(Stock stock, StockInfoResponse response) {
