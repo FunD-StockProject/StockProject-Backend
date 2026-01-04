@@ -4,6 +4,7 @@ import com.fund.stockProject.experiment.dto.ExperimentReportResponse;
 import com.fund.stockProject.experiment.dto.ExperimentSimpleResponse;
 import com.fund.stockProject.experiment.dto.ExperimentStatusDetailResponse;
 import com.fund.stockProject.experiment.dto.ExperimentStatusResponse;
+import com.fund.stockProject.experiment.dto.HumanIndicatorDistributionResponse;
 import com.fund.stockProject.experiment.service.ExperimentService;
 import com.fund.stockProject.security.principle.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -95,5 +96,14 @@ public class ExperimentController {
     public ResponseEntity<ExperimentReportResponse> getReport(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails customUserDetails) {
         return ResponseEntity.ok(experimentService.getReport(customUserDetails));
+    }
+
+    @GetMapping("/distribution")
+    @Operation(
+            summary = "인간지표 등급 분포 조회",
+            description = "완료된 실험 1건 이상 유저 기준으로 인간지표 등급 비율을 조회합니다."
+    )
+    public ResponseEntity<HumanIndicatorDistributionResponse> getHumanIndicatorDistribution() {
+        return ResponseEntity.ok(experimentService.getHumanIndicatorDistribution());
     }
 }

@@ -3,6 +3,7 @@ package com.fund.stockProject.portfolio.dto;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -51,6 +52,7 @@ public class PortfolioResultResponse {
         private double successRate;   // 성공률
         private int totalBuyCount;    // 종목 구매 횟수
         private int successCount;     // 오르는 종목 개수
+        private Map<String, Integer> distribution; // 등급별 유저 비율
     }
 
     @Getter
@@ -80,5 +82,4 @@ public class PortfolioResultResponse {
         }
     }
 }
-
 

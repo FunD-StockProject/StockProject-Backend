@@ -106,6 +106,9 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
         + "WHERE a.ratio BETWEEN :startRange AND :endRange", nativeQuery = true)
     int countSameGradeUser(@Param("startRange") int startRange, @Param("endRange") int endRange);
 
+    @Query("SELECT COUNT(DISTINCT e.user.id) FROM Experiment e WHERE e.status = 'COMPLETE'")
+    long countUsersWithCompletedExperiments();
+
     @Query(value = "SELECT "
         + "    sub.buy_date, "
         + "    ROUND(AVG(sub.roi), 1) AS avg_roi, "
