@@ -25,6 +25,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
+import java.time.Duration;
 
 /**
  * 🚀 숏뷰 주식 추천 서비스
@@ -503,5 +505,18 @@ public class ShortViewService {
 
     public StockInfoResponse getCachedRealTimeStockPrice(Stock stock) {
         return securityService.getCachedRealTimeStockPrice(stock);
+    }
+
+    public void prefetchRealTimePrices(List<Stock> stocks) {
+        if (stocks == null || stocks.isEmpty()) {
+            return;
+        }
+
+        int priceConcurrency = 8;
+        Flux.fromIterable(stocks)
+                .flatMap(stock -> securityService.getRealTimeStockPrice(stock)
+                        .timeout(Duration.ofMillis(800))
+                        .onErrorResume(e -> Mono.empty()), priceConcurrency)
+                .subscribe();
     }
 }
