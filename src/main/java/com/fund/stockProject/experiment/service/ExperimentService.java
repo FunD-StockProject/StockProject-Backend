@@ -9,6 +9,7 @@ import com.fund.stockProject.experiment.dto.ExperimentStatusDetailResponse;
 import com.fund.stockProject.experiment.dto.ExperimentStatusDetailResponse.TradeInfo;
 import com.fund.stockProject.experiment.dto.ExperimentStatusResponse;
 import com.fund.stockProject.experiment.dto.ExperimentInfoResponse;
+import com.fund.stockProject.experiment.dto.HumanIndicatorDistributionResponse;
 import com.fund.stockProject.experiment.dto.ReportPatternDto;
 import com.fund.stockProject.experiment.dto.ReportStatisticDto;
 import com.fund.stockProject.experiment.entity.Experiment;
@@ -31,7 +32,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -662,8 +665,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
         // 동일 등급 전체 유저 비율 계산
         final int countSameGradeUser = experimentRepository.countSameGradeUser(startRange, endRange);
-        final long userCount = userRepository.count();
-        long sameGradeUserRage = (countSameGradeUser * 100L / userCount);
+        final long completedUserCount = experimentRepository.countUsersWithCompletedExperiments();
+        long sameGradeUserRage = completedUserCount == 0 ? 0 : (countSameGradeUser * 100L / completedUserCount);
 
         final List<ReportPatternDto> reportPatternDtos = new ArrayList<>();
 
@@ -755,8 +758,23 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             endRange = 100;
         }
         final int countSameGradeUser = experimentRepository.countSameGradeUser(startRange, endRange);
-        final long userCount = userRepository.count();
-        int sameGradePercentile = userCount == 0 ? 0 : (int) (countSameGradeUser * 100L / userCount);
+        final long completedUserCount = experimentRepository.countUsersWithCompletedExperiments();
+        int sameGradePercentile = completedUserCount == 0 ? 0 : (int) (countSameGradeUser * 100L / completedUserCount);
+
+        Map<String, Integer> distribution = new LinkedHashMap<>();
+        if (completedUserCount == 0) {
+            distribution.put("worst", 0);
+            distribution.put("bad", 0);
+            distribution.put("normal", 0);
+            distribution.put("good", 0);
+            distribution.put("best", 0);
+        } else {
+            distribution.put("worst", (int) (experimentRepository.countSameGradeUser(0, 20) * 100L / completedUserCount));
+            distribution.put("bad", (int) (experimentRepository.countSameGradeUser(21, 40) * 100L / completedUserCount));
+            distribution.put("normal", (int) (experimentRepository.countSameGradeUser(41, 60) * 100L / completedUserCount));
+            distribution.put("good", (int) (experimentRepository.countSameGradeUser(61, 80) * 100L / completedUserCount));
+            distribution.put("best", (int) (experimentRepository.countSameGradeUser(81, 100) * 100L / completedUserCount));
+        }
 
         // 최고/최저 수익률 실험의 점수 산출
         Integer bestYieldScore = null;
@@ -879,6 +897,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .successRate(Math.round(successRateVal * 10) / 10.0)
             .totalBuyCount((int) totalCompleted)
             .successCount((int) profitCount)
+            .distribution(distribution)
             .build();
 
         PortfolioResultResponse.Pattern pattern = PortfolioResultResponse.Pattern.builder()
@@ -891,6 +910,30 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .recommend(recommend)
             .humanIndicator(humanIndicator)
             .pattern(pattern)
+            .build();
+    }
+
+    @Transactional(readOnly = true)
+    public HumanIndicatorDistributionResponse getHumanIndicatorDistribution() {
+        final long completedUserCount = experimentRepository.countUsersWithCompletedExperiments();
+        Map<String, Integer> distribution = new LinkedHashMap<>();
+        if (completedUserCount == 0) {
+            distribution.put("worst", 0);
+            distribution.put("bad", 0);
+            distribution.put("normal", 0);
+            distribution.put("good", 0);
+            distribution.put("best", 0);
+        } else {
+            distribution.put("worst", (int) (experimentRepository.countSameGradeUser(0, 20) * 100L / completedUserCount));
+            distribution.put("bad", (int) (experimentRepository.countSameGradeUser(21, 40) * 100L / completedUserCount));
+            distribution.put("normal", (int) (experimentRepository.countSameGradeUser(41, 60) * 100L / completedUserCount));
+            distribution.put("good", (int) (experimentRepository.countSameGradeUser(61, 80) * 100L / completedUserCount));
+            distribution.put("best", (int) (experimentRepository.countSameGradeUser(81, 100) * 100L / completedUserCount));
+        }
+
+        return HumanIndicatorDistributionResponse.builder()
+            .totalUsers(completedUserCount)
+            .distribution(distribution)
             .build();
     }
 
