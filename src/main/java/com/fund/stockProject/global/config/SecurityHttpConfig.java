@@ -3,6 +3,7 @@ package com.fund.stockProject.global.config;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,6 +29,15 @@ public class SecurityHttpConfig {
 
     private volatile String accessToken;
     private volatile LocalDateTime expiredDateTime = LocalDateTime.now();
+
+    @PostConstruct
+    public void warmUpAccessToken() {
+        try {
+            refreshTokenIfNeeded();
+        } catch (Exception e) {
+            log.warn("Access token warm-up failed. It will retry on demand. error: {}", e.getMessage());
+        }
+    }
 
     @Bean
     public WebClient webClient() {
