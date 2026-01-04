@@ -398,6 +398,17 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         final DayOfWeek dayOfWeek = now.getDayOfWeek(); // 요일
         Double price = 0.0d;
 
+        // 진행 중인 동일 종목 실험이 있으면 중복 매수 불가
+        Optional<Experiment> progressExperiment = experimentRepository.findProgressExperimentByUserAndStock(
+            user.getId(), stockId);
+        if (progressExperiment.isPresent()) {
+            return ExperimentSimpleResponse.builder()
+                .message("진행 중인 동일 종목이 있습니다")
+                .success(false)
+                .price(0.0d)
+                .build();
+        }
+
         // Score 조회 및 검증 - 오늘 날짜 우선, 없으면 최신 점수 사용
         Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(stockId, LocalDate.now());
         if (scoreOptional.isEmpty()) {
@@ -441,7 +452,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
         if (stockInfoResponse.getCountry().equals(COUNTRY.KOREA)) {
             score = findByStockIdAndDate.getScoreKorea();
-            final Optional<Experiment> experimentByStockIdAndBuyAt = experimentRepository.findExperimentByStockIdForToday(stockId, startOfToday, endOfToday);
+            final Optional<Experiment> experimentByStockIdAndBuyAt = experimentRepository.findExperimentByStockIdForTodayAndUser(
+                stockId, user.getId(), startOfToday, endOfToday);
 
             // 하루에 같은 종목 중복 구매 불가 처리
             if (experimentByStockIdAndBuyAt.isPresent()) {
@@ -477,7 +489,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             score = findByStockIdAndDate.getScoreOversea();
 
             // 해당 구간에 이미 매수한 경우 중복 매수 방지
-            Optional<Experiment> existingItem = experimentRepository.findExperimentByStockIdForToday(stockId, startOfToday, endOfToday);
+            Optional<Experiment> existingItem = experimentRepository.findExperimentByStockIdForTodayAndUser(
+                stockId, user.getId(), startOfToday, endOfToday);
 
             if (existingItem.isPresent()) {
                 return ExperimentSimpleResponse.builder()
