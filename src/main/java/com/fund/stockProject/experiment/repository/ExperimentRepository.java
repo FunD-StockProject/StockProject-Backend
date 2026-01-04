@@ -31,6 +31,12 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
     @Query("SELECT e FROM Experiment e WHERE e.stock.id = :stockId AND e.buyAt BETWEEN :startOfDay and :endOfDay")
     Optional<Experiment> findExperimentByStockIdForToday(@Param("stockId") Integer stockId, @Param("startOfDay") LocalDateTime startOfDay, @Param("endOfDay") LocalDateTime endOfDay); // 금일 진행중인 실험 상세정보
 
+    @Query("SELECT e FROM Experiment e WHERE e.stock.id = :stockId AND e.user.id = :userId AND e.buyAt BETWEEN :startOfDay and :endOfDay")
+    Optional<Experiment> findExperimentByStockIdForTodayAndUser(@Param("stockId") Integer stockId, @Param("userId") Integer userId, @Param("startOfDay") LocalDateTime startOfDay, @Param("endOfDay") LocalDateTime endOfDay);
+
+    @Query("SELECT e FROM Experiment e WHERE e.stock.id = :stockId AND e.user.id = :userId AND e.status = 'PROGRESS'")
+    Optional<Experiment> findProgressExperimentByUserAndStock(@Param("userId") Integer userId, @Param("stockId") Integer stockId);
+
     @Query("SELECT count(e) FROM Experiment e WHERE e.buyAt BETWEEN :startOfWeek and :endOfWeek")
     int countExperimentsForWeek(@Param("startOfWeek") LocalDateTime startOfWeek, @Param("endOfWeek") LocalDateTime endOfWeek);
 
