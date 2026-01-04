@@ -16,13 +16,59 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
     
     // 사용자별 알림 목록 조회 (최신순)
     Page<Notification> findByUserIdOrderByCreatedAtDesc(Integer userId, Pageable pageable);
+
+    // 유효한 알림 목록 조회 (점수 변동 알림은 유효한 점수만)
+    @Query("""
+        SELECT n FROM Notification n
+        WHERE n.user.id = :userId
+        AND (
+            n.notificationType <> :scoreSpike
+            OR (n.changeAbs IS NOT NULL AND n.changeAbs <> 0 AND n.oldScore IS NOT NULL AND n.newScore IS NOT NULL)
+        )
+        ORDER BY n.createdAt DESC
+    """)
+    Page<Notification> findValidByUserIdOrderByCreatedAtDesc(
+            @Param("userId") Integer userId,
+            @Param("scoreSpike") NotificationType scoreSpike,
+            Pageable pageable);
     
     // 특정 타입의 알림 조회
     Page<Notification> findByUserIdAndNotificationTypeOrderByCreatedAtDesc(
             Integer userId, NotificationType notificationType, Pageable pageable);
+
+    // 유효한 특정 타입의 알림 조회
+    @Query("""
+        SELECT n FROM Notification n
+        WHERE n.user.id = :userId
+        AND n.notificationType = :notificationType
+        AND (
+            :notificationType <> :scoreSpike
+            OR (n.changeAbs IS NOT NULL AND n.changeAbs <> 0 AND n.oldScore IS NOT NULL AND n.newScore IS NOT NULL)
+        )
+        ORDER BY n.createdAt DESC
+    """)
+    Page<Notification> findValidByUserIdAndNotificationTypeOrderByCreatedAtDesc(
+            @Param("userId") Integer userId,
+            @Param("notificationType") NotificationType notificationType,
+            @Param("scoreSpike") NotificationType scoreSpike,
+            Pageable pageable);
     
     // 읽지 않은 알림 개수
     long countByUserIdAndIsReadFalse(Integer userId);
+
+    // 유효한 읽지 않은 알림 개수
+    @Query("""
+        SELECT COUNT(n) FROM Notification n
+        WHERE n.user.id = :userId
+        AND n.isRead = false
+        AND (
+            n.notificationType <> :scoreSpike
+            OR (n.changeAbs IS NOT NULL AND n.changeAbs <> 0 AND n.oldScore IS NOT NULL AND n.newScore IS NOT NULL)
+        )
+    """)
+    long countValidByUserIdAndIsReadFalse(
+            @Param("userId") Integer userId,
+            @Param("scoreSpike") NotificationType scoreSpike);
     
     // 모든 알림 읽음 처리
     @Modifying

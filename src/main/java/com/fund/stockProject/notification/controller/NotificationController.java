@@ -50,7 +50,8 @@ public class NotificationController {
             @PageableDefault(size = 20) @Parameter(description = "페이지네이션 정보(page, size, sort)") Pageable pageable) {
 
         Integer userId = userDetails.getUser().getId();
-        Page<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+        Page<Notification> notifications = notificationRepository.findValidByUserIdOrderByCreatedAtDesc(
+                userId, NotificationType.SCORE_SPIKE, pageable);
 
         Page<NotificationResponse> response = notifications.map(NotificationResponse::fromEntity);
         return ResponseEntity.ok(response);
@@ -119,7 +120,8 @@ public class NotificationController {
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails userDetails) {
 
         Integer userId = userDetails.getUser().getId();
-        long count = notificationRepository.countByUserIdAndIsReadFalse(userId);
+        long count = notificationRepository.countValidByUserIdAndIsReadFalse(
+                userId, NotificationType.SCORE_SPIKE);
         return ResponseEntity.ok(Map.of("unreadCount", (int) count));
     }
 
@@ -138,8 +140,8 @@ public class NotificationController {
             @PageableDefault(size = 20) @Parameter(description = "페이지네이션 정보") Pageable pageable) {
 
         Integer userId = userDetails.getUser().getId();
-        Page<Notification> notifications = notificationRepository.findByUserIdAndNotificationTypeOrderByCreatedAtDesc(
-                userId, notificationType, pageable);
+        Page<Notification> notifications = notificationRepository.findValidByUserIdAndNotificationTypeOrderByCreatedAtDesc(
+                userId, notificationType, NotificationType.SCORE_SPIKE, pageable);
 
         Page<NotificationResponse> response = notifications.map(NotificationResponse::fromEntity);
         return ResponseEntity.ok(response);
