@@ -8,6 +8,8 @@ import com.fund.stockProject.auth.oauth2.GoogleOAuth2UserInfo;
 import com.fund.stockProject.auth.oauth2.KakaoOAuth2UserInfo;
 import com.fund.stockProject.auth.oauth2.NaverOAuth2UserInfo;
 import com.fund.stockProject.user.repository.UserRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +17,6 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Service
@@ -27,6 +28,7 @@ public class OAuth2Service {
     private final NaverService naverService;
     private final GoogleService googleService;
     private final AppleService appleService;
+    private final ObjectMapper objectMapper;
 
     public LoginResponse kakaoLogin(String code, String state) {
         String redirectUri = decodeState(state);
@@ -83,25 +85,51 @@ public class OAuth2Service {
     }
 
     public LoginResponse appleLogin(String code, String state) {
+        return appleLogin(code, state, null);
+    }
+
+    public LoginResponse appleLogin(String code, String state, String userJson) {
         String redirectUri = decodeState(state);
         // 1. 애플로 code + client_secret을 보내서 토큰(및 id_token) 받기
         AppleTokenResponse response = appleService.getAccessToken(code, redirectUri);
         // 2. id_token(JWT)에서 사용자 정보 추출 (이메일, sub=providerId 등)
         AppleOAuth2UserInfo appleUserInfo = appleService.getUserInfoFromIdToken(response.getIdToken());
 
-        Optional<User> userOptional = userRepository.findByEmail(appleUserInfo.getEmail());
+        String email = appleUserInfo.getEmail();
+        if ((email == null || email.isBlank()) && userJson != null && !userJson.isBlank()) {
+            email = extractAppleEmail(userJson).orElse(null);
+        }
+        if (email == null || email.isBlank()) {
+            throw new IllegalStateException("Apple email is missing");
+        }
+
+        Optional<User> userOptional = userRepository.findByEmail(email);
         if (userOptional.isEmpty()) {
-            return new LoginResponse("NEED_REGISTER", appleUserInfo.getEmail(), null, null, null, null);
+            return new LoginResponse("NEED_REGISTER", email, null, null, null, null);
         }
 
         User user = userOptional.get();
         user.updateSocialUserInfo(PROVIDER.APPLE, appleUserInfo.getProviderId(), response.getAccessToken(), response.getRefreshToken());
         userRepository.save(user);
 
-        return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
+        return tokenService.issueTokensOnLogin(email, user.getRole(), null);
     }
 
 
+
+    private Optional<String> extractAppleEmail(String userJson) {
+        try {
+            JsonNode root = objectMapper.readTree(userJson);
+            JsonNode emailNode = root.get("email");
+            if (emailNode == null || emailNode.isNull()) {
+                return Optional.empty();
+            }
+            String email = emailNode.asText();
+            return email == null || email.isBlank() ? Optional.empty() : Optional.of(email);
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
 
 
     private String decodeState(String encodedState) {

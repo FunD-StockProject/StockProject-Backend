@@ -5,8 +5,10 @@ import com.fund.stockProject.auth.service.OAuth2Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -132,6 +134,41 @@ public class OAuth2Controller {
         } catch (Exception e) {
             log.error("Apple login failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(); // 500 Internal Server Error
+        }
+    }
+
+    @PostMapping(value = "/login/apple", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    @Operation(summary = "애플 로그인 (form_post)", description = "애플 form_post 응답을 처리합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그인 성공", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "404", description = "회원가입 필요", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "500", description = "외부 연동/서버 오류")
+    })
+    public ResponseEntity<LoginResponse> appleLoginFormPost(
+            @Parameter(description = "인가 코드", example = "c1d2e3f4...") @RequestParam String code,
+            @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/apple") @RequestParam String state,
+            @Parameter(description = "user") @RequestParam(required = false) String user,
+            @Parameter(description = "error", example = "invalid_request") @RequestParam(required = false) String error,
+            @Parameter(description = "error_description") @RequestParam(required = false, name = "error_description") String errorDescription) {
+        if (error != null && !error.isBlank()) {
+            log.warn("Apple login form_post error: {} - {}", error, errorDescription);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+
+        try {
+            log.info("Apple login (form_post) attempt - state: {}", state);
+            LoginResponse response = oAuth2Service.appleLogin(code, state, user);
+
+            if ("NEED_REGISTER".equals(response.getState())) {
+                log.info("Apple login (form_post) - registration required");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            log.info("Apple login (form_post) successful");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Apple login (form_post) failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
