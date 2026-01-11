@@ -40,10 +40,18 @@ public class SearchKeyword extends Core {
     @Column(nullable = false, length = 20)
     private COUNTRY country;
 
+    @Column(name = "search_count")
+    private Long searchCount;
+
     public static SearchKeyword of(String keyword, COUNTRY country) {
         return SearchKeyword.builder()
                 .keyword(keyword)
                 .country(country)
+                .searchCount(1L)
                 .build();
+    }
+
+    public void updateSearchCount(long searchCount) {
+        this.searchCount = searchCount;
     }
 }

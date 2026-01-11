@@ -66,8 +66,15 @@ public class StockService {
 
     private final int LIMITS = 9;
 
-    @Cacheable(value = "searchResult", key = "#searchKeyword + '_' + #country", unless = "#result == null")
     public Mono<StockInfoResponse> searchStockBySymbolName(final String searchKeyword,
+        final String country) {
+        return searchStockBySymbolNameCached(searchKeyword, country)
+            .doOnNext(result -> searchKeywordService.saveSearchKeyword(
+                searchKeyword, COUNTRY.valueOf(country)));
+    }
+
+    @Cacheable(value = "searchResult", key = "#searchKeyword + '_' + #country", unless = "#result == null")
+    public Mono<StockInfoResponse> searchStockBySymbolNameCached(final String searchKeyword,
         final String country) {
         List<EXCHANGENUM> koreaExchanges = List.of(EXCHANGENUM.KOSPI, EXCHANGENUM.KOSDAQ,
             EXCHANGENUM.KOREAN_ETF);
@@ -79,10 +86,6 @@ public class StockService {
 
         if (bySymbolNameAndCountryWithEnums.isPresent()) {
             final Stock stock = bySymbolNameAndCountryWithEnums.get();
-
-            COUNTRY countryEnum = COUNTRY.valueOf(country);
-            searchKeywordService.saveSearchKeyword(searchKeyword, countryEnum);
-
             return securityService.getSecurityStockInfoKorea(stock.getId(), stock.getSymbolName(),
                 stock.getSecurityName(), stock.getSymbol(), stock.getExchangeNum(),
                 getCountryFromExchangeNum(stock.getExchangeNum()));
