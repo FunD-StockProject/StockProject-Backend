@@ -1036,8 +1036,8 @@ public class StockService {
         if (sector == null || sector == DomesticSector.UNKNOWN) {
             return PageResponse.<ShortViewResponse>builder()
                 .items(java.util.List.of())
-                .page(page)
-                .size(size)
+                .page(0)
+                .size(20)
                 .totalElements(0)
                 .totalPages(0)
                 .build();
@@ -1073,21 +1073,18 @@ public class StockService {
             })
             .toList();
 
-        // sort by score desc
-        List<Stock> sorted = stocksWithScore.stream()
-            .sorted((a, b) -> {
-                int sa = getScoreByCountry(scoreMap.get(a.getId()), a.getExchangeNum());
-                int sb = getScoreByCountry(scoreMap.get(b.getId()), b.getExchangeNum());
-                return Integer.compare(sb, sa);
-            })
-            .toList();
+        // 사용자 요청에서의 페이징을 무시하고, 무작위로 20개를 추천합니다.
+        final int RECOMMEND_SIZE = 20;
 
-        final int total = sorted.size();
-        final int totalPages = (int) Math.ceil((double) total / size);
-        final int from = Math.min(page * size, total);
-        final int to = Math.min(from + size, total);
+        // Shuffle to pick random items (preserve stocksWithScore list)
+        java.util.List<Stock> shuffled = new java.util.ArrayList<>(stocksWithScore);
+        java.util.Collections.shuffle(shuffled, new Random(System.currentTimeMillis()));
 
-        List<ShortViewResponse> items = sorted.subList(from, to).stream()
+        final int total = shuffled.size();
+        final int totalPages = (int) Math.ceil((double) total / RECOMMEND_SIZE);
+
+        List<ShortViewResponse> items = shuffled.stream()
+            .limit(RECOMMEND_SIZE)
             .map(stock -> {
                 try {
                     var stockInfo = securityService.getRealTimeStockPrice(stock).block();
@@ -1102,8 +1099,8 @@ public class StockService {
             .toList();
         return PageResponse.<ShortViewResponse>builder()
                 .items(items)
-                .page(page)
-                .size(size)
+                .page(0)
+                .size(RECOMMEND_SIZE)
                 .totalElements(total)
                 .totalPages(totalPages)
                 .build();
@@ -1181,8 +1178,8 @@ public class StockService {
         if (sector == null || sector == OverseasSector.UNKNOWN) {
             return PageResponse.<ShortViewResponse>builder()
                 .items(java.util.List.of())
-                .page(page)
-                .size(size)
+                .page(0)
+                .size(20)
                 .totalElements(0)
                 .totalPages(0)
                 .build();
@@ -1218,21 +1215,18 @@ public class StockService {
             })
             .toList();
 
-        // sort by score desc
-        List<Stock> sorted = stocksWithScore.stream()
-            .sorted((a, b) -> {
-                int sa = getScoreByCountry(scoreMap.get(a.getId()), a.getExchangeNum());
-                int sb = getScoreByCountry(scoreMap.get(b.getId()), b.getExchangeNum());
-                return Integer.compare(sb, sa);
-            })
-            .toList();
+        // 사용자 요청에서의 페이징을 무시하고, 무작위로 20개를 추천합니다.
+        final int RECOMMEND_SIZE = 20;
 
-        final int total = sorted.size();
-        final int totalPages = (int) Math.ceil((double) total / size);
-        final int from = Math.min(page * size, total);
-        final int to = Math.min(from + size, total);
+        // Shuffle to pick random items (preserve stocksWithScore list)
+        java.util.List<Stock> shuffled = new java.util.ArrayList<>(stocksWithScore);
+        java.util.Collections.shuffle(shuffled, new Random(System.currentTimeMillis()));
 
-        List<ShortViewResponse> items = sorted.subList(from, to).stream()
+        final int total = shuffled.size();
+        final int totalPages = (int) Math.ceil((double) total / RECOMMEND_SIZE);
+
+        List<ShortViewResponse> items = shuffled.stream()
+            .limit(RECOMMEND_SIZE)
             .map(stock -> {
                 try {
                     var stockInfo = securityService.getRealTimeStockPrice(stock).block();
@@ -1247,8 +1241,8 @@ public class StockService {
             .toList();
         return PageResponse.<ShortViewResponse>builder()
                 .items(items)
-                .page(page)
-                .size(size)
+                .page(0)
+                .size(RECOMMEND_SIZE)
                 .totalElements(total)
                 .totalPages(totalPages)
                 .build();
