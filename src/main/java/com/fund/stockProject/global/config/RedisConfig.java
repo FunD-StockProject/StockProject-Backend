@@ -28,11 +28,7 @@ public class RedisConfig {
     public ObjectMapper redisCacheObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
-        // 캐시에 저장된 객체를 원래 타입으로 복원하기 위해 타입 정보를 포함
-        // (GenericJackson2JsonRedisSerializer 사용시 복원 시 LinkedHashMap으로 읽히는 문제 해결)
-        mapper.activateDefaultTyping(LaissezFaireSubTypeValidator.instance,
-            ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
-
+        // 타입 정보를 포함하지 않도록 설정 (클린한 JSON)
         return mapper;
     }
 
