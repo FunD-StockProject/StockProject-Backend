@@ -12,13 +12,14 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
+import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fund.stockProject.stock.dto.response.StockInfoResponse;
 
 @Configuration
 @EnableCaching
@@ -52,9 +53,17 @@ public class RedisConfig {
     @Bean
     public CacheManager cacheManager(
             RedisConnectionFactory connectionFactory,
-            RedisCacheConfiguration defaultCacheConfiguration) {
+            RedisCacheConfiguration defaultCacheConfiguration,
+            ObjectMapper redisCacheObjectMapper) {
 
         Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
+
+        @SuppressWarnings("unchecked")
+        RedisSerializer<Object> stockInfoSerializer =
+            (RedisSerializer<Object>) new Jackson2JsonRedisSerializer<>(StockInfoResponse.class);
+        ((Jackson2JsonRedisSerializer<?>) stockInfoSerializer).setObjectMapper(redisCacheObjectMapper);
+        RedisSerializationContext.SerializationPair<Object> stockInfoSerializationPair =
+            RedisSerializationContext.SerializationPair.fromSerializer(stockInfoSerializer);
 
         // 숏뷰 추천: 5분 캐시 (사용자별 추천 결과)
         cacheConfigurations.put("shortview",
@@ -62,7 +71,8 @@ public class RedisConfig {
 
         // 실시간 가격: 30초 캐시 (변동성 높음)
         cacheConfigurations.put("stockPrice",
-            defaultCacheConfiguration.entryTtl(Duration.ofSeconds(30)));
+            defaultCacheConfiguration.entryTtl(Duration.ofSeconds(30))
+                .serializeValuesWith(stockInfoSerializationPair));
 
         // 주식 정보: 1시간 캐시 (기본 정보, 변동 적음)
         cacheConfigurations.put("stockInfo",
@@ -70,7 +80,8 @@ public class RedisConfig {
 
         // 검색 결과: 30분 캐시
         cacheConfigurations.put("searchResult",
-            defaultCacheConfiguration.entryTtl(Duration.ofMinutes(30)));
+            defaultCacheConfiguration.entryTtl(Duration.ofMinutes(30))
+                .serializeValuesWith(stockInfoSerializationPair));
 
         // 유효한 주식 목록: 1시간 캐시
         cacheConfigurations.put("validStocks",
