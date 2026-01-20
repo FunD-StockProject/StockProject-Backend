@@ -77,6 +77,9 @@ public class FcmPushService {
                 // APNs Headers 추가 (iOS 앱 번들 ID와 일치해야 함)
                 apns.setAps(apsBuilder.build());
 
+                // APNs topic 설정 (필수: 앱의 Bundle Identifier)
+                apns.putHeader("apns-topic", "com.durumi99.humanzipyoapp");
+
                 // APNs 우선순위 설정
                 if (!silent) {
                     apns.putHeader("apns-priority", "10"); // 높은 우선순위
