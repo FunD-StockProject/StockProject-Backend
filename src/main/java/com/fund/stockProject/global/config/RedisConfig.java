@@ -58,10 +58,8 @@ public class RedisConfig {
 
         Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
 
-        @SuppressWarnings("unchecked")
-        RedisSerializer<Object> stockInfoSerializer =
-            (RedisSerializer<Object>) new Jackson2JsonRedisSerializer<>(StockInfoResponse.class);
-        ((Jackson2JsonRedisSerializer<?>) stockInfoSerializer).setObjectMapper(redisCacheObjectMapper);
+        Jackson2JsonRedisSerializer<Object> stockInfoSerializer =
+            new Jackson2JsonRedisSerializer<>(redisCacheObjectMapper, Object.class);
         RedisSerializationContext.SerializationPair<Object> stockInfoSerializationPair =
             RedisSerializationContext.SerializationPair.fromSerializer(stockInfoSerializer);
 
