@@ -3,6 +3,8 @@ package com.fund.stockProject.auth.service;
 import com.fund.stockProject.auth.dto.*;
 import com.fund.stockProject.user.entity.User;
 import com.fund.stockProject.user.repository.UserRepository;
+import com.fund.stockProject.experiment.repository.ExperimentRepository;
+import com.fund.stockProject.experiment.repository.ExperimentTradeItemRepository;
 import com.fund.stockProject.preference.repository.PreferenceRepository;
 import com.fund.stockProject.notification.repository.NotificationRepository;
 import com.fund.stockProject.notification.repository.UserDeviceTokenRepository;
@@ -31,6 +33,8 @@ public class AuthService {
     private final PreferenceRepository preferenceRepository;
     private final NotificationRepository notificationRepository;
     private final UserDeviceTokenRepository userDeviceTokenRepository;
+    private final ExperimentRepository experimentRepository;
+    private final ExperimentTradeItemRepository experimentTradeItemRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final S3Service s3Service;
     private final PasswordEncoder passwordEncoder;
@@ -74,19 +78,25 @@ public class AuthService {
 
         Integer userId = user.getId();
 
-        // 1. Preference 데이터 삭제 (외래 키 제약 조건 때문에 가장 먼저 삭제)
+        // 1. ExperimentTradeItem 삭제 (외래 키 제약 조건 때문에 가장 먼저 삭제)
+        experimentTradeItemRepository.deleteByUserId(userId);
+
+        // 2. Experiment 삭제
+        experimentRepository.deleteByUserId(userId);
+
+        // 3. Preference 데이터 삭제
         preferenceRepository.deleteByUserId(userId);
 
-        // 2. Notification 데이터 삭제
+        // 4. Notification 데이터 삭제
         notificationRepository.deleteByUserId(userId);
 
-        // 3. UserDeviceToken 데이터 삭제
+        // 5. UserDeviceToken 데이터 삭제
         userDeviceTokenRepository.deleteByUserId(userId);
 
-        // 4. RefreshToken 데이터 삭제 (email 기반)
+        // 6. RefreshToken 데이터 삭제 (email 기반)
         refreshTokenRepository.deleteByEmail(email);
 
-        // 5. 마지막으로 User 삭제
+        // 7. 마지막으로 User 삭제
         userRepository.delete(user);
     }
 
