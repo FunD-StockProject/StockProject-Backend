@@ -15,7 +15,7 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(
-                "http://192.168.0.4:5173", "http://localhost:5173", "https://stockvalue13.netlify.app", "https://zingy-quokka-fcfc59.netlify.app", "https://humanzipyo.com", "https://api.humanzipyo.com", "https://humanzipyo.com:5173"
+                "http://192.168.0.2:5173", "http://localhost:5173", "https://stockvalue13.netlify.app", "https://zingy-quokka-fcfc59.netlify.app", "https://humanzipyo.com", "https://api.humanzipyo.com", "https://humanzipyo.com:5173"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS","PATCH"));
         config.setAllowedHeaders(List.of("Origin", "Content-Type", "Accept", "Authorization"));
