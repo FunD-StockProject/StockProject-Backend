@@ -1,5 +1,6 @@
 package com.fund.stockProject.notification.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fund.stockProject.notification.domain.NotificationType;
 import com.fund.stockProject.notification.entity.Notification;
 import com.fund.stockProject.stock.domain.COUNTRY;
@@ -35,7 +36,8 @@ public class NotificationResponse {
     private String body;
     @Schema(description = "읽음 여부", example = "false")
     private Boolean isRead;
-    @Schema(description = "알림 생성 시각 (UTC ISO-8601)", example = "2025-08-24T12:34:56Z", type = "string", format = "date-time")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
+    @Schema(description = "알림 생성 시각 (UTC ISO-8601)", example = "2025-08-24T12:34:56.000Z", type = "string", format = "date-time")
     private Instant createdAt;
     
     @Schema(description = "종목 국가 정보 (KOREA 또는 OVERSEA)", example = "KOREA")
