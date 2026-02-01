@@ -769,11 +769,11 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             distribution.put("good", 0);
             distribution.put("best", 0);
         } else {
-            distribution.put("worst", (int) (experimentRepository.countSameGradeUser(0, 20) * 100L / completedUserCount));
-            distribution.put("bad", (int) (experimentRepository.countSameGradeUser(21, 40) * 100L / completedUserCount));
-            distribution.put("normal", (int) (experimentRepository.countSameGradeUser(41, 60) * 100L / completedUserCount));
-            distribution.put("good", (int) (experimentRepository.countSameGradeUser(61, 80) * 100L / completedUserCount));
-            distribution.put("best", (int) (experimentRepository.countSameGradeUser(81, 100) * 100L / completedUserCount));
+            distribution.put("worst", (int) (experimentRepository.countUsersBySuccessRateRange(0, 20) * 100L / completedUserCount));
+            distribution.put("bad", (int) (experimentRepository.countUsersBySuccessRateRange(20, 40) * 100L / completedUserCount));
+            distribution.put("normal", (int) (experimentRepository.countUsersBySuccessRateRange(40, 60) * 100L / completedUserCount));
+            distribution.put("good", (int) (experimentRepository.countUsersBySuccessRateRange(60, 80) * 100L / completedUserCount));
+            distribution.put("best", (int) (experimentRepository.countUsersBySuccessRateAtLeast(80) * 100L / completedUserCount));
         }
 
         // 최고/최저 수익률 실험의 점수 산출
