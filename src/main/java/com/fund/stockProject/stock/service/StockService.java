@@ -30,6 +30,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -818,6 +819,170 @@ public class StockService {
                 .scoreDiff(stock.getScores().get(0).getDiff())
                 .keywords(keywords)
                 .build();
+    }
+
+    public List<SectorAverageResponse> getSectorAverageScores(COUNTRY country) {
+        if (country == COUNTRY.KOREA) {
+            List<Score> scores = scoreRepository.findLatestValidScoresByCountryKorea();
+            return buildDomesticSectorAverages(scores);
+        }
+
+        List<Score> scores = scoreRepository.findLatestValidScoresByCountryOversea();
+        return buildOverseasSectorAverages(scores);
+    }
+
+    public SectorPercentileResponse getSectorPercentile(Integer stockId) {
+        Stock stock = stockRepository.findStockById(stockId)
+            .orElseThrow(() -> new RuntimeException("no stock found"));
+
+        COUNTRY country = getCountryFromExchangeNum(stock.getExchangeNum());
+        if (country == COUNTRY.KOREA) {
+            DomesticSector sector = stock.getDomesticSector();
+            String sectorName = sector != null ? sector.getName() : DomesticSector.UNKNOWN.getName();
+            String sectorKey = sector != null ? sector.name() : DomesticSector.UNKNOWN.name();
+
+            if (sector == null || sector == DomesticSector.UNKNOWN) {
+                return buildEmptySectorPercentile(stockId, sectorKey, sectorName, null);
+            }
+
+            Optional<Score> targetScoreOpt = scoreRepository
+                .findTopByStockIdAndScoreOverseaAndScoreKoreaNotOrderByDateDesc(stockId, 9999, 9999);
+            if (targetScoreOpt.isEmpty()) {
+                return buildEmptySectorPercentile(stockId, sectorKey, sectorName, null);
+            }
+
+            int targetScore = targetScoreOpt.get().getScoreKorea();
+            List<Score> sectorScores = scoreRepository.findLatestValidScoresByDomesticSector(sector);
+            return buildSectorPercentileResponse(stockId, sectorKey, sectorName, targetScore, sectorScores, true);
+        }
+
+        OverseasSector sector = stock.getOverseasSector();
+        String sectorName = sector != null ? sector.getName() : OverseasSector.UNKNOWN.getName();
+        String sectorKey = sector != null ? sector.name() : OverseasSector.UNKNOWN.name();
+
+        if (sector == null || sector == OverseasSector.UNKNOWN) {
+            return buildEmptySectorPercentile(stockId, sectorKey, sectorName, null);
+        }
+
+        Optional<Score> targetScoreOpt = scoreRepository
+            .findTopByStockIdAndScoreKoreaAndScoreOverseaNotOrderByDateDesc(stockId, 9999, 9999);
+        if (targetScoreOpt.isEmpty()) {
+            return buildEmptySectorPercentile(stockId, sectorKey, sectorName, null);
+        }
+
+        int targetScore = targetScoreOpt.get().getScoreOversea();
+        List<Score> sectorScores = scoreRepository.findLatestValidScoresByOverseasSector(sector);
+        return buildSectorPercentileResponse(stockId, sectorKey, sectorName, targetScore, sectorScores, false);
+    }
+
+    private List<SectorAverageResponse> buildDomesticSectorAverages(List<Score> scores) {
+        Map<DomesticSector, long[]> stats = new EnumMap<>(DomesticSector.class);
+        for (Score score : scores) {
+            Stock stock = score.getStock();
+            if (stock == null) {
+                continue;
+            }
+            DomesticSector sector = stock.getDomesticSector();
+            if (sector == null || sector == DomesticSector.UNKNOWN) {
+                continue;
+            }
+            int value = score.getScoreKorea();
+            long[] acc = stats.computeIfAbsent(sector, key -> new long[2]);
+            acc[0] += value;
+            acc[1] += 1;
+        }
+
+        return stats.entrySet().stream()
+            .map(entry -> buildSectorAverageResponse(entry.getKey().name(), entry.getKey().getName(), entry.getValue()))
+            .toList();
+    }
+
+    private List<SectorAverageResponse> buildOverseasSectorAverages(List<Score> scores) {
+        Map<OverseasSector, long[]> stats = new EnumMap<>(OverseasSector.class);
+        for (Score score : scores) {
+            Stock stock = score.getStock();
+            if (stock == null) {
+                continue;
+            }
+            OverseasSector sector = stock.getOverseasSector();
+            if (sector == null || sector == OverseasSector.UNKNOWN) {
+                continue;
+            }
+            int value = score.getScoreOversea();
+            long[] acc = stats.computeIfAbsent(sector, key -> new long[2]);
+            acc[0] += value;
+            acc[1] += 1;
+        }
+
+        return stats.entrySet().stream()
+            .map(entry -> buildSectorAverageResponse(entry.getKey().name(), entry.getKey().getName(), entry.getValue()))
+            .toList();
+    }
+
+    private SectorAverageResponse buildSectorAverageResponse(String sectorKey, String sectorName, long[] acc) {
+        long count = acc[1];
+        int avgScore = count == 0 ? 0 : (int) Math.round(acc[0] / (double) count);
+        return SectorAverageResponse.builder()
+            .sector(sectorKey)
+            .sectorName(sectorName)
+            .averageScore(avgScore)
+            .count((int) count)
+            .build();
+    }
+
+    private SectorPercentileResponse buildSectorPercentileResponse(
+        Integer stockId,
+        String sectorKey,
+        String sectorName,
+        int targetScore,
+        List<Score> sectorScores,
+        boolean isKorea
+    ) {
+        int total = sectorScores.size();
+        if (total == 0) {
+            return buildEmptySectorPercentile(stockId, sectorKey, sectorName, targetScore);
+        }
+
+        long higher = 0;
+        long equal = 0;
+        for (Score score : sectorScores) {
+            int value = isKorea ? score.getScoreKorea() : score.getScoreOversea();
+            if (value > targetScore) {
+                higher++;
+            } else if (value == targetScore) {
+                equal++;
+            }
+        }
+
+        int rank = (int) higher + 1;
+        int topPercent = (int) Math.round((higher + equal) * 100.0 / total);
+
+        return SectorPercentileResponse.builder()
+            .stockId(stockId)
+            .sector(sectorKey)
+            .sectorName(sectorName)
+            .score(targetScore)
+            .rank(rank)
+            .total(total)
+            .topPercent(topPercent)
+            .build();
+    }
+
+    private SectorPercentileResponse buildEmptySectorPercentile(
+        Integer stockId,
+        String sectorKey,
+        String sectorName,
+        Integer score
+    ) {
+        return SectorPercentileResponse.builder()
+            .stockId(stockId)
+            .sector(sectorKey)
+            .sectorName(sectorName)
+            .score(score)
+            .rank(0)
+            .total(0)
+            .topPercent(0)
+            .build();
     }
 
     private COUNTRY getCountryFromExchangeNum(EXCHANGENUM exchangenum) {

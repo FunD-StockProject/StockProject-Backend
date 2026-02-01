@@ -172,4 +172,20 @@ public class StockController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+    @GetMapping("/sector/average/{country}")
+    @Operation(summary = "섹터별 평균 인간지표 점수", description = "국내/해외 섹터별 최신 인간지표 평균 점수를 반환합니다.")
+    public ResponseEntity<List<SectorAverageResponse>> getSectorAverageScores(
+        @PathVariable("country") COUNTRY country
+    ) {
+        return ResponseEntity.ok(stockService.getSectorAverageScores(country));
+    }
+
+    @GetMapping("/{id}/sector/percentile")
+    @Operation(summary = "섹터 내 상위 퍼센트", description = "특정 종목이 해당 섹터에서 상위 몇 %인지 반환합니다.")
+    public ResponseEntity<SectorPercentileResponse> getSectorPercentile(
+        @PathVariable("id") Integer id
+    ) {
+        return ResponseEntity.ok(stockService.getSectorPercentile(id));
+    }
 }
