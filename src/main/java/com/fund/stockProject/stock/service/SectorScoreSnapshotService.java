@@ -37,6 +37,39 @@ public class SectorScoreSnapshotService {
                 .toList())
             .orElseGet(List::of);
     }
+    public SectorAverageResponse getLatestSectorAverage(COUNTRY country, String sectorKey) {
+        String normalizedSector = sectorKey == null ? null : sectorKey.trim().toUpperCase();
+        if (normalizedSector == null || normalizedSector.isEmpty()) {
+            return SectorAverageResponse.builder()
+                .sector(sectorKey)
+                .sectorName(null)
+                .averageScore(0)
+                .count(0)
+                .build();
+        }
+
+        String sectorName = resolveSectorNameByKey(country, normalizedSector);
+        return snapshotRepository.findLatestDateByCountry(country)
+            .map(date -> snapshotRepository.findByCountryAndDateAndSector(country, date, normalizedSector)
+                .map(snapshot -> SectorAverageResponse.builder()
+                    .sector(snapshot.getSector())
+                    .sectorName(snapshot.getSectorName())
+                    .averageScore(snapshot.getAverageScore())
+                    .count(snapshot.getCount())
+                    .build())
+                .orElseGet(() -> SectorAverageResponse.builder()
+                    .sector(normalizedSector)
+                    .sectorName(sectorName)
+                    .averageScore(0)
+                    .count(0)
+                    .build()))
+            .orElseGet(() -> SectorAverageResponse.builder()
+                .sector(normalizedSector)
+                .sectorName(sectorName)
+                .averageScore(0)
+                .count(0)
+                .build());
+    }
 
     public void saveDailySnapshot(COUNTRY country, LocalDate date) {
         if (country == COUNTRY.KOREA) {
@@ -108,5 +141,15 @@ public class SectorScoreSnapshotService {
             return overseas.getName();
         }
         return sector.name();
+    }
+    private String resolveSectorNameByKey(COUNTRY country, String sectorKey) {
+        try {
+            if (country == COUNTRY.KOREA) {
+                return DomesticSector.valueOf(sectorKey).getName();
+            }
+            return OverseasSector.valueOf(sectorKey).getName();
+        } catch (IllegalArgumentException e) {
+            return sectorKey;
+        }
     }
 }

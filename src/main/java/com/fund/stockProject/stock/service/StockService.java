@@ -545,6 +545,17 @@ public class StockService {
         }
     }
 
+    private double roundTo1Decimal(double value) {
+        return Math.round(value * 10.0) / 10.0;
+    }
+
+    private java.time.YearMonth parseYearMonthOrNow(String value) {
+        if (value == null || value.isBlank()) {
+            return java.time.YearMonth.now();
+        }
+        return java.time.YearMonth.parse(value.trim());
+    }
+
     /**
      * 국내/해외 떡상 지표 반환
      * @param country 국내/해외 분류
@@ -821,8 +832,47 @@ public class StockService {
                 .build();
     }
 
+    public StockMonthlyAverageResponse getMonthlyAverageScore(Integer id, String yearMonth) {
+        Stock stock = stockRepository.findStockById(id)
+            .orElseThrow(() -> new RuntimeException("no stock found"));
+
+        COUNTRY country = getCountryFromExchangeNum(stock.getExchangeNum());
+        java.time.YearMonth targetMonth = parseYearMonthOrNow(yearMonth);
+        LocalDate startDate = targetMonth.atDay(1);
+        LocalDate endDate = targetMonth.atEndOfMonth();
+
+        List<Score> scores = scoreRepository.findByStockIdAndDateBetween(stock.getId(), startDate, endDate);
+
+        int sum = 0;
+        int count = 0;
+        if (scores != null) {
+            for (Score score : scores) {
+                int value = country == COUNTRY.KOREA ? score.getScoreKorea() : score.getScoreOversea();
+                if (value == 9999) {
+                    continue;
+                }
+                sum += value;
+                count++;
+            }
+        }
+
+        Double average = count == 0 ? null : roundTo1Decimal(sum / (double) count);
+        return StockMonthlyAverageResponse.builder()
+            .stockId(stock.getId())
+            .symbolName(stock.getSymbolName())
+            .country(country)
+            .yearMonth(targetMonth.toString())
+            .dataCount(count)
+            .averageScore(average)
+            .build();
+    }
+
     public List<SectorAverageResponse> getSectorAverageScores(COUNTRY country) {
         return sectorScoreSnapshotService.getLatestSectorAverages(country);
+    }
+
+    public SectorAverageResponse getSectorAverageScore(COUNTRY country, String sectorKey) {
+        return sectorScoreSnapshotService.getLatestSectorAverage(country, sectorKey);
     }
 
     public SectorPercentileResponse getSectorPercentile(Integer stockId) {
