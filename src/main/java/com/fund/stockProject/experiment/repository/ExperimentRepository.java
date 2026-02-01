@@ -106,6 +106,58 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
         + "WHERE a.ratio BETWEEN :startRange AND :endRange", nativeQuery = true)
     int countSameGradeUser(@Param("startRange") int startRange, @Param("endRange") int endRange);
 
+    @Query(value = "SELECT count(*) "
+        + "FROM "
+        + "( "
+        + "  SELECT ROUND(IFNULL(profitable.cnt, 0) / total.cnt * 100, 1) AS ratio "
+        + "  FROM "
+        + "  ( SELECT u.email, COUNT(e.id) AS cnt "
+        + "    FROM experiment e "
+        + "    JOIN users u ON e.user_id = u.id "
+        + "    WHERE e.status = 'COMPLETE' "
+        + "    GROUP BY u.email "
+        + "    HAVING COUNT(e.id) > 0 "
+        + "   ) AS total "
+        + " LEFT JOIN "
+        + "  ( "
+        + "    SELECT u.email, COUNT(e.id) AS cnt "
+        + "    FROM experiment e "
+        + "    JOIN users u ON e.user_id = u.id "
+        + "    WHERE e.status = 'COMPLETE' AND e.roi > 0 "
+        + "    GROUP BY u.email "
+        + "  ) AS profitable "
+        + " ON total.email = profitable.email "
+        + "  WHERE total.cnt > 0 "
+        + ") a "
+        + "WHERE a.ratio >= :startRange AND a.ratio < :endRange", nativeQuery = true)
+    int countUsersBySuccessRateRange(@Param("startRange") double startRange, @Param("endRange") double endRange);
+
+    @Query(value = "SELECT count(*) "
+        + "FROM "
+        + "( "
+        + "  SELECT ROUND(IFNULL(profitable.cnt, 0) / total.cnt * 100, 1) AS ratio "
+        + "  FROM "
+        + "  ( SELECT u.email, COUNT(e.id) AS cnt "
+        + "    FROM experiment e "
+        + "    JOIN users u ON e.user_id = u.id "
+        + "    WHERE e.status = 'COMPLETE' "
+        + "    GROUP BY u.email "
+        + "    HAVING COUNT(e.id) > 0 "
+        + "   ) AS total "
+        + " LEFT JOIN "
+        + "  ( "
+        + "    SELECT u.email, COUNT(e.id) AS cnt "
+        + "    FROM experiment e "
+        + "    JOIN users u ON e.user_id = u.id "
+        + "    WHERE e.status = 'COMPLETE' AND e.roi > 0 "
+        + "    GROUP BY u.email "
+        + "  ) AS profitable "
+        + " ON total.email = profitable.email "
+        + "  WHERE total.cnt > 0 "
+        + ") a "
+        + "WHERE a.ratio >= :startRange", nativeQuery = true)
+    int countUsersBySuccessRateAtLeast(@Param("startRange") double startRange);
+
     @Query("SELECT COUNT(DISTINCT e.user.id) FROM Experiment e WHERE e.status = 'COMPLETE'")
     long countUsersWithCompletedExperiments();
 

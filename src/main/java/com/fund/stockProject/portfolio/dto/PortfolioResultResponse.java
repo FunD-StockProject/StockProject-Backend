@@ -26,8 +26,8 @@ public class PortfolioResultResponse {
     @AllArgsConstructor
     public static class Recommend {
         private int weeklyExperimentCount;  // 이번 주 실험 진행 횟수
-        private Integer bestYieldScore;    // 가장 높은 수익률 실험의 점수
-        private Integer worstYieldScore;   // 가장 낮은 수익률 실험의 점수
+        private Integer bestYieldScore;    // 가장 높은 수익률 구간의 대표 점수(구간 min)
+        private Integer worstYieldScore;   // 가장 낮은 수익률 구간의 대표 점수(구간 min)
         private List<ScoreTableItem> scoreTable;  // 점수대별 통계
     }
 
@@ -72,7 +72,7 @@ public class PortfolioResultResponse {
     public static class HistoryPoint {
         private String date;          // MM.DD
         private int score;            // X축 (0~100)
-        private double yield;         // Y축
+        private double roi;           // Y축 (수익률)
         private Integer stockId;      // 종목 ID
         private String stockName;     // 종목명
         private boolean isDuplicateName;  // 리스트 내 이름 중복 여부
@@ -82,4 +82,3 @@ public class PortfolioResultResponse {
         }
     }
 }
-

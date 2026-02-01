@@ -769,21 +769,11 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             distribution.put("good", 0);
             distribution.put("best", 0);
         } else {
-            distribution.put("worst", (int) (experimentRepository.countSameGradeUser(0, 20) * 100L / completedUserCount));
-            distribution.put("bad", (int) (experimentRepository.countSameGradeUser(21, 40) * 100L / completedUserCount));
-            distribution.put("normal", (int) (experimentRepository.countSameGradeUser(41, 60) * 100L / completedUserCount));
-            distribution.put("good", (int) (experimentRepository.countSameGradeUser(61, 80) * 100L / completedUserCount));
-            distribution.put("best", (int) (experimentRepository.countSameGradeUser(81, 100) * 100L / completedUserCount));
-        }
-
-        // 최고/최저 수익률 실험의 점수 산출
-        Integer bestYieldScore = null;
-        Integer worstYieldScore = null;
-        if (!completed.isEmpty()) {
-            Experiment max = completed.stream().max((a, b) -> Double.compare(a.getRoi(), b.getRoi())).get();
-            Experiment min = completed.stream().min((a, b) -> Double.compare(a.getRoi(), b.getRoi())).get();
-            bestYieldScore = max.getScore();
-            worstYieldScore = min.getScore();
+            distribution.put("worst", (int) (experimentRepository.countUsersBySuccessRateRange(0, 20) * 100L / completedUserCount));
+            distribution.put("bad", (int) (experimentRepository.countUsersBySuccessRateRange(20, 40) * 100L / completedUserCount));
+            distribution.put("normal", (int) (experimentRepository.countUsersBySuccessRateRange(40, 60) * 100L / completedUserCount));
+            distribution.put("good", (int) (experimentRepository.countUsersBySuccessRateRange(60, 80) * 100L / completedUserCount));
+            distribution.put("best", (int) (experimentRepository.countUsersBySuccessRateAtLeast(80) * 100L / completedUserCount));
         }
 
         // 점수 구간별 사용자 평균 수익률 및 전체 유저 평균
@@ -802,6 +792,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().min(70).max(79).avgYieldTotal(t_70_79).avgYieldUser(u_70_79).build());
         scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().min(80).max(89).avgYieldTotal(t_80_89).avgYieldUser(u_80_89).build());
         scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().min(90).max(100).avgYieldTotal(t_90_100).avgYieldUser(u_90_100).build());
+
+        BestWorstRangeScores bestWorstRangeScores = resolveBestWorstRangeScores(scoreTable);
+        Integer bestYieldScore = bestWorstRangeScores.bestScore();
+        Integer worstYieldScore = bestWorstRangeScores.worstScore();
 
         // HumanIndicator type 결정 (성공률 기반)
         String humanIndicatorType;
@@ -834,7 +828,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .map(e -> PortfolioResultResponse.HistoryPoint.builder()
                 .date(PortfolioResultResponse.HistoryPoint.toDateLabel(e.getSellAt() != null ? e.getSellAt() : e.getBuyAt()))
                 .score(e.getScore())
-                .yield(e.getRoi() != null ? e.getRoi() : 0.0)
+                .roi(roundTo1Decimal(e.getRoi() != null ? e.getRoi() : 0.0))
                 .stockId(e.getStock().getId())
                 .stockName(e.getStock().getSecurityName())
                 .isDuplicateName(stockNameCount.get(e.getStock().getSecurityName()) > 1)
@@ -850,14 +844,14 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
         for (PortfolioResultResponse.HistoryPoint point : history) {
             double dx = point.getScore() - 50.0;
-            double dy = point.getYield();
+            double dy = point.getRoi();
             double distance = Math.sqrt(dx * dx + dy * dy);
 
-            if (point.getScore() < 50 && point.getYield() > 0) {
+            if (point.getScore() < 50 && point.getRoi() > 0) {
                 valuePreemptiveSum += distance;   // 가치 선점형
-            } else if (point.getScore() >= 50 && point.getYield() > 0) {
+            } else if (point.getScore() >= 50 && point.getRoi() > 0) {
                 trendPreemptiveSum += distance;   // 트렌드 선점형
-            } else if (point.getScore() < 50 && point.getYield() <= 0) {
+            } else if (point.getScore() < 50 && point.getRoi() <= 0) {
                 reverseInvestorSum += distance;   // 역행 투자형
             } else {
                 laggingFollowerSum += distance;   // 후행 추종형
@@ -937,12 +931,109 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .build();
     }
 
+    private BestWorstRangeScores resolveBestWorstRangeScores(List<PortfolioResultResponse.ScoreTableItem> scoreTable) {
+        if (scoreTable == null || scoreTable.isEmpty()) {
+            return new BestWorstRangeScores(null, null);
+        }
+
+        ScoreTableItemRange bestRange = null;
+        ScoreTableItemRange worstRange = null;
+
+        List<PortfolioResultResponse.ScoreTableItem> userItems = filterByMetric(scoreTable, true);
+        if (!userItems.isEmpty()) {
+            bestRange = toRange(selectBestRange(userItems, true));
+            worstRange = toRange(selectWorstRange(excludeRange(userItems, bestRange), true));
+        }
+
+        if (bestRange == null) {
+            List<PortfolioResultResponse.ScoreTableItem> totalItems = filterByMetric(scoreTable, false);
+            bestRange = toRange(selectBestRange(totalItems, false));
+        }
+
+        if (worstRange == null) {
+            List<PortfolioResultResponse.ScoreTableItem> totalItems = filterByMetric(scoreTable, false);
+            worstRange = toRange(selectWorstRange(excludeRange(totalItems, bestRange), false));
+        }
+
+        Integer bestScore = bestRange != null ? bestRange.min() : null;
+        Integer worstScore = worstRange != null ? worstRange.min() : null;
+        return new BestWorstRangeScores(bestScore, worstScore);
+    }
+
+    private List<PortfolioResultResponse.ScoreTableItem> filterByMetric(
+        List<PortfolioResultResponse.ScoreTableItem> scoreTable,
+        boolean useUser
+    ) {
+        return scoreTable.stream()
+            .filter(item -> getMetric(item, useUser) != null)
+            .toList();
+    }
+
+    private PortfolioResultResponse.ScoreTableItem selectBestRange(
+        List<PortfolioResultResponse.ScoreTableItem> items,
+        boolean useUser
+    ) {
+        if (items == null || items.isEmpty()) {
+            return null;
+        }
+        return items.stream()
+            .max(java.util.Comparator.<PortfolioResultResponse.ScoreTableItem>comparingDouble(
+                    item -> getMetric(item, useUser))
+                .thenComparingInt(PortfolioResultResponse.ScoreTableItem::getMin))
+            .orElse(null);
+    }
+
+    private PortfolioResultResponse.ScoreTableItem selectWorstRange(
+        List<PortfolioResultResponse.ScoreTableItem> items,
+        boolean useUser
+    ) {
+        if (items == null || items.isEmpty()) {
+            return null;
+        }
+        return items.stream()
+            .min(java.util.Comparator.<PortfolioResultResponse.ScoreTableItem>comparingDouble(
+                    item -> getMetric(item, useUser))
+                .thenComparingInt(PortfolioResultResponse.ScoreTableItem::getMin))
+            .orElse(null);
+    }
+
+    private List<PortfolioResultResponse.ScoreTableItem> excludeRange(
+        List<PortfolioResultResponse.ScoreTableItem> items,
+        ScoreTableItemRange range
+    ) {
+        if (items == null || items.isEmpty() || range == null) {
+            return items;
+        }
+        return items.stream()
+            .filter(item -> item.getMin() != range.min() || item.getMax() != range.max())
+            .toList();
+    }
+
+    private Double getMetric(PortfolioResultResponse.ScoreTableItem item, boolean useUser) {
+        return useUser ? item.getAvgYieldUser() : item.getAvgYieldTotal();
+    }
+
+    private ScoreTableItemRange toRange(PortfolioResultResponse.ScoreTableItem item) {
+        if (item == null) {
+            return null;
+        }
+        return new ScoreTableItemRange(item.getMin(), item.getMax());
+    }
+
+    private record ScoreTableItemRange(int min, int max) { }
+
+    private record BestWorstRangeScores(Integer bestScore, Integer worstScore) { }
+
     private String toScoreRangeLabel(int score) {
         if (score <= 59) return "60점 이하";
         if (score <= 69) return "60-69";
         if (score <= 79) return "70-79";
         if (score <= 89) return "80-89";
         return "90+";
+    }
+
+    private double roundTo1Decimal(double value) {
+        return Math.round(value * 10.0) / 10.0;
     }
 
     // 영업일 기준 실험 진행한 기간이 5일 이상 지난 실험 데이터 조회
