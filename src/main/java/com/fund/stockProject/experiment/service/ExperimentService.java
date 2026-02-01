@@ -828,7 +828,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .map(e -> PortfolioResultResponse.HistoryPoint.builder()
                 .date(PortfolioResultResponse.HistoryPoint.toDateLabel(e.getSellAt() != null ? e.getSellAt() : e.getBuyAt()))
                 .score(e.getScore())
-                .yield(e.getRoi() != null ? e.getRoi() : 0.0)
+                .roi(roundTo1Decimal(e.getRoi() != null ? e.getRoi() : 0.0))
                 .stockId(e.getStock().getId())
                 .stockName(e.getStock().getSecurityName())
                 .isDuplicateName(stockNameCount.get(e.getStock().getSecurityName()) > 1)
@@ -844,14 +844,14 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
         for (PortfolioResultResponse.HistoryPoint point : history) {
             double dx = point.getScore() - 50.0;
-            double dy = point.getYield();
+            double dy = point.getRoi();
             double distance = Math.sqrt(dx * dx + dy * dy);
 
-            if (point.getScore() < 50 && point.getYield() > 0) {
+            if (point.getScore() < 50 && point.getRoi() > 0) {
                 valuePreemptiveSum += distance;   // 가치 선점형
-            } else if (point.getScore() >= 50 && point.getYield() > 0) {
+            } else if (point.getScore() >= 50 && point.getRoi() > 0) {
                 trendPreemptiveSum += distance;   // 트렌드 선점형
-            } else if (point.getScore() < 50 && point.getYield() <= 0) {
+            } else if (point.getScore() < 50 && point.getRoi() <= 0) {
                 reverseInvestorSum += distance;   // 역행 투자형
             } else {
                 laggingFollowerSum += distance;   // 후행 추종형
@@ -1030,6 +1030,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         if (score <= 79) return "70-79";
         if (score <= 89) return "80-89";
         return "90+";
+    }
+
+    private double roundTo1Decimal(double value) {
+        return Math.round(value * 10.0) / 10.0;
     }
 
     // 영업일 기준 실험 진행한 기간이 5일 이상 지난 실험 데이터 조회

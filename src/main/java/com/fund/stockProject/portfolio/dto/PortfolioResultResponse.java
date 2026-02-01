@@ -72,7 +72,7 @@ public class PortfolioResultResponse {
     public static class HistoryPoint {
         private String date;          // MM.DD
         private int score;            // X축 (0~100)
-        private double yield;         // Y축
+        private double roi;           // Y축 (수익률)
         private Integer stockId;      // 종목 ID
         private String stockName;     // 종목명
         private boolean isDuplicateName;  // 리스트 내 이름 중복 여부
