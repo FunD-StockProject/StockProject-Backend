@@ -26,8 +26,8 @@ public class PortfolioResultResponse {
     @AllArgsConstructor
     public static class Recommend {
         private int weeklyExperimentCount;  // 이번 주 실험 진행 횟수
-        private Integer bestYieldScore;    // 가장 높은 수익률 실험의 점수
-        private Integer worstYieldScore;   // 가장 낮은 수익률 실험의 점수
+        private Integer bestYieldScore;    // 가장 높은 수익률 구간의 대표 점수(구간 min)
+        private Integer worstYieldScore;   // 가장 낮은 수익률 구간의 대표 점수(구간 min)
         private List<ScoreTableItem> scoreTable;  // 점수대별 통계
     }
 
@@ -82,4 +82,3 @@ public class PortfolioResultResponse {
         }
     }
 }
-

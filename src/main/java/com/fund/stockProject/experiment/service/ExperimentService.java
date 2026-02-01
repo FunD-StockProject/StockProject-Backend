@@ -776,16 +776,6 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             distribution.put("best", (int) (experimentRepository.countUsersBySuccessRateAtLeast(80) * 100L / completedUserCount));
         }
 
-        // 최고/최저 수익률 실험의 점수 산출
-        Integer bestYieldScore = null;
-        Integer worstYieldScore = null;
-        if (!completed.isEmpty()) {
-            Experiment max = completed.stream().max((a, b) -> Double.compare(a.getRoi(), b.getRoi())).get();
-            Experiment min = completed.stream().min((a, b) -> Double.compare(a.getRoi(), b.getRoi())).get();
-            bestYieldScore = max.getScore();
-            worstYieldScore = min.getScore();
-        }
-
         // 점수 구간별 사용자 평균 수익률 및 전체 유저 평균
         Double u_60_69 = experimentRepository.findUserAvgRoi(60, 69, email);
         Double u_70_79 = experimentRepository.findUserAvgRoi(70, 79, email);
@@ -802,6 +792,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().min(70).max(79).avgYieldTotal(t_70_79).avgYieldUser(u_70_79).build());
         scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().min(80).max(89).avgYieldTotal(t_80_89).avgYieldUser(u_80_89).build());
         scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().min(90).max(100).avgYieldTotal(t_90_100).avgYieldUser(u_90_100).build());
+
+        BestWorstRangeScores bestWorstRangeScores = resolveBestWorstRangeScores(scoreTable);
+        Integer bestYieldScore = bestWorstRangeScores.bestScore();
+        Integer worstYieldScore = bestWorstRangeScores.worstScore();
 
         // HumanIndicator type 결정 (성공률 기반)
         String humanIndicatorType;
@@ -936,6 +930,99 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .distribution(distribution)
             .build();
     }
+
+    private BestWorstRangeScores resolveBestWorstRangeScores(List<PortfolioResultResponse.ScoreTableItem> scoreTable) {
+        if (scoreTable == null || scoreTable.isEmpty()) {
+            return new BestWorstRangeScores(null, null);
+        }
+
+        ScoreTableItemRange bestRange = null;
+        ScoreTableItemRange worstRange = null;
+
+        List<PortfolioResultResponse.ScoreTableItem> userItems = filterByMetric(scoreTable, true);
+        if (!userItems.isEmpty()) {
+            bestRange = toRange(selectBestRange(userItems, true));
+            worstRange = toRange(selectWorstRange(excludeRange(userItems, bestRange), true));
+        }
+
+        if (bestRange == null) {
+            List<PortfolioResultResponse.ScoreTableItem> totalItems = filterByMetric(scoreTable, false);
+            bestRange = toRange(selectBestRange(totalItems, false));
+        }
+
+        if (worstRange == null) {
+            List<PortfolioResultResponse.ScoreTableItem> totalItems = filterByMetric(scoreTable, false);
+            worstRange = toRange(selectWorstRange(excludeRange(totalItems, bestRange), false));
+        }
+
+        Integer bestScore = bestRange != null ? bestRange.min() : null;
+        Integer worstScore = worstRange != null ? worstRange.min() : null;
+        return new BestWorstRangeScores(bestScore, worstScore);
+    }
+
+    private List<PortfolioResultResponse.ScoreTableItem> filterByMetric(
+        List<PortfolioResultResponse.ScoreTableItem> scoreTable,
+        boolean useUser
+    ) {
+        return scoreTable.stream()
+            .filter(item -> getMetric(item, useUser) != null)
+            .toList();
+    }
+
+    private PortfolioResultResponse.ScoreTableItem selectBestRange(
+        List<PortfolioResultResponse.ScoreTableItem> items,
+        boolean useUser
+    ) {
+        if (items == null || items.isEmpty()) {
+            return null;
+        }
+        return items.stream()
+            .max(java.util.Comparator.<PortfolioResultResponse.ScoreTableItem>comparingDouble(
+                    item -> getMetric(item, useUser))
+                .thenComparingInt(PortfolioResultResponse.ScoreTableItem::getMin))
+            .orElse(null);
+    }
+
+    private PortfolioResultResponse.ScoreTableItem selectWorstRange(
+        List<PortfolioResultResponse.ScoreTableItem> items,
+        boolean useUser
+    ) {
+        if (items == null || items.isEmpty()) {
+            return null;
+        }
+        return items.stream()
+            .min(java.util.Comparator.<PortfolioResultResponse.ScoreTableItem>comparingDouble(
+                    item -> getMetric(item, useUser))
+                .thenComparingInt(PortfolioResultResponse.ScoreTableItem::getMin))
+            .orElse(null);
+    }
+
+    private List<PortfolioResultResponse.ScoreTableItem> excludeRange(
+        List<PortfolioResultResponse.ScoreTableItem> items,
+        ScoreTableItemRange range
+    ) {
+        if (items == null || items.isEmpty() || range == null) {
+            return items;
+        }
+        return items.stream()
+            .filter(item -> item.getMin() != range.min() || item.getMax() != range.max())
+            .toList();
+    }
+
+    private Double getMetric(PortfolioResultResponse.ScoreTableItem item, boolean useUser) {
+        return useUser ? item.getAvgYieldUser() : item.getAvgYieldTotal();
+    }
+
+    private ScoreTableItemRange toRange(PortfolioResultResponse.ScoreTableItem item) {
+        if (item == null) {
+            return null;
+        }
+        return new ScoreTableItemRange(item.getMin(), item.getMax());
+    }
+
+    private record ScoreTableItemRange(int min, int max) { }
+
+    private record BestWorstRangeScores(Integer bestScore, Integer worstScore) { }
 
     private String toScoreRangeLabel(int score) {
         if (score <= 59) return "60점 이하";
