@@ -13,6 +13,8 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fund.stockProject.score.entity.Score;
+import com.fund.stockProject.stock.domain.DomesticSector;
+import com.fund.stockProject.stock.domain.OverseasSector;
 
 @Repository
 @EnableJpaRepositories
@@ -102,4 +104,92 @@ public interface ScoreRepository extends JpaRepository<Score, Integer> {
         AND s.date = (SELECT MAX(s2.date) FROM Score s2 WHERE s2.stockId = s.stockId)
     """)
     List<Score> findLatestScoresByStockIds(@Param("stockIds") List<Integer> stockIds);
+
+    /**
+     * 각 stock별 최신 유효 Score 데이터를 조회 (국내 종목용)
+     * scoreOversea = 9999 이며 scoreKorea != 9999 인 데이터 중 최신
+     */
+    @Query("""
+        SELECT s
+        FROM Score s
+        JOIN FETCH s.stock st
+        WHERE st.valid = true
+        AND s.scoreOversea = 9999
+        AND s.scoreKorea <> 9999
+        AND s.date = (
+            SELECT MAX(s2.date)
+            FROM Score s2
+            WHERE s2.stockId = s.stockId
+            AND s2.scoreOversea = 9999
+            AND s2.scoreKorea <> 9999
+        )
+    """)
+    List<Score> findLatestValidScoresByCountryKorea();
+
+    /**
+     * 각 stock별 최신 유효 Score 데이터를 조회 (해외 종목용)
+     * scoreKorea = 9999 이며 scoreOversea != 9999 인 데이터 중 최신
+     */
+    @Query("""
+        SELECT s
+        FROM Score s
+        JOIN FETCH s.stock st
+        WHERE st.valid = true
+        AND s.scoreKorea = 9999
+        AND s.scoreOversea <> 9999
+        AND s.date = (
+            SELECT MAX(s2.date)
+            FROM Score s2
+            WHERE s2.stockId = s.stockId
+            AND s2.scoreKorea = 9999
+            AND s2.scoreOversea <> 9999
+        )
+    """)
+    List<Score> findLatestValidScoresByCountryOversea();
+
+    /**
+     * 특정 국내 섹터의 최신 유효 Score 데이터를 조회
+     */
+    @Query("""
+        SELECT s
+        FROM Score s
+        JOIN FETCH s.stock st
+        WHERE st.valid = true
+        AND st.domesticSector = :sector
+        AND s.scoreOversea = 9999
+        AND s.scoreKorea <> 9999
+        AND s.date = (
+            SELECT MAX(s2.date)
+            FROM Score s2
+            WHERE s2.stockId = s.stockId
+            AND s2.scoreOversea = 9999
+            AND s2.scoreKorea <> 9999
+        )
+    """)
+    List<Score> findLatestValidScoresByDomesticSector(@Param("sector") DomesticSector sector);
+
+    /**
+     * 특정 해외 섹터의 최신 유효 Score 데이터를 조회
+     */
+    @Query("""
+        SELECT s
+        FROM Score s
+        JOIN FETCH s.stock st
+        WHERE st.valid = true
+        AND st.overseasSector = :sector
+        AND s.scoreKorea = 9999
+        AND s.scoreOversea <> 9999
+        AND s.date = (
+            SELECT MAX(s2.date)
+            FROM Score s2
+            WHERE s2.stockId = s.stockId
+            AND s2.scoreKorea = 9999
+            AND s2.scoreOversea <> 9999
+        )
+    """)
+    List<Score> findLatestValidScoresByOverseasSector(@Param("sector") OverseasSector sector);
+
+    Optional<Score> findTopByStockIdAndScoreOverseaAndScoreKoreaNotOrderByDateDesc(Integer stockId, Integer scoreOversea, Integer scoreKorea);
+
+    Optional<Score> findTopByStockIdAndScoreKoreaAndScoreOverseaNotOrderByDateDesc(Integer stockId, Integer scoreKorea, Integer scoreOversea);
 }
