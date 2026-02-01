@@ -825,6 +825,10 @@ public class StockService {
         return sectorScoreSnapshotService.getLatestSectorAverages(country);
     }
 
+    public SectorAverageResponse getSectorAverageScore(COUNTRY country, String sectorKey) {
+        return sectorScoreSnapshotService.getLatestSectorAverage(country, sectorKey);
+    }
+
     public SectorPercentileResponse getSectorPercentile(Integer stockId) {
         Stock stock = stockRepository.findStockById(stockId)
             .orElseThrow(() -> new RuntimeException("no stock found"));

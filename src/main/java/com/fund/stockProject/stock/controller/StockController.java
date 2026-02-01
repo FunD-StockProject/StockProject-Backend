@@ -181,6 +181,31 @@ public class StockController {
         return ResponseEntity.ok(stockService.getSectorAverageScores(country));
     }
 
+    @GetMapping("/sector/average/{country}/{sector}")
+    @Operation(summary = "섹터 평균 점수(단일)", description = "선택한 섹터의 최신 평균 인간지표 점수를 반환합니다.")
+    public ResponseEntity<SectorAverageResponse> getSectorAverageScore(
+        @PathVariable("country") COUNTRY country,
+        @PathVariable("sector") String sector
+    ) {
+        String normalized = sector == null ? null : sector.trim().toUpperCase();
+        if (normalized == null || normalized.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            if (country == COUNTRY.KOREA) {
+                DomesticSector.valueOf(normalized);
+            } else {
+                OverseasSector.valueOf(normalized);
+            }
+        } catch (IllegalArgumentException e) {
+            log.warn("잘못된 섹터 값: country={}, sector={}", country, sector);
+            return ResponseEntity.badRequest().build();
+        }
+
+        return ResponseEntity.ok(stockService.getSectorAverageScore(country, normalized));
+    }
+
     @GetMapping("/{id}/sector/percentile")
     @Operation(summary = "섹터 내 상위 퍼센트", description = "특정 종목이 해당 섹터에서 상위 몇 %인지 반환합니다.")
     public ResponseEntity<SectorPercentileResponse> getSectorPercentile(
