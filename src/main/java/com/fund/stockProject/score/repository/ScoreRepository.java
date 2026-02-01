@@ -105,6 +105,8 @@ public interface ScoreRepository extends JpaRepository<Score, Integer> {
     """)
     List<Score> findLatestScoresByStockIds(@Param("stockIds") List<Integer> stockIds);
 
+    List<Score> findByStockIdAndDateBetween(Integer stockId, LocalDate startDate, LocalDate endDate);
+
     /**
      * 각 stock별 최신 유효 Score 데이터를 조회 (국내 종목용)
      * scoreOversea = 9999 이며 scoreKorea != 9999 인 데이터 중 최신

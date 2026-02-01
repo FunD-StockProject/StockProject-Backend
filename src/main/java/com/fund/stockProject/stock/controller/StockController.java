@@ -94,6 +94,15 @@ public class StockController {
         return ResponseEntity.ok().body(stockService.getStockDetailInfo(id, country));
     }
 
+    @GetMapping("/{id}/average/month")
+    @Operation(summary = "월 평균 인간지표 점수", description = "지정한 월(yyyy-MM)의 평균 인간지표 점수를 반환합니다. 미지정 시 현재 월.")
+    ResponseEntity<StockMonthlyAverageResponse> getMonthlyAverageScore(
+        final @PathVariable("id") Integer id,
+        @RequestParam(required = false) String yearMonth
+    ) {
+        return ResponseEntity.ok().body(stockService.getMonthlyAverageScore(id, yearMonth));
+    }
+
     @GetMapping("/category/{category}/{country}")
     @Operation(summary = "종목 차트별 인간지표 api", description = "종목 차트별 인간지표 api")
     ResponseEntity<Mono<List<StockCategoryResponse>>> getCategoryStocks(final @PathVariable("category") CATEGORY category, final @PathVariable("country") COUNTRY country) {
