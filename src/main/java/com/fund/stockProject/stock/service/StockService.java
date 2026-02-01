@@ -30,7 +30,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +63,7 @@ public class StockService {
     private final ObjectMapper objectMapper;
     private final KeywordRepository keywordRepository;
     private final SearchKeywordService searchKeywordService;
+    private final SectorScoreSnapshotService sectorScoreSnapshotService;
 
     private final int LIMITS = 9;
 
@@ -822,13 +822,7 @@ public class StockService {
     }
 
     public List<SectorAverageResponse> getSectorAverageScores(COUNTRY country) {
-        if (country == COUNTRY.KOREA) {
-            List<Score> scores = scoreRepository.findLatestValidScoresByCountryKorea();
-            return buildDomesticSectorAverages(scores);
-        }
-
-        List<Score> scores = scoreRepository.findLatestValidScoresByCountryOversea();
-        return buildOverseasSectorAverages(scores);
+        return sectorScoreSnapshotService.getLatestSectorAverages(country);
     }
 
     public SectorPercentileResponse getSectorPercentile(Integer stockId) {
@@ -873,61 +867,6 @@ public class StockService {
         int targetScore = targetScoreOpt.get().getScoreOversea();
         List<Score> sectorScores = scoreRepository.findLatestValidScoresByOverseasSector(sector);
         return buildSectorPercentileResponse(stockId, sectorKey, sectorName, targetScore, sectorScores, false);
-    }
-
-    private List<SectorAverageResponse> buildDomesticSectorAverages(List<Score> scores) {
-        Map<DomesticSector, long[]> stats = new EnumMap<>(DomesticSector.class);
-        for (Score score : scores) {
-            Stock stock = score.getStock();
-            if (stock == null) {
-                continue;
-            }
-            DomesticSector sector = stock.getDomesticSector();
-            if (sector == null || sector == DomesticSector.UNKNOWN) {
-                continue;
-            }
-            int value = score.getScoreKorea();
-            long[] acc = stats.computeIfAbsent(sector, key -> new long[2]);
-            acc[0] += value;
-            acc[1] += 1;
-        }
-
-        return stats.entrySet().stream()
-            .map(entry -> buildSectorAverageResponse(entry.getKey().name(), entry.getKey().getName(), entry.getValue()))
-            .toList();
-    }
-
-    private List<SectorAverageResponse> buildOverseasSectorAverages(List<Score> scores) {
-        Map<OverseasSector, long[]> stats = new EnumMap<>(OverseasSector.class);
-        for (Score score : scores) {
-            Stock stock = score.getStock();
-            if (stock == null) {
-                continue;
-            }
-            OverseasSector sector = stock.getOverseasSector();
-            if (sector == null || sector == OverseasSector.UNKNOWN) {
-                continue;
-            }
-            int value = score.getScoreOversea();
-            long[] acc = stats.computeIfAbsent(sector, key -> new long[2]);
-            acc[0] += value;
-            acc[1] += 1;
-        }
-
-        return stats.entrySet().stream()
-            .map(entry -> buildSectorAverageResponse(entry.getKey().name(), entry.getKey().getName(), entry.getValue()))
-            .toList();
-    }
-
-    private SectorAverageResponse buildSectorAverageResponse(String sectorKey, String sectorName, long[] acc) {
-        long count = acc[1];
-        int avgScore = count == 0 ? 0 : (int) Math.round(acc[0] / (double) count);
-        return SectorAverageResponse.builder()
-            .sector(sectorKey)
-            .sectorName(sectorName)
-            .averageScore(avgScore)
-            .count((int) count)
-            .build();
     }
 
     private SectorPercentileResponse buildSectorPercentileResponse(

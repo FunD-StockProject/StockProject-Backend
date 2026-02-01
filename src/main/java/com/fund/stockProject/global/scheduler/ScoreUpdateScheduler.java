@@ -1,6 +1,7 @@
 package com.fund.stockProject.global.scheduler;
 
 import com.fund.stockProject.score.service.ScoreBatchService;
+import com.fund.stockProject.stock.service.SectorScoreSnapshotService;
 import com.fund.stockProject.stock.domain.COUNTRY;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 public class ScoreUpdateScheduler {
 
     private final ScoreBatchService scoreBatchService;
+    private final SectorScoreSnapshotService sectorScoreSnapshotService;
 
     /**
      * 해외 점수&키워드 업데이트 스케줄러
@@ -22,6 +24,7 @@ public class ScoreUpdateScheduler {
         log.info("Starting oversea score batch scheduler");
         try {
             scoreBatchService.runCountryBatch(COUNTRY.OVERSEA);
+            sectorScoreSnapshotService.saveDailySnapshot(COUNTRY.OVERSEA, java.time.LocalDate.now());
             log.info("Oversea score batch scheduler completed successfully");
         } catch (Exception e) {
             log.error("Oversea score batch scheduler failed", e);
@@ -37,6 +40,7 @@ public class ScoreUpdateScheduler {
         log.info("Starting korea score batch scheduler");
         try {
             scoreBatchService.runCountryBatch(COUNTRY.KOREA);
+            sectorScoreSnapshotService.saveDailySnapshot(COUNTRY.KOREA, java.time.LocalDate.now());
             log.info("Korea score batch scheduler completed successfully");
         } catch (Exception e) {
             log.error("Korea score batch scheduler failed", e);
