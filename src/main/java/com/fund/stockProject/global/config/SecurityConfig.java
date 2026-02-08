@@ -78,7 +78,11 @@ public class SecurityConfig {
             "/stock/{id}/info/{country}",
             "/stock/category/{category}/{country}",
             "/stock/rankings/hot",
-            "/stock/summary/{symbol}/{country}"
+            "/stock/summary/{symbol}/{country}",
+            "/stock/sector/average/{country}",
+            "/stock/{id}/sector/percentile",
+            "/stock/{id}/average/month",
+            "/stock/sector/average/{country}/{sector}",
     };
 
     @Bean
