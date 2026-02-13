@@ -23,6 +23,20 @@ public interface OutboxRepository extends JpaRepository<OutboxEvent, Integer> {
     @Query("SELECT e FROM OutboxEvent e WHERE e.status IN :statuses AND (e.scheduledAt IS NULL OR e.scheduledAt <= :now)")
     Page<OutboxEvent> findReadyToProcessInStatuses(@Param("statuses") List<String> statuses, @Param("now") Instant now, Pageable pageable);
 
+    @Query("""
+        SELECT e FROM OutboxEvent e
+        WHERE e.status = 'PENDING'
+        AND e.scheduledAt IS NULL
+    """)
+    Page<OutboxEvent> findReadyImmediateEvents(Pageable pageable);
+
+    @Query("""
+        SELECT e FROM OutboxEvent e
+        WHERE e.status = 'READY_TO_SEND'
+        AND e.scheduledAt <= :now
+    """)
+    Page<OutboxEvent> findReadyScheduledEvents(@Param("now") Instant now, Pageable pageable);
+
     @Query("SELECT e FROM OutboxEvent e WHERE e.status = :status AND e.nextAttemptAt <= :now")
     List<OutboxEvent> findRetryableEvents(@Param("status") String status, @Param("now") Instant now);
 
