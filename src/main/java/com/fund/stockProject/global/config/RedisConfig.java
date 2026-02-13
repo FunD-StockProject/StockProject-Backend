@@ -14,7 +14,6 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
-import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,12 +28,12 @@ public class RedisConfig {
     public ObjectMapper redisCacheObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
-        // 타입 정보를 포함하지 않도록 설정 (클린한 JSON)
+        // 명시 타입 serializer에서 사용할 ObjectMapper
         return mapper;
     }
 
     @Bean
-    public RedisCacheConfiguration defaultCacheConfiguration(ObjectMapper redisCacheObjectMapper) {
+    public RedisCacheConfiguration defaultCacheConfiguration() {
         return RedisCacheConfiguration.defaultCacheConfig()
             .entryTtl(Duration.ofMinutes(10))
             .disableCachingNullValues()
@@ -45,7 +44,8 @@ public class RedisConfig {
             )
             .serializeValuesWith(
                 RedisSerializationContext.SerializationPair.fromSerializer(
-                    new GenericJackson2JsonRedisSerializer(redisCacheObjectMapper)
+                    // 기본 캐시도 타입 정보를 유지해 역직렬화 시 Map으로 깨지지 않도록 설정
+                    new GenericJackson2JsonRedisSerializer()
                 )
             );
     }
@@ -58,9 +58,9 @@ public class RedisConfig {
 
         Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
 
-        Jackson2JsonRedisSerializer<Object> stockInfoSerializer =
-            new Jackson2JsonRedisSerializer<>(redisCacheObjectMapper, Object.class);
-        RedisSerializationContext.SerializationPair<Object> stockInfoSerializationPair =
+        Jackson2JsonRedisSerializer<StockInfoResponse> stockInfoSerializer =
+            new Jackson2JsonRedisSerializer<>(redisCacheObjectMapper, StockInfoResponse.class);
+        RedisSerializationContext.SerializationPair<StockInfoResponse> stockInfoSerializationPair =
             RedisSerializationContext.SerializationPair.fromSerializer(stockInfoSerializer);
 
         // 숏뷰 추천: 5분 캐시 (사용자별 추천 결과)
@@ -70,7 +70,7 @@ public class RedisConfig {
         // 실시간 가격: 30초 캐시 (변동성 높음)
         cacheConfigurations.put("stockPrice",
             defaultCacheConfiguration.entryTtl(Duration.ofSeconds(30))
-                .serializeValuesWith(stockInfoSerializationPair));
+                .serializeValuesWith(castToObjectPair(stockInfoSerializationPair)));
 
         // 주식 정보: 1시간 캐시 (기본 정보, 변동 적음)
         cacheConfigurations.put("stockInfo",
@@ -79,7 +79,7 @@ public class RedisConfig {
         // 검색 결과: 30분 캐시
         cacheConfigurations.put("searchResult",
             defaultCacheConfiguration.entryTtl(Duration.ofMinutes(30))
-                .serializeValuesWith(stockInfoSerializationPair));
+                .serializeValuesWith(castToObjectPair(stockInfoSerializationPair)));
 
         // 유효한 주식 목록: 1시간 캐시
         cacheConfigurations.put("validStocks",
@@ -89,5 +89,11 @@ public class RedisConfig {
             .cacheDefaults(defaultCacheConfiguration)
             .withInitialCacheConfigurations(cacheConfigurations)
             .build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private RedisSerializationContext.SerializationPair<Object> castToObjectPair(
+        RedisSerializationContext.SerializationPair<?> pair) {
+        return (RedisSerializationContext.SerializationPair<Object>) pair;
     }
 }
