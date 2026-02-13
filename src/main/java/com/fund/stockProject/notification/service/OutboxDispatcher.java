@@ -43,28 +43,42 @@ public class OutboxDispatcher {
     }
 
     /**
-     * 즉시 발송 처리 (15분마다)
+     * 즉시 알림 발송 처리
      */
-    @Scheduled(fixedDelay = 900000) // 15분 = 900,000ms
+    @Scheduled(fixedDelay = 60000) // 1분
     public void dispatchImmediate() {
         try {
-            // 스케줄러에서는 트랜잭션을 사용하지 않고, 개별 처리에서만 사용
-            var batch = outboxRepo.findReadyToProcessInStatuses(
-                    List.of("PENDING", "READY_TO_SEND"),
-                    Instant.now(),
-                    PageRequest.of(0, 100)
-            );
+            var batch = outboxRepo.findReadyImmediateEvents(PageRequest.of(0, 100));
 
-            log.debug("Found {} events to process immediately", batch.getContent().size());
+            log.debug("Found {} immediate events to process", batch.getContent().size());
 
             for (OutboxEvent e : batch.getContent()) {
                 if (!"ALERT_CREATED".equals(e.getType())) continue;
 
-                // 각 이벤트를 개별 트랜잭션으로 처리
-                processEventWithTransaction(e);
+                processEvent(e);
             }
         } catch (Exception e) {
             log.error("Error in dispatchImmediate scheduler", e);
+        }
+    }
+
+    /**
+     * 예약 알림 발송 처리 (9시대 매분)
+     */
+    @Scheduled(cron = "0 * 9 * * *", zone = "Asia/Seoul")
+    public void dispatchScheduled() {
+        try {
+            var batch = outboxRepo.findReadyScheduledEvents(Instant.now(), PageRequest.of(0, 200));
+
+            log.debug("Found {} scheduled events to process", batch.getContent().size());
+
+            for (OutboxEvent e : batch.getContent()) {
+                if (!"ALERT_CREATED".equals(e.getType())) continue;
+
+                processEvent(e);
+            }
+        } catch (Exception e) {
+            log.error("Error in dispatchScheduled scheduler", e);
         }
     }
 
@@ -81,24 +95,10 @@ public class OutboxDispatcher {
             for (OutboxEvent e : retryEvents) {
                 if (!"ALERT_CREATED".equals(e.getType())) continue;
 
-                // 각 이벤트를 개별 트랜잭션으로 처리
-                processEventWithTransaction(e);
+                processEvent(e);
             }
         } catch (Exception e) {
             log.error("Error in dispatchRetry scheduler", e);
-        }
-    }
-
-    /**
-     * 개별 이벤트를 트랜잭션으로 처리
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void processEventWithTransaction(OutboxEvent e) {
-        try {
-            processEvent(e);
-        } catch (Exception ex) {
-            log.error("Failed to process event {}: {}", e.getId(), ex.getMessage());
-            handleError(e, ex);
         }
     }
 
@@ -132,6 +132,7 @@ public class OutboxDispatcher {
             }
 
             e.setStatus("PROCESSED");
+            outboxRepo.save(e);
             log.info("Notification sent successfully: userId={}, notificationId={}", userId, nId);
             
         } catch (Exception ex) {
@@ -150,6 +151,7 @@ public class OutboxDispatcher {
         long backoffSec = Math.min(300, 1L << Math.min(10, retryCount));
         e.setNextAttemptAt(Instant.now().plusSeconds(backoffSec));
         e.setStatus("RETRY");
+        outboxRepo.save(e);
         
         log.warn("Notification dispatch failed, will retry: eventId={}, retryCount={}, nextAttempt={}, error={}", 
                 e.getId(), retryCount, e.getNextAttemptAt(), ex.getMessage());
