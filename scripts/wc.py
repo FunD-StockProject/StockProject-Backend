@@ -1,120 +1,296 @@
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
 warnings.filterwarnings("ignore", message="Some weights of")
 
-import requests
-import sys
 import json
 import re
+import sys
 from collections import Counter
 
-# 1. API를 통해 데이터 받아오기 (가중치 반영 및 전체 텍스트 저장)
-def fetch_texts_from_api(api_url):
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    response = requests.get(api_url, headers=headers)
-    if response.status_code == 200:
-        data = response.json()
-        all_text = ""  # 전체 텍스트를 누적할 변수
+try:
+    import requests
+    REQUESTS_IMPORT_ERROR = None
+except Exception as import_error:
+    requests = None
+    REQUESTS_IMPORT_ERROR = str(import_error)
 
-        for item in data:
-            # 제목과 내용을 결합한 뒤 <br> 태그 제거
-            text = (item['title'] + " " + item['contents']).replace("<br>", "").strip()
-            text = text.lower()  # 텍스트를 소문자로 변환
-            text = preprocess_text(text)  # 전처리
-            all_text += text + " "  # 전체 텍스트 누적
-        # 텍스트와 전체 텍스트를 함께 반환
-        return all_text.strip()
-    else:
-        raise Exception(f"API 요청 실패: {response.status_code}")
-    
+
+def build_session():
+    session = requests.Session()
+    session.headers.update(
+        {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/91.0.4472.124 Safari/537.36"
+            ),
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3",
+            "Referer": "https://m.stock.naver.com/",
+            "Origin": "https://m.stock.naver.com",
+        }
+    )
+    return session
+
+
+def safe_get_json(session, url, timeout=10):
+    response = session.get(url, timeout=timeout)
+    response.raise_for_status()
+
+    content_type = response.headers.get("Content-Type", "")
+    if "json" not in content_type.lower():
+        preview = response.text[:200].replace("\n", " ")
+        raise ValueError(f"non-json response: {preview}")
+
+    return response.json()
+
+
+def resolve_oversea_item_code(session, symbol):
+    url = (
+        "https://m.stock.naver.com/front-api/search/autoComplete"
+        f"?query={symbol}%20&target=stock%2Cindex%2Cmarketindicator%2Ccoin%2Cipo"
+    )
+    data = safe_get_json(session, url)
+    items = data.get("result", {}).get("items", [])
+    if not items:
+        raise ValueError("no overseas items from autocomplete")
+
+    for item in items:
+        reuters_code = item.get("reutersCode")
+        if reuters_code:
+            return reuters_code
+
+    raise ValueError("missing reutersCode in autocomplete result")
+
+
+def collect_posts(session, item_code, discussion_type, max_posts=150):
+    texts = []
+
+    hot_url = (
+        "https://m.stock.naver.com/front-api/discussion/list/hot"
+        f"?itemCode={item_code}&discussionType={discussion_type}"
+    )
+    try:
+        hot_data = safe_get_json(session, hot_url)
+        if hot_data.get("isSuccess"):
+            for post in hot_data.get("result", {}).get("hotPosts", []):
+                title = post.get("title", "")
+                contents = post.get("contentSwReplacedButImg") or post.get(
+                    "contentSwReplaced", ""
+                )
+                text = (title + " " + contents).replace("<br>", " ").strip()
+                if text:
+                    texts.append(text)
+    except Exception:
+        pass
+
+    page = 1
+    page_size = 50
+    while len(texts) < max_posts:
+        url = (
+            "https://m.stock.naver.com/front-api/discussion/list"
+            f"?discussionType={discussion_type}&itemCode={item_code}"
+            f"&page={page}&pageSize={page_size}"
+            "&isHolderOnly=false&excludesItemNews=false&isItemNewsOnly=false"
+        )
+        try:
+            data = safe_get_json(session, url)
+        except Exception:
+            break
+
+        if not data.get("isSuccess"):
+            break
+
+        posts = data.get("result", {}).get("posts", [])
+        if not posts:
+            break
+
+        for post in posts:
+            title = post.get("title", "")
+            contents = post.get("contentSwReplacedButImg") or post.get(
+                "contentSwReplaced", ""
+            )
+            text = (title + " " + contents).replace("<br>", " ").strip()
+            if text:
+                texts.append(text)
+            if len(texts) >= max_posts:
+                break
+
+        if len(posts) < page_size:
+            break
+        page += 1
+
+    return texts[:max_posts]
+
+
 def preprocess_text(text):
-    text = re.sub(r'[^가-힣a-zA-Z0-9\s]', '', text)  # 특수문자 제거
-    text = re.sub(r'\s+', ' ', text)  # 연속된 공백 제거
-    return text.strip().lower()  # 소문자 변환 및 양 끝 공백 제거    
+    text = re.sub(r"[^가-힣a-zA-Z0-9\s]", "", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip().lower()
 
-# 전체 텍스트 단어 빈도수 계산 및 긍정, 부정 점수 추가
+
 def calculate_word_frequencies_with_scores(all_text):
-    # 단어 빈도수 계산
     word_counts = Counter(all_text.split())
 
-    # 긍정 및 부정 점수 추가
     word_freq_list = []
     for word, freq in word_counts.items():
         if word in STOP_WORDS:
-            continue  # 불용어는 건너뛰기
+            continue
         if any(re.fullmatch(pattern, word) for pattern in FILTER_PATTERNS):
             continue
 
-        # 단어 정보와 빈도수, 긍정 및 부정 점수를 저장
-        word_freq_list.append({
-            "word": word,
-            "freq": freq
-        })
+        word_freq_list.append({"word": word, "freq": freq})
 
-    # 정렬: 빈도수가 높은 순으로 정렬
-    sorted_word_freq_list = sorted(word_freq_list, key=lambda x: x['freq'], reverse=True)
+    return sorted(word_freq_list, key=lambda x: x["freq"], reverse=True)
 
-    return sorted_word_freq_list
 
-# 4. Main Script
-if __name__ == "__main__":
-    # 국내, 해외 구분
-    api_url = ""
-    symbol = sys.argv[1]
-    country = sys.argv[2]
-    
-    if country == 'OVERSEA':
-        # 검색 API 요청
-        url = f"https://m.stock.naver.com/front-api/search/autoComplete?query={symbol}%20&target=stock%2Cindex%2Cmarketindicator%2Ccoin%2Cipo"
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            try:
-                # 첫 번째 items의 reutersCode 값 저장
-                reuters_code = data["result"]["items"][0]["reutersCode"]
-                print(f"Reuters Code: {reuters_code}")
-            except (KeyError, IndexError):
-                print("items 배열이 비어있거나 reutersCode 키가 존재하지 않습니다.")
-        else:
-            print(f"API 요청 실패: {response.status_code}")
-        api_url = f"https://m.stock.naver.com/api/discuss/globalStock/{reuters_code}?rsno=0&size=100&filter="
-    else:
-        api_url = f"https://m.stock.naver.com/api/discuss/localStock/{symbol}?rsno=0&size=100&filter="
+STOP_WORDS = [
+    "하",
+    "이거",
+    "종목",
+    "다시",
+    "종토방",
+    "그럼",
+    "이런",
+    "다들",
+    "지금",
+    "뉴스로배우는세상",
+    "또",
+    "주식",
+    "세상",
+    "대신",
+    "죄",
+    "우리",
+    "뭐",
+    "찢",
+    "좀",
+    "너무",
+    "아",
+    "더",
+    "다",
+    "이",
+    "그",
+    "것",
+    "수",
+    "들",
+    "를",
+    "은",
+    "는",
+    "에",
+    "의",
+    "가",
+    "와",
+    "과",
+    "역시",
+    "해",
+    "당장",
+    "현재",
+    "한",
+    "로",
+    "으로",
+    "을",
+    "하고",
+    "그리고",
+    "그러나",
+    "하지만",
+    "해서",
+    "및",
+    "또한",
+    "근데",
+    "흠",
+    "진짜",
+    "이제",
+    "그리고",
+    "며",
+    "이다",
+    "에서",
+    "에게",
+    "와의",
+    "하고",
+    "에서의",
+    "난",
+    "왜",
+    "잘",
+    "오",
+    "딱",
+    "말",
+    "할",
+    "한다",
+    "오늘",
+    "어제",
+    "내일",
+    "통해",
+    "경우",
+    "관련",
+    "지난해",
+    "현물",
+    "시장",
+    "대한",
+    "따르면",
+]
 
-    # 불용어 리스트 정의
-    STOP_WORDS = [
-        '하', '이거', '종목', '다시', '종토방', '그럼', '이런', '다들', '지금', '뉴스로배우는세상', '또', '주식', '세상', '대신', '죄', '우리', '뭐', '찢', '좀', '너무', '아', '더', '다', '이', '그', '것', '수', '들', '를', '은', '는', '에', '의', '가', '와', '과', '역시', '해', '당장', '현재',
-        '한', '로', '으로', '을', '하고', '그리고', '그러나', '하지만', '해서', '및', '또한', '근데', '흠', '진짜', '이제',
-        '그리고', '며', '이다', '에서', '에게', '와의', '하고', '에서의', '난', '왜', '잘', '오', '딱', '말', '할', '한다', '오늘', '어제', '내일', '통해', '경우', '관련', '지난해', '현물', '시장', '대한', '따르면'
-    ]
+FILTER_PATTERNS = [
+    r"[ㅋㅎ]+",
+    r"[ㅜㅠ]+",
+    r".*다$",
+    r".*오늘.*",
+    r".*어제.*",
+    r".*내일.*",
+    r".*있.*",
+    r".*의$",
+    r".*이$",
+    r".*가$",
+    r".*는$",
+    r".*은$",
+    r".*을$",
+    r".*로$",
+    r".*를$",
+    r".*가$",
+]
 
-    # 필터링할 패턴 정의
-    FILTER_PATTERNS = [
-        r'[ㅋㅎ]+',           # ㅋ, ㅎ이 하나 이상 반복된 패턴 (예: ㅋ, ㅋㅋ, ㅎㅎ 등)
-        r'[ㅜㅠ]+',           # ㅜ, ㅠ가 하나 이상 반복된 패턴 (예: ㅜㅜ, ㅠㅠ 등)
-        r'.*다$',            # ~다로 끝나는 단어
-        r'.*오늘.*',         # '오늘'이 포함된 단어
-        r'.*어제.*',         # '어제'가 포함된 단어
-        r'.*내일.*',          # '내일'이 포함된 단어
-        r'.*있.*',          # '있'이 포함된 단어
-        r'.*의$',             # ~의로 끝나는 단어
-        r'.*이$',             # ~이로 끝나는 단어
-        r'.*가$',             # ~가로 끝나는 단어
-        r'.*는$',             # ~는로 끝나는 단어
-        r'.*은$',             # ~은로 끝나는 단어
-        r'.*을$',             # ~을로 끝나는 단어
-        r'.*로$',             # ~로 끝나는 단어
-        r'.*를$',             # ~를로 끝나는 단어
-        r'.*가$'             # ~가로 끝나는 단어
-    ]
+
+def main():
+    if len(sys.argv) != 3:
+        print(json.dumps({"word_cloud": [], "error": "invalid args"}, ensure_ascii=False))
+        return 0
+
+    if requests is None:
+        print(
+            json.dumps(
+                {"word_cloud": [], "error": f"requests import failed: {REQUESTS_IMPORT_ERROR}"},
+                ensure_ascii=False,
+            )
+        )
+        return 0
+
+    symbol = sys.argv[1].strip()
+    country = sys.argv[2].strip().upper()
+    session = build_session()
 
     try:
-        # API에서 텍스트 데이터 가져오기
-        all_text = fetch_texts_from_api(api_url)
+        if country == "OVERSEA":
+            item_code = resolve_oversea_item_code(session, symbol)
+            discussion_type = "foreignStock"
+        else:
+            item_code = symbol
+            discussion_type = "domesticStock"
+
+        texts = collect_posts(session, item_code, discussion_type, max_posts=150)
+        normalized_texts = [preprocess_text(text) for text in texts if text]
+        all_text = " ".join(t for t in normalized_texts if t).strip()
+
+        if not all_text:
+            print(json.dumps({"word_cloud": []}, ensure_ascii=False))
+            return 0
+
         freq_list = calculate_word_frequencies_with_scores(all_text)
         print(json.dumps({"word_cloud": freq_list}, ensure_ascii=False))
-        sys.exit(0)  # 성공 시 exit code 0
-    
+        return 0
     except Exception as e:
-        print(f"오류 발생: {e}")
-        sys.exit(1)  # 성공 시 exit code 0
+        print(json.dumps({"word_cloud": [], "error": str(e)}, ensure_ascii=False))
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

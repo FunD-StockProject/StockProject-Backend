@@ -79,9 +79,7 @@ public class ScoreService {
 
             Future<String> outputFuture = pythonExecutorService.submit(() -> {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                return reader.lines()
-                    .filter(line -> line.trim().startsWith("{") && line.trim().endsWith("}"))
-                    .collect(Collectors.joining("\n"));
+                return reader.lines().collect(Collectors.joining("\n"));
             });
 
             String output;
@@ -100,17 +98,31 @@ public class ScoreService {
             }
             int exitCode = process.exitValue();
             if (exitCode != 0) {
-                log.error("Word cloud Python script execution failed - symbol: {}, country: {}, exitCode: {}", symbol, country, exitCode);
-                throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
+                String outputPreview = output.length() > 1000 ? output.substring(0, 1000) + "..." : output;
+                log.error("Word cloud Python script execution failed - symbol: {}, country: {}, exitCode: {}, output: {}",
+                    symbol, country, exitCode, outputPreview);
+                return List.of();
             }
 
             // Parse the JSON output from the Python script
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode jsonNode = objectMapper.readTree(output);
 
+            if (jsonNode.has("error")) {
+                log.warn("Word cloud Python script returned error payload - symbol: {}, country: {}, error: {}",
+                    symbol, country, jsonNode.get("error").asText());
+            }
+
+            JsonNode wordCloudNode = jsonNode.path("word_cloud");
+            if (!wordCloudNode.isArray()) {
+                log.warn("Word cloud payload missing word_cloud array - symbol: {}, country: {}, payload: {}",
+                    symbol, country, jsonNode.toString());
+                return List.of();
+            }
+
             // Parse the "word_cloud" array
             List<StockWordResponse> wordCloud = new ArrayList<>();
-            for (JsonNode wordNode : jsonNode.get("word_cloud")) {
+            for (JsonNode wordNode : wordCloudNode) {
                 String word = wordNode.get("word").asText();
                 int freq = wordNode.get("freq").asInt();
                 wordCloud.add(new StockWordResponse(word, freq));
@@ -121,7 +133,7 @@ public class ScoreService {
 
         } catch (Exception e) {
             log.error("Failed to execute word cloud Python script - symbol: {}, country: {}", symbol, country, e);
-            throw new RuntimeException("Failed to execute Python script", e);
+            return List.of();
         } finally {
             if (pythonProcessSemaphore.availablePermits() < 2) {
                 pythonProcessSemaphore.release();
