@@ -219,41 +219,25 @@ public class SecurityService {
             stockInfoResponse.setCountry(country);
 
             if (outputNode != null && !outputNode.isNull() && !outputNode.isEmpty()) {
-                // 안전하게 필드 파싱
-                JsonNode yesterdayPriceNode = outputNode.get("stck_prdy_clpr");
-                if (yesterdayPriceNode != null && !yesterdayPriceNode.isNull()) {
-                    try {
-                        stockInfoResponse.setYesterdayPrice(yesterdayPriceNode.asDouble());
-                    } catch (Exception e) {
-                        log.warn("Failed to parse yesterdayPrice for symbol: {}, value: {}", symbol, yesterdayPriceNode.asText());
-                    }
+                // 빈 값/문자열을 0.0으로 오인하지 않도록 안전하게 숫자 파싱
+                final Double yesterdayPrice = parseFiniteDouble(outputNode.get("stck_prdy_clpr"), symbol, "stck_prdy_clpr");
+                if (isPositiveFinite(yesterdayPrice)) {
+                    stockInfoResponse.setYesterdayPrice(yesterdayPrice);
                 }
-                
-                JsonNode currentPriceNode = outputNode.get("stck_prpr");
-                if (currentPriceNode != null && !currentPriceNode.isNull()) {
-                    try {
-                        stockInfoResponse.setPrice(currentPriceNode.asDouble());
-                    } catch (Exception e) {
-                        log.warn("Failed to parse currentPrice for symbol: {}, value: {}", symbol, currentPriceNode.asText());
-                    }
+
+                final Double currentPrice = parseFiniteDouble(outputNode.get("stck_prpr"), symbol, "stck_prpr");
+                if (isPositiveFinite(currentPrice)) {
+                    stockInfoResponse.setPrice(currentPrice);
                 }
-                
-                JsonNode priceDiffNode = outputNode.get("prdy_vrss");
-                if (priceDiffNode != null && !priceDiffNode.isNull()) {
-                    try {
-                        stockInfoResponse.setPriceDiff(priceDiffNode.asDouble());
-                    } catch (Exception e) {
-                        log.warn("Failed to parse priceDiff for symbol: {}", symbol);
-                    }
+
+                final Double priceDiff = parseFiniteDouble(outputNode.get("prdy_vrss"), symbol, "prdy_vrss");
+                if (priceDiff != null) {
+                    stockInfoResponse.setPriceDiff(priceDiff);
                 }
-                
-                JsonNode priceDiffPercentNode = outputNode.get("prdy_ctrt");
-                if (priceDiffPercentNode != null && !priceDiffPercentNode.isNull()) {
-                    try {
-                        stockInfoResponse.setPriceDiffPerCent(priceDiffPercentNode.asDouble());
-                    } catch (Exception e) {
-                        log.warn("Failed to parse priceDiffPerCent for symbol: {}", symbol);
-                    }
+
+                final Double priceDiffPercent = parseFiniteDouble(outputNode.get("prdy_ctrt"), symbol, "prdy_ctrt");
+                if (priceDiffPercent != null) {
+                    stockInfoResponse.setPriceDiffPerCent(priceDiffPercent);
                 }
                 
                 // 가격 정보가 하나도 없는 경우 에러
@@ -283,29 +267,77 @@ public class SecurityService {
             JsonNode outputNode = rootNode.get("output");
             StockInfoResponse stockInfoResponse = new StockInfoResponse();
 
-            if (outputNode != null) {
+            if (outputNode != null && !outputNode.isNull() && !outputNode.isEmpty()) {
                 stockInfoResponse.setStockId(id);
                 stockInfoResponse.setSymbolName(symbolName);
                 stockInfoResponse.setSecurityName(securityName);
                 stockInfoResponse.setCountry(country);
                 stockInfoResponse.setSymbol(symbol);
                 stockInfoResponse.setExchangeNum(exchangenum);
-                stockInfoResponse.setYesterdayPrice(outputNode.get("base").asDouble()); // 전일종가
-                stockInfoResponse.setPrice(outputNode.get("last").asDouble()); // 현재가
-                // 해외는 diff가 절대값이므로 절대값에 따라 음수로 변경
-                if(outputNode.get("rate").asDouble() < 0) {
-                    stockInfoResponse.setPriceDiff(outputNode.get("diff").asDouble() * -1);
+
+                final Double yesterdayPrice = parseFiniteDouble(outputNode.get("base"), symbol, "base");
+                if (isPositiveFinite(yesterdayPrice)) {
+                    stockInfoResponse.setYesterdayPrice(yesterdayPrice);
                 }
-                else{
-                    stockInfoResponse.setPriceDiff(outputNode.get("diff").asDouble());
+
+                final Double currentPrice = parseFiniteDouble(outputNode.get("last"), symbol, "last");
+                if (isPositiveFinite(currentPrice)) {
+                    stockInfoResponse.setPrice(currentPrice);
                 }
-                stockInfoResponse.setPriceDiffPerCent(outputNode.get("rate").asDouble());
+
+                final Double rate = parseFiniteDouble(outputNode.get("rate"), symbol, "rate");
+                final Double diff = parseFiniteDouble(outputNode.get("diff"), symbol, "diff");
+                if (rate != null && diff != null) {
+                    // 해외 diff는 절대값으로 오는 경우가 많아 부호를 rate 기준으로 정규화
+                    stockInfoResponse.setPriceDiff(rate < 0 ? -Math.abs(diff) : Math.abs(diff));
+                    stockInfoResponse.setPriceDiffPerCent(rate);
+                }
+
+                if (stockInfoResponse.getPrice() == null && stockInfoResponse.getYesterdayPrice() == null) {
+                    log.error("Both overseas price and yesterdayPrice are missing - symbol: {}, output: {}", symbol, outputNode.toString());
+                    return Mono.error(new UnsupportedOperationException("해외 종목 주가 정보가 없습니다 (symbol: " + symbol + ")"));
+                }
+            } else {
+                log.error("Overseas output node is null, missing or empty - symbol: {}, response: {}", symbol, response);
+                return Mono.error(new UnsupportedOperationException("해외 종목 정보가 없습니다 (output node missing, symbol: " + symbol + ")"));
             }
 
             return Mono.just(stockInfoResponse);
         } catch (Exception e) {
             return Mono.error(new UnsupportedOperationException("해외 종목 정보가 없습니다"));
         }
+    }
+
+    private Double parseFiniteDouble(JsonNode node, String symbol, String fieldName) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+
+        try {
+            final double value;
+            if (node.isNumber()) {
+                value = node.asDouble();
+            } else {
+                final String text = node.asText("");
+                if (text.isBlank()) {
+                    return null;
+                }
+                value = Double.parseDouble(text.replace(",", ""));
+            }
+
+            if (!Double.isFinite(value)) {
+                log.warn("Non-finite numeric value for symbol: {}, field: {}, raw: {}", symbol, fieldName, node.asText());
+                return null;
+            }
+            return value;
+        } catch (Exception e) {
+            log.warn("Failed to parse numeric field - symbol: {}, field: {}, raw: {}", symbol, fieldName, node.asText());
+            return null;
+        }
+    }
+
+    private boolean isPositiveFinite(Double value) {
+        return value != null && Double.isFinite(value) && value > 0;
     }
 
     /**
