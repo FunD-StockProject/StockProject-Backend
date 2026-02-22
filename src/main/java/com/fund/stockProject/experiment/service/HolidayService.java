@@ -8,6 +8,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
+import java.time.Duration;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.Set;
@@ -24,6 +25,7 @@ public class HolidayService {
     private String serviceKey;
 
     private static final String API_BASE_URL = "http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService";
+    private static final Duration HOLIDAY_API_TIMEOUT = Duration.ofSeconds(8);
     
     // 간단한 메모리 캐시 (연도별)
     private final ConcurrentHashMap<Integer, Set<LocalDate>> holidayCache = new ConcurrentHashMap<>();
@@ -51,6 +53,7 @@ public class HolidayService {
                         .build())
                 .retrieve()
                 .bodyToMono(String.class)
+                .timeout(HOLIDAY_API_TIMEOUT)
                 .map(xmlResponse -> {
                     Set<LocalDate> holidays = parseHolidays(xmlResponse);
                     // 캐시에 저장
@@ -107,7 +110,7 @@ public class HolidayService {
      */
     public boolean isHolidaySync(LocalDate date) {
         try {
-            Set<LocalDate> holidays = getHolidays(date.getYear()).block();
+            Set<LocalDate> holidays = getHolidays(date.getYear()).block(HOLIDAY_API_TIMEOUT.plusSeconds(1));
             return holidays != null && holidays.contains(date);
         } catch (Exception e) {
             log.error("Failed to check holiday synchronously", e);
@@ -115,4 +118,3 @@ public class HolidayService {
         }
     }
 }
-

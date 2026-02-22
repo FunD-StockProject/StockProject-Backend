@@ -1,14 +1,17 @@
 package com.fund.stockProject.global.config;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.time.format.DateTimeFormatter;
 
 import jakarta.annotation.PostConstruct;
+import io.netty.channel.ChannelOption;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -16,10 +19,14 @@ import com.fund.stockProject.global.dto.request.AccessTokenRequest;
 import com.fund.stockProject.global.dto.response.AccessTokenResponse;
 
 import lombok.extern.slf4j.Slf4j;
+import reactor.netty.http.client.HttpClient;
 
 @Slf4j
 @Configuration
 public class SecurityHttpConfig {
+    private static final int CONNECT_TIMEOUT_MILLIS = 5000;
+    private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(10);
+    private static final String KIS_BASE_URL = "https://openapi.koreainvestment.com:9443";
 
     @Value("${spring.security.appkey}")
     private String appkey;
@@ -41,9 +48,7 @@ public class SecurityHttpConfig {
 
     @Bean
     public WebClient webClient() {
-        return WebClient.builder()
-                        .baseUrl("https://openapi.koreainvestment.com:9443")
-                        .build(); // 기본 헤더는 WebClient 호출 시 동적으로 설정
+        return buildKisWebClient(); // 기본 헤더는 WebClient 호출 시 동적으로 설정
     }
 
     public HttpHeaders createSecurityHeaders() {
@@ -59,17 +64,18 @@ public class SecurityHttpConfig {
 
     private String fetchAccessTokenFromApi() {
         log.info("Fetching access token from Korea Investment API");
-        WebClient webClient = WebClient.create();
+        final WebClient webClient = buildKisWebClient();
         AccessTokenRequest request = new AccessTokenRequest("client_credentials", appkey, appSecret);
 
         try {
             AccessTokenResponse response = webClient.post()
-                                                    .uri("https://openapi.koreainvestment.com:9443/oauth2/tokenP")
+                                                    .uri("/oauth2/tokenP")
                                                     .headers(headers -> headers.setContentType(MediaType.APPLICATION_JSON))
                                                     .bodyValue(request)
                                                     .retrieve()
                                                     .bodyToMono(AccessTokenResponse.class)
-                                                    .block();
+                                                    .timeout(RESPONSE_TIMEOUT)
+                                                    .block(RESPONSE_TIMEOUT.plusSeconds(1));
 
             if (response != null) {
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -85,6 +91,17 @@ public class SecurityHttpConfig {
             log.error("Failed to fetch access token from Korea Investment API", e);
             throw new RuntimeException("Failed to fetch access token", e);
         }
+    }
+
+    private WebClient buildKisWebClient() {
+        final HttpClient httpClient = HttpClient.create()
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MILLIS)
+            .responseTimeout(RESPONSE_TIMEOUT);
+
+        return WebClient.builder()
+            .baseUrl(KIS_BASE_URL)
+            .clientConnector(new ReactorClientHttpConnector(httpClient))
+            .build();
     }
 
     public void refreshTokenIfNeeded() {

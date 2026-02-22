@@ -1,17 +1,17 @@
 package com.fund.stockProject.global.scheduler;
 
 import java.time.LocalDate;
-import java.util.List;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.fund.stockProject.keyword.entity.Keyword;
 import com.fund.stockProject.keyword.repository.KeywordRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class KeywordCleanupScheduler {
@@ -22,10 +22,11 @@ public class KeywordCleanupScheduler {
     @Scheduled(cron = "0 0 0 * * MON") // 매주 월요일 0시 실행
     @Transactional
     public void cleanupUnusedKeywords() {
-        LocalDate cutoffDate = LocalDate.now().minusDays(30);
-        List<Keyword> unusedKeywords = keywordRepository.findByLastUsedAtBefore(cutoffDate);
-        keywordRepository.deleteAll(unusedKeywords);
+        final LocalDate cutoffDate = LocalDate.now().minusDays(30);
+        final int agedOrphanDeleted = keywordRepository.deleteOrphanKeywordsByLastUsedAtBefore(cutoffDate);
+        final int orphanDeleted = keywordRepository.deleteAllOrphanKeywords();
 
-        System.out.println("Unused keywords cleanup completed: " + unusedKeywords.size() + " keywords deleted.");
+        log.info("Unused keywords cleanup completed - agedOrphanDeleted: {}, orphanDeleted: {}",
+            agedOrphanDeleted, orphanDeleted);
     }
 }

@@ -147,8 +147,9 @@ public class OutboxDispatcher {
         int retryCount = e.getRetryCount() + 1;
         e.setRetryCount(retryCount);
         
-        // 지수 백오프: 1분, 2분, 4분, 8분, 16분, 32분, 64분, 128분, 256분, 300분(최대)
-        long backoffSec = Math.min(300, 1L << Math.min(10, retryCount));
+        // 지수 백오프(분 단위): 1분, 2분, 4분 ... 최대 300분
+        final long backoffMinutes = Math.min(300L, 1L << Math.min(10, Math.max(0, retryCount - 1)));
+        long backoffSec = backoffMinutes * 60L;
         e.setNextAttemptAt(Instant.now().plusSeconds(backoffSec));
         e.setStatus("RETRY");
         outboxRepo.save(e);
