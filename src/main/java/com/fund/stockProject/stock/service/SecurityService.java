@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +30,6 @@ import com.fund.stockProject.stock.dto.response.StockOverseaVolumeRankResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.Cacheable;
 import reactor.core.publisher.Mono;
 
 @Service
@@ -43,6 +43,7 @@ public class SecurityService {
     private final ObjectMapper objectMapper;
     private final CacheManager cacheManager;
     private static final String STOCK_PRICE_CACHE = "stockPrice";
+    private final Map<String, Mono<StockInfoResponse>> inFlightPriceRequests = new ConcurrentHashMap<>();
 
     /**
      * 국내, 해외 주식 정보 조회
@@ -152,9 +153,7 @@ public class SecurityService {
 
     /**
      * 국내, 해외 주식 정보 조회
-     * Redis 캐시: 30초간 동일한 결과 반환 (실시간 가격 변동 고려)
      */
-    @Cacheable(value = "stockPrice", key = "#symbol + '_' + #exchangenum.name()", unless = "#result == null")
     public Mono<StockInfoResponse> getSecurityStockInfoKorea(Integer id, String symbolName, String securityName, String symbol, EXCHANGENUM exchangenum, COUNTRY country) {
         if (country == COUNTRY.KOREA) {
             return webClient.get()
@@ -251,9 +250,14 @@ public class SecurityService {
                 return Mono.error(new UnsupportedOperationException("주가 정보가 없습니다 (output node missing, symbol: " + symbol + ")"));
             }
 
-            log.debug("Successfully parsed StockInfo (inquire-price) - symbol: {}, price: {}, yesterdayPrice: {}", 
-                symbol, stockInfoResponse.getPrice(), stockInfoResponse.getYesterdayPrice());
-            return Mono.just(stockInfoResponse);
+            StockInfoResponse normalized = normalizePriceInfo(stockInfoResponse);
+            if (normalized == null) {
+                return Mono.error(new UnsupportedOperationException("주가 정보가 없습니다 (symbol: " + symbol + ")"));
+            }
+
+            log.debug("Successfully parsed StockInfo (inquire-price) - symbol: {}, price: {}, yesterdayPrice: {}",
+                symbol, normalized.getPrice(), normalized.getYesterdayPrice());
+            return Mono.just(normalized);
         } catch (Exception e) {
             log.error("Failed to parse StockInfo response - symbol: {}, response: {}, error: {}", 
                 symbol, response, e.getMessage(), e);
@@ -290,6 +294,10 @@ public class SecurityService {
                 if (rate != null && diff != null) {
                     // 해외 diff는 절대값으로 오는 경우가 많아 부호를 rate 기준으로 정규화
                     stockInfoResponse.setPriceDiff(rate < 0 ? -Math.abs(diff) : Math.abs(diff));
+                } else if (diff != null) {
+                    stockInfoResponse.setPriceDiff(diff);
+                }
+                if (rate != null) {
                     stockInfoResponse.setPriceDiffPerCent(rate);
                 }
 
@@ -302,7 +310,12 @@ public class SecurityService {
                 return Mono.error(new UnsupportedOperationException("해외 종목 정보가 없습니다 (output node missing, symbol: " + symbol + ")"));
             }
 
-            return Mono.just(stockInfoResponse);
+            StockInfoResponse normalized = normalizePriceInfo(stockInfoResponse);
+            if (normalized == null) {
+                return Mono.error(new UnsupportedOperationException("해외 종목 주가 정보가 없습니다 (symbol: " + symbol + ")"));
+            }
+
+            return Mono.just(normalized);
         } catch (Exception e) {
             return Mono.error(new UnsupportedOperationException("해외 종목 정보가 없습니다"));
         }
@@ -334,6 +347,60 @@ public class SecurityService {
             log.warn("Failed to parse numeric field - symbol: {}, field: {}, raw: {}", symbol, fieldName, node.asText());
             return null;
         }
+    }
+
+    private StockInfoResponse normalizePriceInfo(StockInfoResponse response) {
+        if (response == null) {
+            return null;
+        }
+
+        Double price = toPositiveFiniteOrNull(response.getPrice());
+        Double yesterdayPrice = toPositiveFiniteOrNull(response.getYesterdayPrice());
+        Double priceDiff = toFiniteOrNull(response.getPriceDiff());
+        Double priceDiffPercent = toFiniteOrNull(response.getPriceDiffPerCent());
+
+        priceDiff = derivePriceDiff(priceDiff, price, yesterdayPrice);
+        priceDiffPercent = derivePriceDiffPercent(priceDiffPercent, priceDiff, yesterdayPrice);
+
+        response.setPrice(price);
+        response.setYesterdayPrice(yesterdayPrice);
+        response.setPriceDiff(priceDiff);
+        response.setPriceDiffPerCent(priceDiffPercent);
+
+        if (price == null && yesterdayPrice == null) {
+            return null;
+        }
+        return response;
+    }
+
+    private Double derivePriceDiff(Double currentDiff, Double price, Double yesterdayPrice) {
+        if (currentDiff != null) {
+            return currentDiff;
+        }
+        if (!isPositiveFinite(price) || !isPositiveFinite(yesterdayPrice)) {
+            return null;
+        }
+        double derived = price - yesterdayPrice;
+        return Double.isFinite(derived) ? derived : null;
+    }
+
+    private Double derivePriceDiffPercent(Double currentDiffPercent, Double priceDiff, Double yesterdayPrice) {
+        if (currentDiffPercent != null) {
+            return currentDiffPercent;
+        }
+        if (!isPositiveFinite(yesterdayPrice) || priceDiff == null) {
+            return null;
+        }
+        double derived = (priceDiff / yesterdayPrice) * 100.0;
+        return Double.isFinite(derived) ? derived : null;
+    }
+
+    private Double toFiniteOrNull(Double value) {
+        return value != null && Double.isFinite(value) ? value : null;
+    }
+
+    private Double toPositiveFiniteOrNull(Double value) {
+        return isPositiveFinite(value) ? value : null;
     }
 
     private boolean isPositiveFinite(Double value) {
@@ -1048,19 +1115,25 @@ public class SecurityService {
     }
 
     public Mono<StockInfoResponse> getRealTimeStockPrice(Stock stock) {
+        if (stock == null || stock.getSymbol() == null || stock.getExchangeNum() == null) {
+            return Mono.error(new IllegalArgumentException("유효하지 않은 종목 정보입니다."));
+        }
+
         StockInfoResponse cached = getCachedRealTimeStockPrice(stock);
         if (cached != null) {
             return Mono.just(cached);
         }
 
-        return getSecurityStockInfoKorea(
-                stock.getId(),
-                stock.getSymbolName(),
-                stock.getSecurityName(),
-                stock.getSymbol(),
-                stock.getExchangeNum(),
-                getCountryFromExchangeNum(stock.getExchangeNum())
-        ).doOnNext(response -> putStockPriceCache(stock, response));
+        String cacheKey = buildStockPriceCacheKey(stock);
+        if (cacheKey == null) {
+            return requestAndCacheRealTimeStockPrice(stock);
+        }
+
+        return inFlightPriceRequests.computeIfAbsent(cacheKey, key ->
+            requestAndCacheRealTimeStockPrice(stock)
+                .doFinally(signalType -> inFlightPriceRequests.remove(key))
+                .cache()
+        );
     }
 
     public StockInfoResponse getCachedRealTimeStockPrice(Stock stock) {
@@ -1081,16 +1154,30 @@ public class SecurityService {
 
         Object value = wrapper.get();
         if (value instanceof StockInfoResponse) {
-            return (StockInfoResponse) value;
+            return normalizePriceInfo((StockInfoResponse) value);
         }
         if (value instanceof Map) {
-            return objectMapper.convertValue(value, StockInfoResponse.class);
+            StockInfoResponse converted = objectMapper.convertValue(value, StockInfoResponse.class);
+            return normalizePriceInfo(converted);
         }
         return null;
     }
 
+    private Mono<StockInfoResponse> requestAndCacheRealTimeStockPrice(Stock stock) {
+        return getSecurityStockInfoKorea(
+            stock.getId(),
+            stock.getSymbolName(),
+            stock.getSecurityName(),
+            stock.getSymbol(),
+            stock.getExchangeNum(),
+            getCountryFromExchangeNum(stock.getExchangeNum())
+        ).map(this::normalizePriceInfo)
+            .doOnNext(response -> putStockPriceCache(stock, response));
+    }
+
     private void putStockPriceCache(Stock stock, StockInfoResponse response) {
-        if (response == null || response.getPrice() == null || response.getPrice() <= 0) {
+        StockInfoResponse normalized = normalizePriceInfo(response);
+        if (normalized == null || !isPositiveFinite(normalized.getPrice())) {
             return;
         }
 
@@ -1101,7 +1188,7 @@ public class SecurityService {
 
         String cacheKey = buildStockPriceCacheKey(stock);
         if (cacheKey != null) {
-            cache.put(cacheKey, response);
+            cache.put(cacheKey, normalized);
         }
     }
 
