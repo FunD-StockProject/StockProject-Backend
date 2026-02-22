@@ -2,10 +2,13 @@ package com.fund.stockProject.notification.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fund.stockProject.notification.domain.NotificationType;
 import com.fund.stockProject.notification.entity.Notification;
 import com.fund.stockProject.notification.entity.OutboxEvent;
 import com.fund.stockProject.notification.repository.NotificationRepository;
 import com.fund.stockProject.notification.repository.OutboxRepository;
+import com.fund.stockProject.preference.domain.PreferenceType;
+import com.fund.stockProject.preference.repository.PreferenceRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
@@ -23,6 +26,7 @@ import java.util.Map;
 public class OutboxDispatcher {
     private final OutboxRepository outboxRepo;
     private final NotificationRepository notificationRepo;
+    private final PreferenceRepository preferenceRepo;
     private final SsePushService ssePushService;  // 웹/웹뷰 실시간
     private final ObjectMapper om;
     
@@ -32,11 +36,13 @@ public class OutboxDispatcher {
     public OutboxDispatcher(
             OutboxRepository outboxRepo,
             NotificationRepository notificationRepo,
+            PreferenceRepository preferenceRepo,
             SsePushService ssePushService,
             ObjectMapper om,
             @Autowired(required = false) FcmPushService fcmPushService) {
         this.outboxRepo = outboxRepo;
         this.notificationRepo = notificationRepo;
+        this.preferenceRepo = preferenceRepo;
         this.ssePushService = ssePushService;
         this.om = om;
         this.fcmPushService = fcmPushService;
@@ -108,9 +114,31 @@ public class OutboxDispatcher {
     private void processEvent(OutboxEvent e) {
         try {
             Map<String, Object> payload = om.readValue(e.getPayload(), new TypeReference<>(){});
-            Integer nId = Integer.valueOf(payload.get("notificationId").toString());
-            Integer userId = Integer.valueOf(payload.get("userId").toString());
-            Notification n = notificationRepo.findById(nId).orElseThrow();
+            Integer nId = toInteger(payload.get("notificationId"));
+            Integer userId = toInteger(payload.get("userId"));
+            if (nId == null || userId == null) {
+                markProcessedWithoutSend(e, "invalid_payload");
+                return;
+            }
+
+            Notification n = notificationRepo.findById(nId).orElse(null);
+            if (n == null) {
+                markProcessedWithoutSend(e, "notification_not_found");
+                return;
+            }
+
+            if (n.getNotificationType() == NotificationType.SCORE_SPIKE) {
+                Integer stockId = n.getStock() != null ? n.getStock().getId() : toInteger(payload.get("stockId"));
+                boolean enabled = stockId != null && preferenceRepo
+                        .existsByUserIdAndStockIdAndPreferenceTypeAndNotificationEnabled(
+                                userId, stockId, PreferenceType.BOOKMARK, true);
+
+                if (!enabled) {
+                    notificationRepo.delete(n);
+                    markProcessedWithoutSend(e, "notification_disabled_or_unbookmarked");
+                    return;
+                }
+            }
 
             // SSE 푸시 (웹/웹뷰)
             ssePushService.pushToUser(userId, n);
@@ -138,6 +166,26 @@ public class OutboxDispatcher {
         } catch (Exception ex) {
             handleError(e, ex);
         }
+    }
+
+    private Integer toInteger(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.valueOf(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private void markProcessedWithoutSend(OutboxEvent event, String reason) {
+        event.setStatus("PROCESSED");
+        outboxRepo.save(event);
+        log.info("Skipped notification dispatch: eventId={}, reason={}", event.getId(), reason);
     }
 
     /**

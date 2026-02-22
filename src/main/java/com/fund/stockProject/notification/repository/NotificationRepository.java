@@ -23,7 +23,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
         WHERE n.user.id = :userId
         AND (
             n.notificationType <> :scoreSpike
-            OR (n.changeAbs IS NOT NULL AND n.changeAbs <> 0 AND n.oldScore IS NOT NULL AND n.newScore IS NOT NULL)
+            OR (
+                COALESCE(n.changeAbs, 1) <> 0
+                AND n.title IS NOT NULL
+                AND n.body IS NOT NULL
+            )
         )
         ORDER BY n.createdAt DESC
     """)
@@ -43,7 +47,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
         AND n.notificationType = :notificationType
         AND (
             :notificationType <> :scoreSpike
-            OR (n.changeAbs IS NOT NULL AND n.changeAbs <> 0 AND n.oldScore IS NOT NULL AND n.newScore IS NOT NULL)
+            OR (
+                COALESCE(n.changeAbs, 1) <> 0
+                AND n.title IS NOT NULL
+                AND n.body IS NOT NULL
+            )
         )
         ORDER BY n.createdAt DESC
     """)
@@ -63,7 +71,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
         AND n.isRead = false
         AND (
             n.notificationType <> :scoreSpike
-            OR (n.changeAbs IS NOT NULL AND n.changeAbs <> 0 AND n.oldScore IS NOT NULL AND n.newScore IS NOT NULL)
+            OR (
+                COALESCE(n.changeAbs, 1) <> 0
+                AND n.title IS NOT NULL
+                AND n.body IS NOT NULL
+            )
         )
     """)
     long countValidByUserIdAndIsReadFalse(

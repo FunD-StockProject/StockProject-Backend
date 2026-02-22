@@ -1,5 +1,6 @@
 package com.fund.stockProject.notification.repository;
 
+import com.fund.stockProject.notification.domain.DevicePlatform;
 import com.fund.stockProject.notification.entity.UserDeviceToken;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -17,10 +18,45 @@ public interface UserDeviceTokenRepository extends JpaRepository<UserDeviceToken
     List<String> findActiveTokens(@Param("userId") Integer userId);
 
     Optional<UserDeviceToken> findByToken(String token);
+    List<UserDeviceToken> findAllByToken(String token);
 
     // Explicit query for ownership check
     @Query("select t from UserDeviceToken t where t.token = :token and t.user.id = :userId")
     Optional<UserDeviceToken> findByTokenAndUserId(@Param("token") String token, @Param("userId") Integer userId);
+
+    @Modifying
+    @Transactional
+    @Query("""
+        UPDATE UserDeviceToken t
+        SET t.isActive = false
+        WHERE t.user.id = :userId
+    """)
+    int deactivateAllByUserId(@Param("userId") Integer userId);
+
+    @Modifying
+    @Transactional
+    @Query("""
+        UPDATE UserDeviceToken t
+        SET t.isActive = false
+        WHERE t.user.id = :userId
+          AND t.token = :token
+    """)
+    int deactivateByTokenAndUserId(@Param("token") String token, @Param("userId") Integer userId);
+
+    @Modifying
+    @Transactional
+    @Query("""
+        UPDATE UserDeviceToken t
+        SET t.isActive = false
+        WHERE t.user.id = :userId
+          AND t.platform = :platform
+          AND t.token <> :currentToken
+    """)
+    int deactivateByUserIdAndPlatformExceptToken(
+        @Param("userId") Integer userId,
+        @Param("platform") DevicePlatform platform,
+        @Param("currentToken") String currentToken
+    );
 
     // 사용자의 모든 디바이스 토큰 삭제
     @Modifying

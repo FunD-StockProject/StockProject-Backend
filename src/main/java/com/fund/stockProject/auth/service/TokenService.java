@@ -5,6 +5,8 @@ import com.fund.stockProject.auth.dto.LoginResponse;
 import com.fund.stockProject.auth.dto.RefreshTokenRequest;
 import com.fund.stockProject.auth.entity.RefreshToken;
 import com.fund.stockProject.auth.repository.RefreshTokenRepository;
+import com.fund.stockProject.notification.service.DeviceTokenService;
+import com.fund.stockProject.user.entity.User;
 import com.fund.stockProject.user.repository.UserRepository;
 import com.fund.stockProject.security.util.JwtUtil;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -25,6 +27,7 @@ public class TokenService {
     private final JwtUtil jwtUtil;
     private final RefreshTokenRepository refreshTokenRepository; // RefreshRepository 주입
     private final UserRepository userRepository;
+    private final DeviceTokenService deviceTokenService;
 
     @Value("${spring.jwt.access-expiration-ms}")
     private Long accessTokenExpirationMs;
@@ -130,7 +133,7 @@ public class TokenService {
     }
 
     @Transactional
-    public void logout(String refreshToken) {
+    public void logout(Integer userId, String refreshToken, String deviceToken) {
         // 1. Refresh Token 유효성 검증 (null 또는 비어 있는지)
         if (refreshToken == null || refreshToken.trim().isEmpty()) {
             throw new IllegalArgumentException("Refresh token is required for logout.");
@@ -154,6 +157,30 @@ public class TokenService {
         // 3. DB에서 Refresh Token 삭제
         // deleteBy... 메소드는 대상이 없어도 오류를 발생시키지 않으므로, find.. 없이 바로 사용 가능
         refreshTokenRepository.deleteByRefreshToken(refreshToken);
+
+        // 4. 디바이스 토큰 비활성화
+        // 멀티 디바이스 환경 보호:
+        // deviceToken이 전달된 경우에만 해당 토큰을 비활성화
+        Integer resolvedUserId = resolveUserId(userId, refreshToken);
+        if (resolvedUserId != null) {
+            deviceTokenService.unregisterOnLogout(resolvedUserId, deviceToken);
+        } else {
+            log.warn("Skip device token cleanup during logout: cannot resolve user. hasAuthPrincipal={}", userId != null);
+        }
+    }
+
+    private Integer resolveUserId(Integer authenticatedUserId, String refreshToken) {
+        if (authenticatedUserId != null) {
+            return authenticatedUserId;
+        }
+
+        try {
+            String email = jwtUtil.getEmail(refreshToken);
+            return userRepository.findByEmail(email).map(User::getId).orElse(null);
+        } catch (Exception e) {
+            log.warn("Failed to resolve userId from refresh token during logout: {}", e.getMessage());
+            return null;
+        }
     }
 
     private UserProfile getUserProfile(String email) {
