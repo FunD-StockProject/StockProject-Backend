@@ -10,7 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface StockKeywordRepository extends JpaRepository<StockKeyword, Integer> {
+public interface StockKeywordRepository extends JpaRepository<StockKeyword, Long> {
 
     @Query("SELECT sk FROM StockKeyword sk WHERE sk.keyword.name = :keywordName ORDER BY sk.keyword.frequency DESC")
     List<StockKeyword> findByKeywordName(@Param("keywordName") String keywordName);

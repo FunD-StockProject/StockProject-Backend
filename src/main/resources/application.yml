@@ -103,9 +103,9 @@ spring:
 
   batch:
     job:
-      enabled: true
+      enabled: false
     jdbc:
-      initialize-schema: ALWAYS
+      initialize-schema: NEVER
       enabled: false
   jwt:
     secret: ENC(ZtLQKC+5jIxK8fYB7W6XZ3mkCr3ueVGBVYTa1SfpAsnsSKUw2k5lHD+egat0VF0fyQH9apHpl5o=)

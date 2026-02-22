@@ -30,11 +30,14 @@ public class ScoreBatchService {
         int processedCount = 0;
         int successCount = 0;
         int skippedCount = 0;
+        int existsSkipCount = 0;
+        int noDataSkipCount = 0;
         int errorCount = 0;
 
         for (Integer stockId : targetStockIds) {
             if (scoreRepository.existsByStockIdAndDate(stockId, today)) {
                 skippedCount++;
+                existsSkipCount++;
                 continue;
             }
 
@@ -43,14 +46,18 @@ public class ScoreBatchService {
                 int yesterdayScore = resolveYesterdayScore(stockId, country, yesterday, today);
                 scoreService.updateScoreAndKeyword(stockId, country, yesterdayScore);
                 successCount++;
+            } catch (NoCrawlerDataException e) {
+                skippedCount++;
+                noDataSkipCount++;
+                log.info("Skipping score update due to no crawler data - stockId: {}, country: {}", stockId, country);
             } catch (Exception e) {
                 errorCount++;
                 log.error("Error processing score for stockId: {}", stockId, e);
             }
         }
 
-        log.info("Score batch completed for {}: processed={}, success={}, skipped={}, errors={}", 
-            country, processedCount, successCount, skippedCount, errorCount);
+        log.info("Score batch completed for {}: processed={}, success={}, skipped={} (exists={}, noData={}), errors={}",
+            country, processedCount, successCount, skippedCount, existsSkipCount, noDataSkipCount, errorCount);
     }
 
     public void runIndexBatch() {

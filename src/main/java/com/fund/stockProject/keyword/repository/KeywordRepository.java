@@ -7,12 +7,14 @@ import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
-public interface KeywordRepository extends JpaRepository<Keyword, Integer> {
+public interface KeywordRepository extends JpaRepository<Keyword, Long> {
     @Query("SELECT k FROM Keyword k WHERE k.lastUsedAt < :cutoffDate")
     List<Keyword> findByLastUsedAtBefore(@Param("cutoffDate") LocalDate cutoffDate);
 
@@ -51,4 +53,25 @@ public interface KeywordRepository extends JpaRepository<Keyword, Integer> {
     List<Keyword> findKeywords(@Param("today") LocalDate today,
                                @Param("yesterday") LocalDate yesterday,
                                PageRequest pageRequest);
+
+    @Modifying
+    @Transactional
+    @Query("""
+        DELETE FROM Keyword k
+        WHERE k.lastUsedAt < :cutoffDate
+        AND NOT EXISTS (
+            SELECT 1 FROM StockKeyword sk WHERE sk.keyword = k
+        )
+    """)
+    int deleteOrphanKeywordsByLastUsedAtBefore(@Param("cutoffDate") LocalDate cutoffDate);
+
+    @Modifying
+    @Transactional
+    @Query("""
+        DELETE FROM Keyword k
+        WHERE NOT EXISTS (
+            SELECT 1 FROM StockKeyword sk WHERE sk.keyword = k
+        )
+    """)
+    int deleteAllOrphanKeywords();
 }

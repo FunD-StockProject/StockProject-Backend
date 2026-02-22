@@ -67,6 +67,7 @@ public class ScoreService {
 
 
     public List<StockWordResponse> getWordCloud(final String symbol, final COUNTRY country) {
+        boolean acquired = false;
         try {
             log.info("Starting word cloud generation - symbol: {}, country: {}", symbol, country);
             String scriptPath = "/app/scripts/wc.py";
@@ -75,6 +76,7 @@ public class ScoreService {
                 country.toString());
             processBuilder.redirectErrorStream(true);
             pythonProcessSemaphore.acquire();
+            acquired = true;
             Process process = processBuilder.start();
 
             Future<String> outputFuture = pythonExecutorService.submit(() -> {
@@ -86,6 +88,9 @@ public class ScoreService {
             try {
                 output = outputFuture.get(65, TimeUnit.SECONDS);
             } catch (Exception ex) {
+                if (ex instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
                 process.destroyForcibly();
                 log.error("Word cloud Python script timed out - symbol: {}, country: {}", symbol, country, ex);
                 throw new RuntimeException("Python script timed out", ex);
@@ -132,10 +137,13 @@ public class ScoreService {
             return wordCloud;
 
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             log.error("Failed to execute word cloud Python script - symbol: {}, country: {}", symbol, country, e);
             return List.of();
         } finally {
-            if (pythonProcessSemaphore.availablePermits() < 2) {
+            if (acquired) {
                 pythonProcessSemaphore.release();
             }
         }
@@ -228,6 +236,8 @@ public class ScoreService {
             ScoreKeywordResponse scoreKeywordResponse = executeUpdateAI(stock.getSymbol(), country);
             scorePersistenceService.saveScoreAndKeyword(stock.getId(), country, yesterdayScore,
                 scoreKeywordResponse);
+        } catch (NoCrawlerDataException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Failed to update score and keyword", e);
         }
@@ -318,6 +328,7 @@ public class ScoreService {
     }
 
     private int executeScoreAI(String symbol, COUNTRY country) {
+        boolean acquired = false;
         try {
             log.info("Starting score AI execution - symbol: {}, country: {}", symbol, country);
             // Python 스크립트 경로
@@ -328,6 +339,7 @@ public class ScoreService {
                 country.toString());
             processBuilder.redirectErrorStream(true);
             pythonProcessSemaphore.acquire();
+            acquired = true;
             Process process = processBuilder.start();
 
             Future<String> outputFuture = pythonExecutorService.submit(() -> {
@@ -341,6 +353,9 @@ public class ScoreService {
             try {
                 output = outputFuture.get(65, TimeUnit.SECONDS);
             } catch (Exception ex) {
+                if (ex instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
                 process.destroyForcibly();
                 log.error("Score AI Python script timed out - symbol: {}, country: {}", symbol, country, ex);
                 throw new RuntimeException("Python script timed out", ex);
@@ -365,16 +380,20 @@ public class ScoreService {
             return finalScore;
 
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             log.error("Failed to execute score AI Python script - symbol: {}, country: {}", symbol, country, e);
             throw new RuntimeException("Failed to execute Python script", e);
         } finally {
-            if (pythonProcessSemaphore.availablePermits() < 2) {
+            if (acquired) {
                 pythonProcessSemaphore.release();
             }
         }
     }
 
     private ScoreKeywordResponse executeUpdateAI(String symbol, COUNTRY country) {
+        boolean acquired = false;
         try {
             log.info("Starting update AI execution - symbol: {}, country: {}", symbol, country);
             // Python 스크립트 경로
@@ -385,6 +404,7 @@ public class ScoreService {
                 country.toString());
             processBuilder.redirectErrorStream(true);
             pythonProcessSemaphore.acquire();
+            acquired = true;
             Process process = processBuilder.start();
 
             Future<String> outputFuture = pythonExecutorService.submit(() -> {
@@ -396,6 +416,9 @@ public class ScoreService {
             try {
                 output = outputFuture.get(65, TimeUnit.SECONDS);
             } catch (Exception ex) {
+                if (ex instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
                 process.destroyForcibly();
                 log.error("Update AI Python script timed out - symbol: {}, country: {}", symbol, country, ex);
                 throw new RuntimeException("Python script timed out", ex);
@@ -407,10 +430,6 @@ public class ScoreService {
                 throw new RuntimeException("Python process did not terminate in time");
             }
             int exitCode = process.exitValue();
-            if (exitCode != 0) {
-                log.error("Update AI Python script execution failed - symbol: {}, country: {}, exitCode: {}", symbol, country, exitCode);
-                throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
-            }
 
             // Python 스크립트에서 출력된 JSON 파싱
             ObjectMapper objectMapper = new ObjectMapper();
@@ -419,8 +438,19 @@ public class ScoreService {
             // 에러 응답 확인
             if (jsonNode.has("error")) {
                 String errorMessage = jsonNode.get("error").asText();
+                if (isNoCrawlerDataError(errorMessage)) {
+                    log.info("Skipping update AI due to no crawler data - symbol: {}, country: {}", symbol, country);
+                    throw new NoCrawlerDataException("No crawler data for symbol: " + symbol);
+                }
                 log.error("Python script returned error - symbol: {}, country: {}, error: {}", symbol, country, errorMessage);
                 throw new RuntimeException("Python script returned error: " + errorMessage);
+            }
+
+            if (exitCode != 0) {
+                String outputPreview = output.length() > 1000 ? output.substring(0, 1000) + "..." : output;
+                log.error("Update AI Python script execution failed - symbol: {}, country: {}, exitCode: {}, output: {}",
+                    symbol, country, exitCode, outputPreview);
+                throw new RuntimeException("Python script execution failed with exit code: " + exitCode);
             }
 
             // final_score 필드 확인
@@ -442,14 +472,26 @@ public class ScoreService {
             log.info("Update AI execution completed successfully - symbol: {}, country: {}, score: {}, keywordCount: {}", symbol, country, finalScore, topKeywords.size());
             return new ScoreKeywordResponse(finalScore, topKeywords);
 
+        } catch (NoCrawlerDataException e) {
+            throw e;
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             log.error("Failed to execute update AI Python script - symbol: {}, country: {}", symbol, country, e);
             throw new RuntimeException("Failed to execute Python script", e);
         } finally {
-            if (pythonProcessSemaphore.availablePermits() < 2) {
+            if (acquired) {
                 pythonProcessSemaphore.release();
             }
         }
+    }
+
+    private boolean isNoCrawlerDataError(String errorMessage) {
+        if (errorMessage == null) {
+            return false;
+        }
+        return errorMessage.toLowerCase().contains("no data available from crawler");
     }
 
     @Transactional(readOnly = true)

@@ -7,18 +7,17 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fund.stockProject.score.entity.Score;
+import com.fund.stockProject.score.entity.ScoreId;
 import com.fund.stockProject.stock.domain.DomesticSector;
 import com.fund.stockProject.stock.domain.OverseasSector;
 
 @Repository
-@EnableJpaRepositories
-public interface ScoreRepository extends JpaRepository<Score, Integer> {
+public interface ScoreRepository extends JpaRepository<Score, ScoreId> {
 
     /**
      * stock_id와 date로 특정 데이터가 존재하는지 확인
