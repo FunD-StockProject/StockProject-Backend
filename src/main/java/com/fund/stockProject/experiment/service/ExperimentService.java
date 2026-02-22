@@ -30,6 +30,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -47,6 +48,8 @@ import com.fund.stockProject.portfolio.dto.PortfolioResultResponse;
 @Service
 @RequiredArgsConstructor
 public class ExperimentService {
+
+    private static final ZoneId ASIA_SEOUL = ZoneId.of("Asia/Seoul");
 
     private final ExperimentRepository experimentRepository;
     private final StockRepository stockRepository;
@@ -290,12 +293,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             }
             
             // 최종 수익률 계산: 현재 가격 기준
-            double roi;
-            if (experiment.getBuyPrice() == null || experiment.getBuyPrice() == 0.0) {
-                roi = 0.0;
-            } else {
-                roi = ((currentPrice - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
-            }
+            final Double roiValue = calculateRoi(currentPrice, experiment.getBuyPrice());
+            final double roi = roiValue != null ? roiValue : 0.0;
             
             // country 설정
             final COUNTRY country = stockInfo != null ? stockInfo.getCountry() : getCountryFromExchangeNum(stock.getExchangeNum());
@@ -323,12 +322,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         }
 
         // 최종 수익률 계산:  ((현재가 - 매수가) / 매수가) * 100
-        double roi;
-        if (experiment.getBuyPrice() == null || experiment.getBuyPrice() == 0.0) {
-            roi = 0.0;
-        } else {
-            roi = ((currentPrice - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
-        }
+        final Double roiValue = calculateRoi(currentPrice, experiment.getBuyPrice());
+        final double roi = roiValue != null ? roiValue : 0.0;
 
         final List<TradeInfo> tradeInfos = new ArrayList<>();
 
@@ -477,10 +472,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 price = selectedPrice != null ? selectedPrice : (stockInfoResponse.getPrice() != null ? stockInfoResponse.getPrice() : stockInfoResponse.getYesterdayPrice());
             }
             
-            // 최종적으로도 null이면 에러
-            if (price == null) {
-                log.error("Price is null for stock - stockId: {}, stockInfo: price={}, yesterdayPrice={}", 
-                    stockId, stockInfoResponse.getPrice(), stockInfoResponse.getYesterdayPrice());
+            // 최종 가격 유효성 검증
+            if (!isPositiveFinite(price)) {
+                log.error("Invalid price for stock buy - stockId: {}, price={}, stockInfo: price={}, yesterdayPrice={}",
+                    stockId, price, stockInfoResponse.getPrice(), stockInfoResponse.getYesterdayPrice());
                 return ExperimentSimpleResponse.builder()
                     .message("주가 정보를 가져올 수 없습니다")
                     .success(false)
@@ -513,10 +508,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 price = selectedPrice != null ? selectedPrice : (stockInfoResponse.getPrice() != null ? stockInfoResponse.getPrice() : stockInfoResponse.getYesterdayPrice());
             }
             
-            // 최종적으로도 null이면 에러
-            if (price == null) {
-                log.error("Price is null for overseas stock - stockId: {}, stockInfo: price={}, yesterdayPrice={}", 
-                    stockId, stockInfoResponse.getPrice(), stockInfoResponse.getYesterdayPrice());
+            // 최종 가격 유효성 검증
+            if (!isPositiveFinite(price)) {
+                log.error("Invalid price for overseas stock buy - stockId: {}, price={}, stockInfo: price={}, yesterdayPrice={}",
+                    stockId, price, stockInfoResponse.getPrice(), stockInfoResponse.getYesterdayPrice());
                 return ExperimentSimpleResponse.builder()
                     .message("주가 정보를 가져올 수 없습니다")
                     .success(false)
@@ -1039,67 +1034,57 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
     // 영업일 기준 실험 진행한 기간이 5일 이상 지난 실험 데이터 조회
     @Transactional(readOnly = true)
     public List<Experiment> findExperimentsAfter5BusinessDays() {
-        LocalDate fiveBusinessDaysAgo = calculatePreviousBusinessDate(LocalDate.now());
-        // 5영업일 전 날짜의 마지막 시간까지의 실험을 모두 조회 (5영업일 이상 지난 모든 실험)
-        LocalDateTime endDate = fiveBusinessDaysAgo.atTime(LocalTime.MAX);
+        final LocalDate today = LocalDate.now(ASIA_SEOUL);
+        final List<Experiment> progressExperiments = experimentRepository.findProgressExperimentsWithStock();
 
-        final List<Experiment> ExperimentsAfter5BusinessDays = experimentRepository.findExperimentsAfterFiveDays(endDate);
-
-        if (ExperimentsAfter5BusinessDays.isEmpty()) {
+        if (progressExperiments.isEmpty()) {
             return new ArrayList<>();
         }
 
-        // Stock이 제대로 로드되었는지 검증
-        int nullStockCount = 0;
-        for (Experiment exp : ExperimentsAfter5BusinessDays) {
-            try {
-                Stock stock = exp.getStock();
-                if (stock == null) {
-                    nullStockCount++;
-                    log.error("Stock is null after fetch - experimentId: {}", exp.getId());
-                } else {
-                    // Stock 필드 접근하여 프록시 초기화 확인
-                    Integer stockId = stock.getId();
-                    if (stockId == null) {
-                        nullStockCount++;
-                        log.error("Stock.id is null after fetch - experimentId: {}", exp.getId());
-                    }
-                }
-            } catch (Exception e) {
-                nullStockCount++;
-                log.error("Failed to access Stock for experiment - experimentId: {}, error: {}", exp.getId(), e.getMessage());
+        final List<Experiment> dueExperiments = new ArrayList<>();
+
+        for (Experiment experiment : progressExperiments) {
+            if (experiment.getBuyAt() == null) {
+                log.warn("Skipping experiment with null buyAt - experimentId: {}", experiment.getId());
+                continue;
+            }
+
+            final LocalDate autoSellDate = calculateNthBusinessDay(experiment.getBuyAt().toLocalDate(), 5);
+            if (!today.isBefore(autoSellDate)) {
+                dueExperiments.add(experiment);
             }
         }
-        
-        if (nullStockCount > 0) {
-            log.warn("Found {} experiments with null or inaccessible Stock out of {} total", 
-                    nullStockCount, ExperimentsAfter5BusinessDays.size());
-        }
 
-        log.info("Found {} experiments that have passed 5 business days ({} with valid Stock)", 
-                ExperimentsAfter5BusinessDays.size(), ExperimentsAfter5BusinessDays.size() - nullStockCount);
-        return ExperimentsAfter5BusinessDays;
+        log.info("Found {} experiments that reached 5th business day out of {} progress experiments",
+            dueExperiments.size(), progressExperiments.size());
+        return dueExperiments;
     }
 
-    // 5영업일 전 날짜 찾는 함수 (주말 및 공휴일 제외)
-    private LocalDate calculatePreviousBusinessDate(LocalDate fromDate) {
-        int daysCounted = 0;
+    // 시작일을 포함해 n번째 영업일을 계산 (주말/공휴일 제외)
+    private LocalDate calculateNthBusinessDay(LocalDate fromDate, int nthBusinessDay) {
+        int businessDays = 0;
         LocalDate date = fromDate;
 
-        while (daysCounted < 5) {
-            date = date.minusDays(1);
-            DayOfWeek day = date.getDayOfWeek();
+        while (businessDays < nthBusinessDay) {
+            if (isBusinessDay(date)) {
+                businessDays++;
+            }
 
-            // 주말 제외
-            if (day != DayOfWeek.SATURDAY && day != DayOfWeek.SUNDAY) {
-                // 공휴일 제외 (API로 확인)
-                if (!holidayService.isHolidaySync(date)) {
-                    daysCounted++;
-                }
+            if (businessDays < nthBusinessDay) {
+                date = date.plusDays(1);
             }
         }
 
         return date;
+    }
+
+    private boolean isBusinessDay(LocalDate date) {
+        final DayOfWeek day = date.getDayOfWeek();
+        if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) {
+            return false;
+        }
+
+        return !holidayService.isHolidaySync(date);
     }
 
     // 자동판매 - 실험 데이터 수정
@@ -1146,56 +1131,73 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 return false;
             }
 
-            if (stockInfo != null && stockInfo.getPrice() != null) {
-                final Double price = stockInfo.getPrice();
-                final LocalDateTime sellAt = LocalDateTime.now();
-                // ROI 계산: ((현재가 - 매수가) / 매수가) * 100
-                final Double roi = ((price - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
-
-                experiment.updateExperiment(price, "COMPLETE", sellAt, roi);
-                // 변경사항 저장
-                experimentRepository.save(experiment);
-                
-                // 완료 시점의 trade item 저장
-                try {
-                    Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(stock.getId(), LocalDate.now());
-                    if (scoreOptional.isEmpty()) {
-                        scoreOptional = scoreRepository.findTopByStockIdOrderByDateDesc(stock.getId());
-                    }
-                    
-                    int score = experiment.getScore(); // 기본값은 실험의 점수
-                    if (scoreOptional.isPresent()) {
-                        final Score scoreData = scoreOptional.get();
-                        if (stockInfo.getCountry().equals(COUNTRY.KOREA)) {
-                            score = scoreData.getScoreKorea();
-                        } else {
-                            score = scoreData.getScoreOversea();
-                        }
-                    }
-                    
-                    final ExperimentTradeItem finalTradeItem = ExperimentTradeItem.builder()
-                        .experiment(experiment)
-                        .price(price)
-                        .roi(roi)
-                        .score(score)
-                        .tradeAt(sellAt)
-                        .build();
-                    
-                    experimentTradeItemRepository.save(finalTradeItem);
-                    log.info("Saved final trade item for completed experiment - experimentId: {}", experiment.getId());
-                } catch (Exception e) {
-                    log.warn("Failed to save final trade item for experiment - experimentId: {}", experiment.getId(), e);
-                    // trade item 저장 실패해도 실험 완료는 성공으로 처리
-                }
-                
-                log.info("Auto-sell completed successfully - experimentId: {}, price: {}, roi: {}", 
-                        experiment.getId(), price, roi);
-                return true;
-            } else {
-                log.warn("Failed to get stock info for auto-sell - experimentId: {}, stockId: {}", 
+            if (stockInfo == null) {
+                log.warn("Stock info is null for auto-sell - experimentId: {}, stockId: {}",
                         experiment.getId(), stock.getId());
                 return false;
             }
+
+            final Double price = stockInfo.getPrice();
+            if (!isPositiveFinite(price)) {
+                log.warn("Invalid sell price for auto-sell - experimentId: {}, stockId: {}, price: {}, yesterdayPrice: {}",
+                        experiment.getId(), stock.getId(), stockInfo.getPrice(), stockInfo.getYesterdayPrice());
+                return false;
+            }
+
+            final Double buyPrice = experiment.getBuyPrice();
+            if (!isPositiveFinite(buyPrice)) {
+                log.error("Invalid buyPrice for auto-sell - experimentId: {}, buyPrice: {}",
+                        experiment.getId(), buyPrice);
+                return false;
+            }
+
+            final Double roi = calculateRoi(price, buyPrice);
+            if (roi == null) {
+                log.error("Failed to calculate ROI for auto-sell - experimentId: {}, price: {}, buyPrice: {}",
+                        experiment.getId(), price, buyPrice);
+                return false;
+            }
+
+            final LocalDateTime sellAt = LocalDateTime.now();
+            experiment.updateExperiment(price, "COMPLETE", sellAt, roi);
+            // DB flush를 통해 잘못된 값은 여기서 즉시 감지
+            experimentRepository.saveAndFlush(experiment);
+                
+            // 완료 시점의 trade item 저장
+            try {
+                Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(stock.getId(), LocalDate.now());
+                if (scoreOptional.isEmpty()) {
+                    scoreOptional = scoreRepository.findTopByStockIdOrderByDateDesc(stock.getId());
+                }
+                
+                int score = experiment.getScore(); // 기본값은 실험의 점수
+                if (scoreOptional.isPresent()) {
+                    final Score scoreData = scoreOptional.get();
+                    if (COUNTRY.KOREA.equals(stockInfo.getCountry())) {
+                        score = scoreData.getScoreKorea();
+                    } else {
+                        score = scoreData.getScoreOversea();
+                    }
+                }
+                
+                final ExperimentTradeItem finalTradeItem = ExperimentTradeItem.builder()
+                    .experiment(experiment)
+                    .price(price)
+                    .roi(roi)
+                    .score(score)
+                    .tradeAt(sellAt)
+                    .build();
+                
+                experimentTradeItemRepository.save(finalTradeItem);
+                log.info("Saved final trade item for completed experiment - experimentId: {}", experiment.getId());
+            } catch (Exception e) {
+                log.warn("Failed to save final trade item for experiment - experimentId: {}", experiment.getId(), e);
+                // trade item 저장 실패해도 실험 완료는 성공으로 처리
+            }
+
+            log.info("Auto-sell completed successfully - experimentId: {}, price: {}, roi: {}",
+                    experiment.getId(), price, roi);
+            return true;
 
         } catch (Exception e) {
             log.error("Failed to auto-sell experiment - experimentId: {}", experiment.getId(), e);
@@ -1205,17 +1207,28 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
     // 실험 진행이 5영업일이 지나지 않은 실험 데이터 조회
     public List<Experiment> findExperimentsPrevious5BusinessDays() {
-        final LocalDate now = LocalDate.now();
-        LocalDate fiveBusinessDaysAgo = calculatePreviousBusinessDate(now);
-        LocalDateTime start = fiveBusinessDaysAgo.atTime(LocalTime.MAX);
+        final LocalDate today = LocalDate.now(ASIA_SEOUL);
+        final List<Experiment> progressExperiments = experimentRepository.findProgressExperimentsWithStock();
 
-        final List<Experiment> ExperimentsAfter5BusinessDays = experimentRepository.findProgressExperiments(start, "PROGRESS");
-
-        if (ExperimentsAfter5BusinessDays.isEmpty()) {
+        if (progressExperiments.isEmpty()) {
             return new ArrayList<>();
         }
 
-        return ExperimentsAfter5BusinessDays;
+        final List<Experiment> beforeAutoSell = new ArrayList<>();
+        for (Experiment experiment : progressExperiments) {
+            if (experiment.getBuyAt() == null) {
+                log.warn("Skipping experiment with null buyAt - experimentId: {}", experiment.getId());
+                continue;
+            }
+
+            final LocalDate autoSellDate = calculateNthBusinessDay(experiment.getBuyAt().toLocalDate(), 5);
+            // 자동 매도 전(또는 당일) 실험만 진행 데이터 수집 대상으로 유지
+            if (!today.isAfter(autoSellDate)) {
+                beforeAutoSell.add(experiment);
+            }
+        }
+
+        return beforeAutoSell;
     }
 
     public void saveExperiment(Experiment experiment) {
@@ -1249,14 +1262,28 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
                 return;
             }
 
-            if (stockInfoResponse == null || stockInfoResponse.getPrice() == null) {
-                log.warn("StockInfo or price is null for saveExperimentTradeItem - experimentId: {}, stockId: {}", 
-                    experiment.getId(), stock.getId());
+            final Double price = stockInfoResponse != null ? stockInfoResponse.getPrice() : null;
+            if (!isPositiveFinite(price)) {
+                log.warn("Invalid stock price for saveExperimentTradeItem - experimentId: {}, stockId: {}, price: {}, yesterdayPrice: {}",
+                    experiment.getId(), stock.getId(),
+                    stockInfoResponse != null ? stockInfoResponse.getPrice() : null,
+                    stockInfoResponse != null ? stockInfoResponse.getYesterdayPrice() : null);
                 return;
             }
 
-            final Double price = stockInfoResponse.getPrice();
-            double roi = ((price - experiment.getBuyPrice()) / experiment.getBuyPrice()) * 100;
+            if (!isPositiveFinite(experiment.getBuyPrice())) {
+                log.warn("Invalid buyPrice for saveExperimentTradeItem - experimentId: {}, buyPrice: {}",
+                    experiment.getId(), experiment.getBuyPrice());
+                return;
+            }
+
+            final Double roiValue = calculateRoi(price, experiment.getBuyPrice());
+            if (roiValue == null) {
+                log.warn("Failed to calculate ROI for saveExperimentTradeItem - experimentId: {}, price: {}, buyPrice: {}",
+                    experiment.getId(), price, experiment.getBuyPrice());
+                return;
+            }
+            final double roi = roiValue;
             
             Optional<Score> scoreOptional = scoreRepository.findByStockIdAndDate(experiment.getStock().getId(), LocalDate.now());
             if (scoreOptional.isEmpty()) {
@@ -1268,7 +1295,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             final Score findByStockIdAndDate = scoreOptional.get();
             int score = 9999;
 
-            if (stockInfoResponse.getCountry().equals(COUNTRY.KOREA)) {
+            if (COUNTRY.KOREA.equals(stockInfoResponse.getCountry())) {
                 score = findByStockIdAndDate.getScoreKorea();
             } else {
                 score = findByStockIdAndDate.getScoreOversea();
@@ -1292,5 +1319,18 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             
             log.debug("Saved ExperimentTradeItem for experimentId: {}, updated ROI: {}", experiment.getId(), roi);
         }
+    }
+
+    private boolean isPositiveFinite(Double value) {
+        return value != null && Double.isFinite(value) && value > 0;
+    }
+
+    private Double calculateRoi(Double price, Double buyPrice) {
+        if (!isPositiveFinite(price) || !isPositiveFinite(buyPrice)) {
+            return null;
+        }
+
+        final double roi = ((price - buyPrice) / buyPrice) * 100;
+        return Double.isFinite(roi) ? roi : null;
     }
 }
