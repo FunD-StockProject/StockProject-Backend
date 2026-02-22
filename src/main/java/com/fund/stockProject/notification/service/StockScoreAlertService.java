@@ -108,15 +108,28 @@ public class StockScoreAlertService {
         for (OutboxEvent event : pendingEvents) {
             Map<String, Object> payload = parsePayload(event.getPayload());
             if (payload == null) {
-                event.setStatus("READY_TO_SEND");
-                readyCount++;
+                suppressEvent(event, null, "payload_parse_failed");
+                suppressedCount++;
                 continue;
             }
 
             String type = String.valueOf(payload.get("type"));
             Integer userId = toInteger(payload.get("userId"));
+            Integer stockId = toInteger(payload.get("stockId"));
 
-            if (NotificationType.SCORE_SPIKE.name().equals(type) && userId != null) {
+            if (NotificationType.SCORE_SPIKE.name().equals(type)) {
+                if (userId == null || stockId == null) {
+                    suppressEvent(event, payload, "missing_user_or_stock");
+                    suppressedCount++;
+                    continue;
+                }
+
+                if (!isNotificationStillEnabled(userId, stockId)) {
+                    suppressEvent(event, payload, "notification_disabled_or_unbookmarked");
+                    suppressedCount++;
+                    continue;
+                }
+
                 scoreSpikeEventsByUser.computeIfAbsent(userId, key -> new ArrayList<>()).add(event);
                 continue;
             }
@@ -164,6 +177,23 @@ public class StockScoreAlertService {
             notification.setBody("북마크한 종목 " + totalCount + "개의 점수가 크게 변했습니다.");
             notificationRepo.save(notification);
         });
+    }
+
+    private boolean isNotificationStillEnabled(Integer userId, Integer stockId) {
+        return preferenceRepo.existsByUserIdAndStockIdAndPreferenceTypeAndNotificationEnabled(
+            userId, stockId, PreferenceType.BOOKMARK, true
+        );
+    }
+
+    private void suppressEvent(OutboxEvent event, Map<String, Object> payload, String reason) {
+        event.setStatus("PROCESSED");
+
+        Integer notificationId = payload != null ? toInteger(payload.get("notificationId")) : null;
+        if (notificationId != null) {
+            notificationRepo.findById(notificationId).ifPresent(notificationRepo::delete);
+        }
+
+        log.info("Suppressed pending score alert event: eventId={}, reason={}", event.getId(), reason);
     }
 
     private Map<String, Object> parsePayload(String payload) {

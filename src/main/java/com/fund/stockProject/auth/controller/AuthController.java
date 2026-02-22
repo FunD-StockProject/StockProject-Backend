@@ -200,9 +200,10 @@ public class AuthController {
             @ApiResponse(responseCode = "401", description = "인증 필요")
     })
     public ResponseEntity<?> logout(
+            @AuthenticationPrincipal(expression = "id") @Parameter(hidden = true) Integer userId,
             @RequestBody @Parameter(description = "Refresh 토큰 DTO", required = true) RefreshTokenRequest requestDto) {
         try {
-            tokenService.logout(requestDto.getRefreshToken());
+            tokenService.logout(userId, requestDto.getRefreshToken(), requestDto.getDeviceToken());
             return ResponseEntity.ok(Map.of("message", "Logout successful"));
         } catch (Exception e) {
             // 예를 들어 유효하지 않은 토큰 포맷 등의 이유로 실패했을 때
