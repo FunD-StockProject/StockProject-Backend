@@ -161,10 +161,10 @@ public class ShortViewController {
         if (price == null || price <= 0 || !Double.isFinite(price)) {
             return false;
         }
-        if (priceDiff == null || !Double.isFinite(priceDiff)) {
+        if (priceDiff != null && !Double.isFinite(priceDiff)) {
             return false;
         }
-        if (priceDiffPerCent == null || !Double.isFinite(priceDiffPerCent)) {
+        if (priceDiffPerCent != null && !Double.isFinite(priceDiffPerCent)) {
             return false;
         }
         return true;
