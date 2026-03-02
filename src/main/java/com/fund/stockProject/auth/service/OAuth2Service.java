@@ -29,23 +29,20 @@ public class OAuth2Service {
     private final GoogleService googleService;
     private final AppleService appleService;
     private final ObjectMapper objectMapper;
+    private final AppleLoginContextService appleLoginContextService;
 
     public LoginResponse kakaoLogin(String code, String state) {
         String redirectUri = decodeState(state);
         KakaoTokenResponse response = kakaoService.getAccessToken(code, redirectUri);
         Map<String, Object> attributes = kakaoService.getUserInfo(response.getAccessToken());
         KakaoOAuth2UserInfo kakaoUserInfo = new KakaoOAuth2UserInfo(attributes);
-
-        Optional<User> userOptional = userRepository.findByEmail(kakaoUserInfo.getEmail());
-        if(userOptional.isEmpty()) {
-            return new LoginResponse("NEED_REGISTER", kakaoUserInfo.getEmail(), null, null, null, null);
-        }
-
-        User user = userOptional.get();
-        user.updateSocialUserInfo(PROVIDER.KAKAO, kakaoUserInfo.getProviderId(), response.getAccessToken(), response.getRefreshToken());
-        userRepository.save(user); // 사용자 정보 업데이트
-
-        return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
+        return loginByProvider(
+                PROVIDER.KAKAO,
+                kakaoUserInfo.getProviderId(),
+                kakaoUserInfo.getEmail(),
+                response.getAccessToken(),
+                response.getRefreshToken()
+        );
     }
 
     public LoginResponse naverLogin(String code, String state) throws UnsupportedEncodingException {
@@ -53,17 +50,13 @@ public class OAuth2Service {
         NaverTokenResponse response = naverService.getAccessToken(code, redirectUri);
         Map<String, Object> attributes = naverService.getUserInfo(response.getAccessToken());
         NaverOAuth2UserInfo naverUserInfo = new NaverOAuth2UserInfo(attributes);
-
-        Optional<User> userOptional = userRepository.findByEmail(naverUserInfo.getEmail());
-        if(userOptional.isEmpty()) {
-            return new LoginResponse("NEED_REGISTER", naverUserInfo.getEmail(), null, null, null, null);
-        }
-
-        User user = userOptional.get();
-        user.updateSocialUserInfo(PROVIDER.NAVER, naverUserInfo.getProviderId(), response.getAccessToken(), response.getRefreshToken());
-        userRepository.save(user); // 사용자 정보 업데이트
-
-        return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
+        return loginByProvider(
+                PROVIDER.NAVER,
+                naverUserInfo.getProviderId(),
+                naverUserInfo.getEmail(),
+                response.getAccessToken(),
+                response.getRefreshToken()
+        );
     }
 
     public LoginResponse googleLogin(String code, String state) {
@@ -71,51 +64,114 @@ public class OAuth2Service {
         GoogleTokenResponse response = googleService.getAccessToken(code, redirectUri);
         Map<String, Object> attributes = googleService.getUserInfo(response.getAccessToken());
         GoogleOAuth2UserInfo googleUserInfo = new GoogleOAuth2UserInfo(attributes);
-
-        Optional<User> userOptional = userRepository.findByEmail(googleUserInfo.getEmail());
-        if(userOptional.isEmpty()) {
-            return new LoginResponse("NEED_REGISTER", googleUserInfo.getEmail(), null, null, null, null);
-        }
-
-        User user = userOptional.get();
-        user.updateSocialUserInfo(PROVIDER.GOOGLE, googleUserInfo.getProviderId(), response.getAccessToken(), response.getRefreshToken());
-        userRepository.save(user); // 사용자 정보 업데이트
-
-        return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
+        return loginByProvider(
+                PROVIDER.GOOGLE,
+                googleUserInfo.getProviderId(),
+                googleUserInfo.getEmail(),
+                response.getAccessToken(),
+                response.getRefreshToken()
+        );
     }
 
     public LoginResponse appleLogin(String code, String state) {
-        return appleLogin(code, state, null);
+        return appleLogin(code, state, null, null);
     }
 
     public LoginResponse appleLogin(String code, String state, String userJson) {
+        return appleLogin(code, state, userJson, null);
+    }
+
+    public LoginResponse appleLogin(String code, String state, String userJson, String clientKey) {
         String redirectUri = decodeState(state);
         // 1. 애플로 code + client_secret을 보내서 토큰(및 id_token) 받기
         AppleTokenResponse response = appleService.getAccessToken(code, redirectUri);
         // 2. id_token(JWT)에서 사용자 정보 추출 (이메일, sub=providerId 등)
         AppleOAuth2UserInfo appleUserInfo = appleService.getUserInfoFromIdToken(response.getIdToken());
 
-        String email = appleUserInfo.getEmail();
-        if ((email == null || email.isBlank()) && userJson != null && !userJson.isBlank()) {
-            email = extractAppleEmail(userJson).orElse(null);
+        String providerId = normalizeToNull(appleUserInfo.getProviderId());
+        if (providerId == null) {
+            throw new IllegalStateException("Apple providerId is missing");
         }
-        if (email == null || email.isBlank()) {
-            throw new IllegalStateException("Apple email is missing");
+
+        Optional<User> userByProviderId = userRepository.findByProviderAndProviderId(PROVIDER.APPLE, providerId);
+        if (userByProviderId.isPresent()) {
+            User user = userByProviderId.get();
+            user.updateSocialUserInfo(PROVIDER.APPLE, providerId, response.getAccessToken(), response.getRefreshToken());
+            userRepository.save(user);
+            return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
+        }
+
+        String email = resolveAppleEmail(appleUserInfo.getEmail(), userJson);
+        if (email == null) {
+            if (clientKey != null && !clientKey.isBlank()) {
+                appleLoginContextService.savePendingProviderIdByClient(PROVIDER.APPLE, clientKey, providerId);
+            }
+            return new LoginResponse("NEED_REGISTER", null, null, null, null, null);
         }
 
         Optional<User> userOptional = userRepository.findByEmail(email);
         if (userOptional.isEmpty()) {
+            appleLoginContextService.savePendingProviderId(PROVIDER.APPLE, email, providerId);
             return new LoginResponse("NEED_REGISTER", email, null, null, null, null);
         }
 
         User user = userOptional.get();
-        user.updateSocialUserInfo(PROVIDER.APPLE, appleUserInfo.getProviderId(), response.getAccessToken(), response.getRefreshToken());
+        user.updateSocialUserInfo(PROVIDER.APPLE, providerId, response.getAccessToken(), response.getRefreshToken());
         userRepository.save(user);
 
-        return tokenService.issueTokensOnLogin(email, user.getRole(), null);
+        return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
+    }
+
+    private LoginResponse loginByProvider(
+            PROVIDER provider,
+            String providerId,
+            String email,
+            String socialAccessToken,
+            String socialRefreshToken
+    ) {
+        String normalizedProviderId = normalizeToNull(providerId);
+        if (normalizedProviderId == null) {
+            throw new IllegalStateException(provider + " providerId is missing");
+        }
+
+        Optional<User> userByProviderId = userRepository.findByProviderAndProviderId(provider, normalizedProviderId);
+        if (userByProviderId.isPresent()) {
+            User user = userByProviderId.get();
+            user.updateSocialUserInfo(provider, normalizedProviderId, socialAccessToken, socialRefreshToken);
+            userRepository.save(user);
+            return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
+        }
+
+        String normalizedEmail = normalizeToNull(email);
+        if (normalizedEmail == null) {
+            return new LoginResponse("NEED_REGISTER", null, null, null, null, null);
+        }
+
+        Optional<User> userByEmail = userRepository.findByEmail(normalizedEmail);
+        if (userByEmail.isEmpty()) {
+            appleLoginContextService.savePendingProviderId(provider, normalizedEmail, normalizedProviderId);
+            return new LoginResponse("NEED_REGISTER", normalizedEmail, null, null, null, null);
+        }
+
+        User user = userByEmail.get();
+        user.updateSocialUserInfo(provider, normalizedProviderId, socialAccessToken, socialRefreshToken);
+        userRepository.save(user);
+        return tokenService.issueTokensOnLogin(user.getEmail(), user.getRole(), null);
     }
 
 
+    private String resolveAppleEmail(String idTokenEmail, String userJson) {
+        String email = normalizeToNull(idTokenEmail);
+        if (email != null) {
+            return email;
+        }
+        if (userJson == null || userJson.isBlank()) {
+            return null;
+        }
+        return extractAppleEmail(userJson)
+                .map(this::normalizeToNull)
+                .orElse(null);
+    }
 
     private Optional<String> extractAppleEmail(String userJson) {
         try {
@@ -129,6 +185,14 @@ public class OAuth2Service {
         } catch (Exception e) {
             return Optional.empty();
         }
+    }
+
+    private String normalizeToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
 

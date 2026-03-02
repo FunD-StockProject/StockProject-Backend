@@ -17,6 +17,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
 import static com.fund.stockProject.security.util.JwtUtil.*;
 
 @Slf4j
@@ -28,12 +32,15 @@ public class TokenService {
     private final RefreshTokenRepository refreshTokenRepository; // RefreshRepository 주입
     private final UserRepository userRepository;
     private final DeviceTokenService deviceTokenService;
+    private final ConcurrentMap<String, RecentReissueResult> recentReissueCache = new ConcurrentHashMap<>();
 
     @Value("${spring.jwt.access-expiration-ms}")
     private Long accessTokenExpirationMs;
 
     @Value("${spring.jwt.refresh-expiration-ms}")
     private Long refreshTokenExpirationMs;
+
+    private static final long REISSUE_CACHE_TTL_MS = Duration.ofSeconds(5).toMillis();
 
 
     @Transactional
@@ -74,10 +81,15 @@ public class TokenService {
             throw new JwtException("Refresh token is required for reissue");
         }
 
+        LoginResponse cachedResult = getCachedReissueResult(oldRefreshToken);
+        if (cachedResult != null) {
+            return cachedResult;
+        }
+
         try {
             // 1. DB에서 해당 refresh token 존재 여부 확인 (토큰 탈취 대비)
             // DB 조회를 먼저 하여 유효한 토큰인지 확인 (만료된 토큰도 DB에 남아있을 수 있으므로)
-            RefreshToken storedToken = refreshTokenRepository.findByRefreshToken(oldRefreshToken)
+            refreshTokenRepository.findByRefreshToken(oldRefreshToken)
                     .orElseThrow(() -> new JwtException("Refresh token not found in database"));
 
             // 2. 토큰 카테고리 확인 (DB 조회 후 수행)
@@ -93,7 +105,7 @@ public class TokenService {
 
             // 4. 새 토큰 발급
             // 여기서는 기존 RefreshToken을 DB에서 삭제하고 새로 발급하는 'Refresh Token Rotation' 전략을 사용
-            refreshTokenRepository.delete(storedToken);
+            refreshTokenRepository.deleteByRefreshToken(oldRefreshToken);
 
             String newAccessToken = jwtUtil.createJwt(JWT_CATEGORY_ACCESS, email, role, accessTokenExpirationMs);
             String newRefreshToken = jwtUtil.createJwt(JWT_CATEGORY_REFRESH, email, role, refreshTokenExpirationMs);
@@ -109,7 +121,9 @@ public class TokenService {
             UserProfile userProfile = getUserProfile(email); // 사용자 닉네임/프로필 이미지 조회
 
             // 6. 새 토큰들을 DTO에 담아 반환
-            return new LoginResponse("SUCCESS", email, userProfile.nickname(), userProfile.profileImageUrl(), newAccessToken, newRefreshToken);
+            LoginResponse response = new LoginResponse("SUCCESS", email, userProfile.nickname(), userProfile.profileImageUrl(), newAccessToken, newRefreshToken);
+            cacheReissueResult(oldRefreshToken, response);
+            return response;
 
         } catch (ExpiredJwtException e) {
             // 만료된 경우, DB에 토큰이 남아있다면 삭제해주는 것이 보안상 좋습니다.
@@ -122,10 +136,20 @@ public class TokenService {
             }
             throw new JwtException("Refresh token has expired. Please log in again.");
         } catch (JwtException e) {
+            LoginResponse cachedOnFailure = getCachedReissueResult(oldRefreshToken);
+            if (cachedOnFailure != null) {
+                log.info("Returning cached token reissue result for duplicated request");
+                return cachedOnFailure;
+            }
             // 그 외 JWT 관련 예외 (서명 오류, 형식 오류 등)
             // ExpiredJwtException이 아닌 다른 JwtException인 경우
             throw new JwtException("Invalid refresh token: " + e.getMessage());
         } catch (Exception e) {
+            LoginResponse cachedOnFailure = getCachedReissueResult(oldRefreshToken);
+            if (cachedOnFailure != null) {
+                log.info("Returning cached token reissue result after transient failure");
+                return cachedOnFailure;
+            }
             // 예상치 못한 예외 (예: IllegalArgumentException from ROLE.valueOf)
             log.error("Unexpected error during token reissue", e);
             throw new JwtException("Invalid refresh token: " + e.getMessage());
@@ -187,6 +211,37 @@ public class TokenService {
         var user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new JwtException("User not found with email: " + email));
         return new UserProfile(user.getNickname(), user.getProfileImageUrl());
+    }
+
+    private void cacheReissueResult(String oldRefreshToken, LoginResponse response) {
+        recentReissueCache.put(
+                oldRefreshToken,
+                new RecentReissueResult(response, System.currentTimeMillis() + REISSUE_CACHE_TTL_MS)
+        );
+        cleanupReissueCacheIfNeeded();
+    }
+
+    private LoginResponse getCachedReissueResult(String oldRefreshToken) {
+        RecentReissueResult cached = recentReissueCache.get(oldRefreshToken);
+        if (cached == null) {
+            return null;
+        }
+        if (cached.expiresAtMillis < System.currentTimeMillis()) {
+            recentReissueCache.remove(oldRefreshToken, cached);
+            return null;
+        }
+        return cached.response;
+    }
+
+    private void cleanupReissueCacheIfNeeded() {
+        if (recentReissueCache.size() < 1000) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        recentReissueCache.entrySet().removeIf(entry -> entry.getValue().expiresAtMillis < now);
+    }
+
+    private record RecentReissueResult(LoginResponse response, long expiresAtMillis) {
     }
 
     private record UserProfile(String nickname, String profileImageUrl) {}
