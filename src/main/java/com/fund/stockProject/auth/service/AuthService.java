@@ -24,6 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Optional;
+
 import static com.fund.stockProject.auth.domain.ROLE.ROLE_USER;
 
 @Service
@@ -40,6 +42,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final TokenService tokenService;
+    private final AppleLoginContextService appleLoginContextService;
 
     /**
      * 현재 사용자가 인증된 상태인지 확인합니다.
@@ -109,19 +112,35 @@ public class AuthService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public String register(OAuth2RegisterRequest oAuth2RegisterRequest) {
+    public String register(OAuth2RegisterRequest oAuth2RegisterRequest, String clientKey) {
         try {
+            String nickname = normalizeToNull(oAuth2RegisterRequest.getNickname());
+            if (nickname == null) {
+                throw new IllegalArgumentException("Nickname is required.");
+            }
+
+            PROVIDER provider = oAuth2RegisterRequest.getProvider();
+            if (provider == null) {
+                throw new IllegalArgumentException("Provider is required.");
+            }
+
             MultipartFile image = oAuth2RegisterRequest.getImage();
             String imageUrl = (image != null && !image.isEmpty()) ? s3Service.uploadUserImage(image, "users") : null;
+            String providerId = resolveSocialProviderId(oAuth2RegisterRequest, provider, clientKey);
+            String email = resolveRegistrationEmail(oAuth2RegisterRequest, provider, providerId);
+            Boolean marketingAgreement = oAuth2RegisterRequest.getMarketingAgreement() != null
+                    ? oAuth2RegisterRequest.getMarketingAgreement()
+                    : false;
 
             User user = User.builder()
-                    .email(oAuth2RegisterRequest.getEmail())
-                    .nickname(oAuth2RegisterRequest.getNickname())
+                    .email(email)
+                    .nickname(nickname)
                     .birthDate(oAuth2RegisterRequest.getBirthDate())
-                    .provider(oAuth2RegisterRequest.getProvider())
+                    .provider(provider)
+                    .providerId(providerId)
                     .role(ROLE_USER)
                     .isActive(true)
-                    .marketingAgreement(oAuth2RegisterRequest.getMarketingAgreement())
+                    .marketingAgreement(marketingAgreement)
                     .profileImageUrl(imageUrl)
                     .build();
 
@@ -133,6 +152,54 @@ public class AuthService {
             e.printStackTrace();
             throw e;
         }
+    }
+
+    private String resolveSocialProviderId(OAuth2RegisterRequest request, PROVIDER provider, String clientKey) {
+        String requestProviderId = normalizeToNull(request.getProviderId());
+        if (requestProviderId != null) {
+            return requestProviderId;
+        }
+
+        String email = normalizeToNull(request.getEmail());
+        if (email != null) {
+            Optional<String> pendingProviderId = appleLoginContextService.consumePendingProviderId(provider, email);
+            if (provider == PROVIDER.APPLE) {
+                return pendingProviderId
+                        .or(() -> appleLoginContextService.extractProviderIdFromFallbackEmail(email))
+                        .orElse(null);
+            }
+            return pendingProviderId.orElse(null);
+        }
+
+        if (provider != PROVIDER.APPLE) {
+            return null;
+        }
+
+        return appleLoginContextService.consumePendingProviderIdByClient(PROVIDER.APPLE, clientKey).orElse(null);
+    }
+
+    private String resolveRegistrationEmail(OAuth2RegisterRequest request, PROVIDER provider, String providerId) {
+        String email = normalizeToNull(request.getEmail());
+        if (email != null) {
+            return email;
+        }
+
+        if (provider == PROVIDER.APPLE) {
+            if (providerId == null) {
+                throw new IllegalArgumentException("Apple registration context expired. Please retry Apple login.");
+            }
+            return appleLoginContextService.buildFallbackEmail(providerId);
+        }
+
+        throw new IllegalArgumentException("Email is required.");
+    }
+
+    private String normalizeToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /**

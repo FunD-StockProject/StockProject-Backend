@@ -21,6 +21,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.Map;
 
@@ -42,13 +43,17 @@ public class AuthController {
     })
     public ResponseEntity<Map<String, String>> register(
             @Parameter(description = "소셜 회원가입 요청 DTO", required = true)
-            @ModelAttribute OAuth2RegisterRequest request) {
+            @ModelAttribute OAuth2RegisterRequest request,
+            HttpServletRequest httpRequest) {
         try {
-            String imageUrl = authService.register(request);
+            String imageUrl = authService.register(request, buildClientKey(httpRequest));
             return ResponseEntity.ok(Map.of(
                     "message", "User registered successfully",
                     "profileImageUrl", imageUrl != null ? imageUrl : ""
             ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "Failed to complete social registration: " + e.getMessage()));
@@ -235,5 +240,18 @@ public class AuthController {
             @RequestParam String email) {
         boolean isDuplicate = authService.isEmailDuplicate(email);
         return ResponseEntity.ok(Map.of("duplicate", isDuplicate));
+    }
+
+    private String buildClientKey(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        String ip;
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            String[] parts = forwardedFor.split(",");
+            ip = parts.length > 0 ? parts[0].trim() : request.getRemoteAddr();
+        } else {
+            ip = request.getRemoteAddr();
+        }
+        String userAgent = request.getHeader("User-Agent");
+        return (ip == null ? "" : ip.trim()) + "|" + (userAgent == null ? "" : userAgent.trim());
     }
 }

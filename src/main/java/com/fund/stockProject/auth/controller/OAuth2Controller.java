@@ -20,6 +20,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.Parameter;
+import jakarta.servlet.http.HttpServletRequest;
 
 @Slf4j
 @RestController
@@ -119,10 +120,11 @@ public class OAuth2Controller {
     })
     public ResponseEntity<LoginResponse> appleLogin(
             @Parameter(description = "인가 코드", example = "c1d2e3f4...") @RequestParam String code,
-            @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/apple") @RequestParam String state) {
+            @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/apple") @RequestParam String state,
+            HttpServletRequest request) {
         try {
             log.info("Apple login attempt - state: {}", state);
-            LoginResponse response = oAuth2Service.appleLogin(code, state);
+            LoginResponse response = oAuth2Service.appleLogin(code, state, null, buildClientKey(request));
 
             if ("NEED_REGISTER".equals(response.getState())) {
                 log.info("Apple login - registration required");
@@ -149,7 +151,8 @@ public class OAuth2Controller {
             @Parameter(description = "redirect uri", example = "http://localhost:5173/login/oauth2/code/apple") @RequestParam String state,
             @Parameter(description = "user") @RequestParam(required = false) String user,
             @Parameter(description = "error", example = "invalid_request") @RequestParam(required = false) String error,
-            @Parameter(description = "error_description") @RequestParam(required = false, name = "error_description") String errorDescription) {
+            @Parameter(description = "error_description") @RequestParam(required = false, name = "error_description") String errorDescription,
+            HttpServletRequest request) {
         if (error != null && !error.isBlank()) {
             log.warn("Apple login form_post error: {} - {}", error, errorDescription);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
@@ -157,7 +160,7 @@ public class OAuth2Controller {
 
         try {
             log.info("Apple login (form_post) attempt - state: {}", state);
-            LoginResponse response = oAuth2Service.appleLogin(code, state, user);
+            LoginResponse response = oAuth2Service.appleLogin(code, state, user, buildClientKey(request));
 
             if ("NEED_REGISTER".equals(response.getState())) {
                 log.info("Apple login (form_post) - registration required");
@@ -170,6 +173,19 @@ public class OAuth2Controller {
             log.error("Apple login (form_post) failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    private String buildClientKey(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        String ip;
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            String[] parts = forwardedFor.split(",");
+            ip = parts.length > 0 ? parts[0].trim() : request.getRemoteAddr();
+        } else {
+            ip = request.getRemoteAddr();
+        }
+        String userAgent = request.getHeader("User-Agent");
+        return (ip == null ? "" : ip.trim()) + "|" + (userAgent == null ? "" : userAgent.trim());
     }
 
 }

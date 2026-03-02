@@ -1,5 +1,6 @@
 package com.fund.stockProject.user.repository;
 
+import com.fund.stockProject.auth.domain.PROVIDER;
 import com.fund.stockProject.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -12,6 +13,7 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     Boolean existsByNickname(String nickname);
     Boolean existsByEmail(String email);
     Optional<User> findByEmail(String email);
+    Optional<User> findByProviderAndProviderId(PROVIDER provider, String providerId);
     void deleteUserByEmail(String email);
     
     // 활성 사용자 조회
