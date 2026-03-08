@@ -127,9 +127,6 @@ public class AuthService {
             MultipartFile image = oAuth2RegisterRequest.getImage();
             String imageUrl = (image != null && !image.isEmpty()) ? s3Service.uploadUserImage(image, "users") : null;
             String providerId = resolveSocialProviderId(oAuth2RegisterRequest, provider, clientKey);
-            if (providerId == null) {
-                throw new IllegalArgumentException("Social registration context expired. Please retry social login.");
-            }
             String email = resolveRegistrationEmail(oAuth2RegisterRequest, provider, providerId);
             Boolean marketingAgreement = oAuth2RegisterRequest.getMarketingAgreement() != null
                     ? oAuth2RegisterRequest.getMarketingAgreement()
@@ -169,7 +166,6 @@ public class AuthService {
             if (provider == PROVIDER.APPLE) {
                 return pendingProviderId
                         .or(() -> appleLoginContextService.extractProviderIdFromFallbackEmail(email))
-                        .or(() -> appleLoginContextService.consumePendingProviderIdByClient(PROVIDER.APPLE, clientKey))
                         .orElse(null);
             }
             return pendingProviderId.orElse(null);

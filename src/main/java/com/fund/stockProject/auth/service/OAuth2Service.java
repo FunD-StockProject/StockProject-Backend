@@ -112,9 +112,6 @@ public class OAuth2Service {
         Optional<User> userOptional = userRepository.findByEmail(email);
         if (userOptional.isEmpty()) {
             appleLoginContextService.savePendingProviderId(PROVIDER.APPLE, email, providerId);
-            if (clientKey != null && !clientKey.isBlank()) {
-                appleLoginContextService.savePendingProviderIdByClient(PROVIDER.APPLE, clientKey, providerId);
-            }
             return new LoginResponse("NEED_REGISTER", email, null, null, null, null);
         }
 
