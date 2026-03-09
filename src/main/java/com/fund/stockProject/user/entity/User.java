@@ -41,8 +41,10 @@ public class User extends Core {
 
     private String providerId;
 
+    @Column(length = 2048)
     private String socialAccessToken;
 
+    @Column(length = 2048)
     private String socialRefreshToken;
 
     // 유저 관련 설정
