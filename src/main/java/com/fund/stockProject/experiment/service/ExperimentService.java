@@ -26,6 +26,7 @@ import com.fund.stockProject.stock.entity.Stock;
 import com.fund.stockProject.stock.repository.StockQueryRepository;
 import com.fund.stockProject.stock.repository.StockRepository;
 import com.fund.stockProject.stock.service.SecurityService;
+import jakarta.persistence.EntityNotFoundException;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -36,7 +37,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -222,14 +222,24 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
     /*
      * 실험실 - 종목 매수 현황 자세히 보기
      * */
-    public ExperimentStatusDetailResponse getExperimentStatusDetail(final Integer experimentId) {
+    public ExperimentStatusDetailResponse getExperimentStatusDetail(
+        final CustomUserDetails customUserDetails,
+        final Integer experimentId
+    ) {
         // 자세히 보기 선택한 실험 데이터 조회
         final Optional<Experiment> experimentOptional = experimentRepository.findExperimentByExperimentId(experimentId);
         if (experimentOptional.isEmpty()) {
             log.warn("Experiment not found - experimentId: {}", experimentId);
-            throw new NoSuchElementException("실험을 찾을 수 없습니다");
+            throw new EntityNotFoundException("실험을 찾을 수 없습니다");
         }
         final Experiment experiment = experimentOptional.get();
+        final String requesterEmail = customUserDetails != null ? customUserDetails.getEmail() : null;
+        final String ownerEmail = experiment.getUser() != null ? experiment.getUser().getEmail() : null;
+
+        if (requesterEmail == null || ownerEmail == null || !ownerEmail.equals(requesterEmail)) {
+            log.warn("Experiment access denied - experimentId: {}, requesterEmail: {}", experimentId, requesterEmail);
+            throw new EntityNotFoundException("실험을 찾을 수 없습니다");
+        }
         
         // 실험 데이터에 해당하는 자동 모의 실험 내역 조회
         final List<ExperimentTradeItem> experimentTradeItems = experimentTradeItemRepository.findExperimentTradeItemsByExperimentId(experimentId);
@@ -561,7 +571,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         final List<ReportStatisticDto> reportStatisticDtos = new ArrayList<>();
 
         // 1. 60점 이하 평균 수익률
-        final double totalAvgRoi_0_59 = experimentRepository.findTotalAvgRoi(0, 59);
+        final double totalAvgRoi_0_59 = defaultIfNull(experimentRepository.findTotalAvgRoi(0, 59));
         final Double userAvgRoi_0_59 = experimentRepository.findUserAvgRoi(0, 59, email);
 
         reportStatisticDtos.add(ReportStatisticDto.builder()
@@ -571,7 +581,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .build());
 
         // 2. 60~69점 평균 수익률
-        final double totalAvgRoi_60_69 = experimentRepository.findTotalAvgRoi(60, 69);
+        final double totalAvgRoi_60_69 = defaultIfNull(experimentRepository.findTotalAvgRoi(60, 69));
         final Double userAvgRoi_60_69 = experimentRepository.findUserAvgRoi(60, 69, email);
 
         reportStatisticDtos.add(ReportStatisticDto.builder()
@@ -581,7 +591,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .build());
 
         // 3. 70~79점 평균 수익률
-        final double totalAvgRoi_70_79 = experimentRepository.findTotalAvgRoi(70, 79);
+        final double totalAvgRoi_70_79 = defaultIfNull(experimentRepository.findTotalAvgRoi(70, 79));
         final Double userAvgRoi_70_79 = experimentRepository.findUserAvgRoi(70, 79, email);
 
         reportStatisticDtos.add(ReportStatisticDto.builder()
@@ -591,7 +601,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .build());
 
         // 3. 80~89점 평균 수익률
-        final double totalAvgRoi_80_89 = experimentRepository.findTotalAvgRoi(80, 89);
+        final double totalAvgRoi_80_89 = defaultIfNull(experimentRepository.findTotalAvgRoi(80, 89));
         final Double userAvgRoi_80_89 = experimentRepository.findUserAvgRoi(80, 89, email);
 
         reportStatisticDtos.add(ReportStatisticDto.builder()
@@ -601,7 +611,7 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .build());
 
         // 5. 90이상 평균 수익률
-        final double totalAvgRoi_90_100 = experimentRepository.findTotalAvgRoi(90, 100);
+        final double totalAvgRoi_90_100 = defaultIfNull(experimentRepository.findTotalAvgRoi(90, 100));
         final Double userAvgRoi_90_100 = experimentRepository.findUserAvgRoi(90, 100, email);
 
         reportStatisticDtos.add(ReportStatisticDto.builder()
@@ -714,6 +724,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             })
             .collect(java.util.stream.Collectors.toList());
 
+        if (completed.isEmpty()) {
+            return null;
+        }
+
         long totalCompleted = completed.size();
         long profitCount = completed.stream().filter(e -> e.getRoi() != null && e.getRoi() > 0).count();
 
@@ -772,15 +786,15 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
         }
 
         // 점수 구간별 사용자 평균 수익률 및 전체 유저 평균
-        Double u_60_69 = experimentRepository.findUserAvgRoi(60, 69, email);
-        Double u_70_79 = experimentRepository.findUserAvgRoi(70, 79, email);
-        Double u_80_89 = experimentRepository.findUserAvgRoi(80, 89, email);
-        Double u_90_100 = experimentRepository.findUserAvgRoi(90, 100, email);
+        Double u_60_69 = defaultIfNull(experimentRepository.findUserAvgRoi(60, 69, email));
+        Double u_70_79 = defaultIfNull(experimentRepository.findUserAvgRoi(70, 79, email));
+        Double u_80_89 = defaultIfNull(experimentRepository.findUserAvgRoi(80, 89, email));
+        Double u_90_100 = defaultIfNull(experimentRepository.findUserAvgRoi(90, 100, email));
 
-        Double t_60_69 = experimentRepository.findTotalAvgRoi(60, 69);
-        Double t_70_79 = experimentRepository.findTotalAvgRoi(70, 79);
-        Double t_80_89 = experimentRepository.findTotalAvgRoi(80, 89);
-        Double t_90_100 = experimentRepository.findTotalAvgRoi(90, 100);
+        Double t_60_69 = defaultIfNull(experimentRepository.findTotalAvgRoi(60, 69));
+        Double t_70_79 = defaultIfNull(experimentRepository.findTotalAvgRoi(70, 79));
+        Double t_80_89 = defaultIfNull(experimentRepository.findTotalAvgRoi(80, 89));
+        Double t_90_100 = defaultIfNull(experimentRepository.findTotalAvgRoi(90, 100));
 
         List<PortfolioResultResponse.ScoreTableItem> scoreTable = new ArrayList<>();
         scoreTable.add(PortfolioResultResponse.ScoreTableItem.builder().min(60).max(69).avgYieldTotal(t_60_69).avgYieldUser(u_60_69).build());
@@ -1029,6 +1043,10 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
     private double roundTo1Decimal(double value) {
         return Math.round(value * 10.0) / 10.0;
+    }
+
+    private double defaultIfNull(Double value) {
+        return value != null ? value : 0.0;
     }
 
     // 영업일 기준 실험 진행한 기간이 5일 이상 지난 실험 데이터 조회

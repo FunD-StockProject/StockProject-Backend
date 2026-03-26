@@ -120,12 +120,9 @@ public class SecurityConfig {
                         .requestMatchers(SWAGGER_API_PATHS).permitAll()
                         .anyRequest().authenticated()
                 );
-        // 부분 stateful: 필요 시 세션 생성 & SecurityContext 자동 저장
         http
                 .sessionManagement((session) -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
-                        .sessionFixation().migrateSession())
-                .securityContext(sc -> sc.requireExplicitSave(false));
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS));
         http
                 .addFilterBefore(jwtAuthenticationFilter, LogoutFilter.class);
         http.exceptionHandling(exception -> exception

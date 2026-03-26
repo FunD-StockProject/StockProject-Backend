@@ -56,13 +56,14 @@ public class ExperimentController {
             description = "특정 실험의 상세 정보 및 5영업일간의 점수/가격 변화 그래프 데이터를 조회합니다."
     )
     public ResponseEntity<ExperimentStatusDetailResponse> getExperimentStatusDetail(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails customUserDetails,
             @Parameter(
                     description = "실험 ID",
                     required = true,
                     example = "1"
             )
             @PathVariable("experimentId") Integer experimentId) {
-        return ResponseEntity.ok(experimentService.getExperimentStatusDetail(experimentId));
+        return ResponseEntity.ok(experimentService.getExperimentStatusDetail(customUserDetails, experimentId));
     }
 
     @PostMapping("/{stockId}/buy/{country}")

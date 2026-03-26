@@ -52,8 +52,8 @@ public interface ExperimentRepository extends JpaRepository<Experiment, Integer>
     @Query("SELECT AVG(e.roi) FROM Experiment e WHERE e.score BETWEEN :start AND :end AND e.user.email = :email AND e.status = 'COMPLETE'")
     Double findUserAvgRoi(@Param("start") int start, @Param("end") int end, @Param("email") String email);
 
-    @Query("SELECT AVG(e.roi) FROM Experiment e WHERE e.score BETWEEN :start AND :end")
-    double findTotalAvgRoi(@Param("start") int start, @Param("end") int end);
+    @Query("SELECT AVG(e.roi) FROM Experiment e WHERE e.score BETWEEN :start AND :end AND e.status = 'COMPLETE'")
+    Double findTotalAvgRoi(@Param("start") int start, @Param("end") int end);
 
     @Query(value = "SELECT ROUND(IFNULL(profitable.cnt, 0) / total.cnt * 100, 1) AS ratio "
         + "FROM ( "
