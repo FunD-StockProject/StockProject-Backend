@@ -632,9 +632,9 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
             .toLocalDate()
             .atTime(LocalTime.MAX);
 
-        // 이번주 진행 실험 횟수
-        final int weeklyExperimentCount = experimentRepository.countExperimentsForWeek(
-            startOfWeek, endOfWeek);
+        // 이번주 진행 실험 횟수 (사용자 기준)
+        final int weeklyExperimentCount = experimentRepository.countExperimentsForWeekByUser(
+            email, startOfWeek, endOfWeek);
 
         // 특정 사용자가 진행한 총 실험
         final List<Experiment> experimentsByEmailAndStatus = experimentRepository.findExperimentsByEmailAndStatus(
@@ -675,8 +675,8 @@ final List<Experiment> experimentsByUserId = experimentRepository.findExperiment
 
         final List<ReportPatternDto> reportPatternDtos = new ArrayList<>();
 
-        // 인간지표 점수 별 투자 유형 패턴 데이터
-        final List<Object[]> experimentGroupByBuyAt = experimentRepository.findExperimentGroupByBuyAt();
+        // 인간지표 점수 별 투자 유형 패턴 데이터 (사용자 기준)
+        final List<Object[]> experimentGroupByBuyAt = experimentRepository.findExperimentGroupByBuyAtByUser(email);
 
         for (final Object[] row : experimentGroupByBuyAt) {
             // Object[]에서 데이터 추출: [buy_date, avg_roi, avg_score]
