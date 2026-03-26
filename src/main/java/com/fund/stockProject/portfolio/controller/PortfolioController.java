@@ -44,7 +44,11 @@ public class PortfolioController {
             @io.swagger.v3.oas.annotations.Parameter(hidden = true)
             @AuthenticationPrincipal CustomUserDetails customUserDetails
     ) {
-        return ResponseEntity.ok(experimentService.getPortfolioResult(customUserDetails));
+        PortfolioResultResponse response = experimentService.getPortfolioResult(customUserDetails);
+        if (response == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(response);
     }
 }
 

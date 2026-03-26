@@ -163,6 +163,10 @@ public class TokenService {
             throw new IllegalArgumentException("Refresh token is required for logout.");
         }
 
+        String refreshTokenEmail = refreshTokenRepository.findByRefreshToken(refreshToken)
+                .map(RefreshToken::getEmail)
+                .orElse(null);
+
         // 2. Refresh Token 유효성 검증 (JWT 파싱)
         // 만료된 토큰으로도 로그아웃은 할 수 있어야 하므로, 만료 예외는 무시하고 진행합니다.
         // 하지만 서명 위조 등 근본적인 문제는 잡아야 합니다.
@@ -171,6 +175,8 @@ public class TokenService {
             if (!JWT_CATEGORY_REFRESH.equals(category)) {
                 throw new JwtException("Invalid token. Not a refresh token.");
             }
+        } catch (ExpiredJwtException e) {
+            log.info("Proceeding logout with expired refresh token");
         } catch (JwtException e) {
             // 서명 오류, 형식 오류 등 진짜 문제 발생 시
             // 이미 탈취되어 변조된 토큰일 수 있으므로 로그만 남기고, 클라이언트에게는 성공처럼 응답할 수도 있습니다.
@@ -185,7 +191,7 @@ public class TokenService {
         // 4. 디바이스 토큰 비활성화
         // 멀티 디바이스 환경 보호:
         // deviceToken이 전달된 경우에만 해당 토큰을 비활성화
-        Integer resolvedUserId = resolveUserId(userId, refreshToken);
+        Integer resolvedUserId = resolveUserId(userId, refreshTokenEmail, refreshToken);
         if (resolvedUserId != null) {
             deviceTokenService.unregisterOnLogout(resolvedUserId, deviceToken);
         } else {
@@ -193,9 +199,13 @@ public class TokenService {
         }
     }
 
-    private Integer resolveUserId(Integer authenticatedUserId, String refreshToken) {
+    private Integer resolveUserId(Integer authenticatedUserId, String refreshTokenEmail, String refreshToken) {
         if (authenticatedUserId != null) {
             return authenticatedUserId;
+        }
+
+        if (refreshTokenEmail != null) {
+            return userRepository.findByEmail(refreshTokenEmail).map(User::getId).orElse(null);
         }
 
         try {
