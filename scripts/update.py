@@ -9,6 +9,34 @@ import requests
 from collections import Counter
 from datetime import datetime, timedelta
 
+
+def text_or_empty(value):
+    return value if isinstance(value, str) else ""
+
+
+def count_or_zero(value):
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
+def normalize_post(post, content_field):
+    writer = post.get('writer') or {}
+    content = text_or_empty(post.get(content_field))
+    if not content:
+        alternate = 'contentSwReplaced' if content_field == 'contentSwReplacedButImg' else 'contentSwReplacedButImg'
+        content = text_or_empty(post.get(alternate))
+    return {
+        'title': text_or_empty(post.get('title')),
+        'content': content,
+        'date': text_or_empty(post.get('writtenAt')),
+        'recommendCount': count_or_zero(post.get('recommendCount')),
+        'notRecommendCount': count_or_zero(post.get('notRecommendCount')),
+        'isHolderVerified': writer.get('isHolderVerified') is True if isinstance(writer, dict) else False,
+    }
+
+
 # 크롤링 클래스
 class StockCrawler:
     def __init__(self):
@@ -24,6 +52,17 @@ class StockCrawler:
     def fetch_stock_posts(self, stock_code, country, max_posts=150):
         """주식 코드에 해당하는 게시글들을 API로 가져오기"""
         posts = []
+        seen_ids = set()
+
+        def add_post(post, content_field):
+            if not isinstance(post, dict):
+                return
+            post_id = post.get('id')
+            if post_id is not None:
+                if post_id in seen_ids:
+                    return
+                seen_ids.add(post_id)
+            posts.append(normalize_post(post, content_field))
         
         # country 파라미터로 해외 주식 여부 결정
         is_foreign = (country.upper() == "OVERSEA")
@@ -41,52 +80,48 @@ class StockCrawler:
             if response.status_code == 200:
                 data = response.json()
                 if data.get('isSuccess') and 'result' in data:
-                    hot_posts = data['result'].get('hotPosts', [])
+                    hot_posts = (data['result'] or {}).get('hotPosts') or []
                     for post in hot_posts:
-                        post_data = {
-                            'title': post.get('title', ''),
-                            'content': post.get('contentSwReplacedButImg', ''),
-                            'date': post.get('writtenAt', ''),
-                            'recommendCount': post.get('recommendCount', 0),
-                            'notRecommendCount': post.get('notRecommendCount', 0),
-                            'isHolderVerified': post.get('writer', {}).get('isHolderVerified', False)
-                        }
-                        posts.append(post_data)
+                        add_post(post, 'contentSwReplacedButImg')
         except Exception as e:
             pass
         
         # 일반 게시글 가져오기
         page_size = 50
-        page = 1
+        offset = None
+        seen_offsets = set()
+        page_count = 0
+        max_pages = (max_posts + page_size - 1) // page_size + 1
         
-        while len(posts) < max_posts:
+        while len(posts) < max_posts and page_count < max_pages:
             try:
                 url = f"https://m.stock.naver.com/front-api/discussion/list?discussionType={discussion_type}&itemCode={stock_code}&pageSize={page_size}&isHolderOnly=false&excludesItemNews=false&isItemNewsOnly=false"
+                if offset is not None:
+                    url += f"&offset={offset}"
                 
                 response = self.session.get(url, timeout=10)
                 if response.status_code == 200:
                     data = response.json()
                     if data.get('isSuccess') and 'result' in data:
-                        page_posts = data['result'].get('posts', [])
+                        page_posts = (data['result'] or {}).get('posts') or []
                         
                         if not page_posts:
                             break
                         
                         for post in page_posts:
-                            post_data = {
-                                'title': post.get('title', ''),
-                                'content': post.get('contentSwReplaced', ''),
-                                'date': post.get('writtenAt', ''),
-                                'recommendCount': post.get('recommendCount', 0),
-                                'notRecommendCount': post.get('notRecommendCount', 0),
-                                'isHolderVerified': post.get('writer', {}).get('isHolderVerified', False)
-                            }
-                            posts.append(post_data)
+                            add_post(post, 'contentSwReplaced')
                         
                         if len(page_posts) < page_size:
                             break
                         
-                        page += 1
+                        next_offset = (data['result'] or {}).get('lastOffset')
+                        if next_offset is None or next_offset in seen_offsets:
+                            break
+                        if not re.fullmatch(r'-?\d+', str(next_offset)):
+                            break
+                        seen_offsets.add(next_offset)
+                        offset = next_offset
+                        page_count += 1
                     else:
                         break
                 else:
@@ -170,14 +205,14 @@ def fetch_texts_from_crawler(symbol, country):
     
     texts_with_weights = []
     for item in formatted_posts:
-        text = (item['title'] + " " + item['contents']).replace("<br>", "").strip()
+        text = (text_or_empty(item.get('title')) + " " + text_or_empty(item.get('contents'))).replace("<br>", "").strip()
         
         # 빈 텍스트는 제외
         if not text or len(text.strip()) == 0:
             continue
             
-        good_count = item.get('goodCount', 0)
-        bad_count = item.get('badCount', 0)
+        good_count = count_or_zero(item.get('goodCount'))
+        bad_count = count_or_zero(item.get('badCount'))
         is_holding = item.get('isHolding', False)
 
         base_weight = 1.0
